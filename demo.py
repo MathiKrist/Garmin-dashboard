@@ -25,6 +25,8 @@ def seed(db_path, days=180):
     rng = random.Random(7)
     today = date.today()
     fatigue = 0.0
+    loads = []
+    status = since = None
     for i in range(days, -1, -1):
         d = today - timedelta(days=i)
         build = 0.75 + 0.35 * (1 - i / days)          # volume grows over the block
@@ -46,7 +48,9 @@ def seed(db_path, days=180):
                 "name": {"intervals": "Odense intervals", "tempo": "Tempo run", "easy": "Easy run", "long": "Long run"}[kind],
                 "distance_m": km * 1000, "duration_s": dur, "avg_hr": round(hr), "max_hr": round(hr + rng.uniform(8, 18)),
                 "avg_speed": 1000 / pace, "elev_gain": rng.uniform(20, 120), "training_load": round(load),
-                "aerobic_te": round(rng.uniform(2.5, 4.2), 1), "anaerobic_te": round(rng.uniform(0, 2.5), 1), "raw": None,
+                "aerobic_te": round(rng.uniform(2.5, 4.2), 1), "anaerobic_te": round(rng.uniform(0, 2.5), 1),
+                "te_label": {"intervals": rng.choice(["VO2MAX", "ANAEROBIC_CAPACITY"]), "tempo": rng.choice(["TEMPO", "LACTATE_THRESHOLD"]),
+                             "easy": "AEROBIC_BASE", "long": "AEROBIC_BASE"}[kind], "raw": None,
             })
         if d.weekday() == 3 and i > 0:
             db.upsert_activity(conn, {
@@ -57,6 +61,11 @@ def seed(db_path, days=180):
             })
             load += 25
         fatigue = fatigue * 0.8 + load * 0.2
+        loads.append(load)
+        recovery_week = (d.isocalendar()[1] % 4) == 0
+        new_status = "RECOVERY" if recovery_week else "PRODUCTIVE" if build > 0.95 else "MAINTAINING"
+        if new_status != status:
+            status, since = new_status, d.isoformat()
         hrv = 64 - fatigue * 0.12 + rng.gauss(0, 5)
         db.upsert_daily(conn, {
             "date": d.isoformat(), "resting_hr": round(48 + fatigue * 0.04 + rng.gauss(0, 1.5)),
@@ -66,6 +75,9 @@ def seed(db_path, days=180):
             "bb_high": rng.randint(70, 98), "bb_low": rng.randint(10, 35), "stress_avg": rng.randint(20, 40),
             "steps": rng.randint(5000, 15000),
             "readiness": max(5, min(100, round(85 - fatigue * 0.5 + rng.gauss(0, 8)))),
+            "training_status": status, "training_status_since": since,
+            "acute_load": round(sum(loads[-7:])), "acute_load_min": 300, "acute_load_max": 560,
+            "acwr_status": "LOW" if sum(loads[-7:]) < 300 else "OPTIMAL", "vo2max": round(50 + (1 - i / days) * 2, 1),
         })
     now = datetime.now().isoformat(timespec="seconds")
     db.set_meta(conn, "last_sync_at", now)

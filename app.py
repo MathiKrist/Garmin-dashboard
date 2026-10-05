@@ -65,7 +65,9 @@ async def password_gate(request: Request, call_next):
                 ok = False
         if not ok:
             return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Training"'})
-    return await call_next(request)
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache"  # revalidate, so code changes show up without a hard refresh
+    return response
 
 
 @app.get("/")

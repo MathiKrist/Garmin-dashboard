@@ -34,8 +34,9 @@ Want to see it before logging in? `python app.py --demo` uses fake data.
 
 ## Things to know
 
-- **Easy vs hard** is decided per run by average heart rate against
-  `AEROBIC_THRESHOLD` (158 by default). It's a run-level split, not time in zone.
+- **Run types** follow Garmin's training effect per run: low aerobic, high aerobic
+  or anaerobic, in Garmin's colors. Runs without a Garmin label fall back to average
+  heart rate against `AEROBIC_THRESHOLD` (158 by default).
 - **Fitness / fatigue / form** are 42- and 7-day exponential averages of Garmin's
   own training load per activity (falls back to a heart-rate TRIMP estimate when
   Garmin has none). Give it about six weeks of history before trusting form.

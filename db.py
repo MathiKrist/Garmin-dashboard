@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS activities (
     training_load REAL,
     aerobic_te    REAL,
     anaerobic_te  REAL,
+    te_label      TEXT,
     raw           TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_activities_date ON activities(date);
@@ -36,7 +37,14 @@ CREATE TABLE IF NOT EXISTS daily (
     bb_low         REAL,
     stress_avg     REAL,
     steps          REAL,
-    readiness      REAL
+    readiness      REAL,
+    training_status       TEXT,
+    training_status_since TEXT,
+    acute_load     REAL,
+    acute_load_min REAL,
+    acute_load_max REAL,
+    acwr_status    TEXT,
+    vo2max         REAL
 );
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
@@ -45,13 +53,19 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 ACTIVITY_COLS = [
     "id", "start_local", "date", "type", "name", "distance_m", "duration_s",
     "avg_hr", "max_hr", "avg_speed", "elev_gain", "training_load",
-    "aerobic_te", "anaerobic_te", "raw",
+    "aerobic_te", "anaerobic_te", "te_label", "raw",
 ]
 DAILY_COLS = [
     "date", "resting_hr", "hrv_last_night", "hrv_weekly_avg", "hrv_low",
     "hrv_high", "hrv_status", "sleep_s", "sleep_score", "bb_high", "bb_low",
-    "stress_avg", "steps", "readiness",
+    "stress_avg", "steps", "readiness", "training_status", "training_status_since",
+    "acute_load", "acute_load_min", "acute_load_max", "acwr_status", "vo2max",
 ]
+# Columns added after the first release; connect() adds them to older databases.
+DAILY_ADDED = {
+    "training_status": "TEXT", "training_status_since": "TEXT", "acute_load": "REAL",
+    "acute_load_min": "REAL", "acute_load_max": "REAL", "acwr_status": "TEXT", "vo2max": "REAL",
+}
 
 
 def connect(db_path):
@@ -59,6 +73,14 @@ def connect(db_path):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(daily)")}
+    for col, typ in DAILY_ADDED.items():
+        if col not in have:
+            conn.execute(f"ALTER TABLE daily ADD COLUMN {col} {typ}")
+    if "te_label" not in {r["name"] for r in conn.execute("PRAGMA table_info(activities)")}:
+        conn.execute("ALTER TABLE activities ADD COLUMN te_label TEXT")
+        conn.execute("UPDATE activities SET te_label = json_extract(raw, '$.trainingEffectLabel') WHERE raw IS NOT NULL")
+        conn.commit()
     return conn
 
 

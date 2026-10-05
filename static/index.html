@@ -20,6 +20,19 @@
   --fitness: #2C4F86;
   --fatigue: #C24A5A;
   --nohr: #A9B2AC;
+  /* Garmin's load focus colors */
+  --low-aerobic: #3FA9DE;
+  --high-aerobic: #F08A24;
+  --anaerobic: #9B4FCF;
+  /* Garmin's training status colors */
+  --st-peaking: #8E44C8;
+  --st-productive: #2E9E4F;
+  --st-maintaining: #D9A400;
+  --st-recovery: #2F6FCF;
+  --st-unproductive: #E8740F;
+  --st-strained: #E0559B;
+  --st-overreaching: #D63A2E;
+  --st-detraining: #7A807C;
   --body: "Barlow", "Segoe UI", system-ui, sans-serif;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   color-scheme: light dark;
@@ -36,6 +49,17 @@
     --fitness: #7FA3DB;
     --fatigue: #E07383;
     --nohr: #55615B;
+    --low-aerobic: #5BBDEB;
+    --high-aerobic: #F59A40;
+    --anaerobic: #B373E3;
+    --st-peaking: #B57BE6;
+    --st-productive: #4CC46C;
+    --st-maintaining: #F0C419;
+    --st-recovery: #5C93E6;
+    --st-unproductive: #F28C33;
+    --st-strained: #F27AB5;
+    --st-overreaching: #EF5A4B;
+    --st-detraining: #9AA19D;
   }
 }
 * { box-sizing: border-box; }
@@ -69,6 +93,18 @@ button:disabled { opacity: 0.55; cursor: progress; }
   background: var(--panel); max-width: 72ch;
 }
 .notice.info { border-color: var(--fitness); }
+
+/* Garmin training status */
+.tstatus { padding: 1.75rem 0 1.5rem; border-bottom: 1px solid var(--rule); }
+.tstatus .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.tstatus-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1.25rem; }
+.tstatus h2 { font: 700 clamp(2.6rem, 8vw, 4rem)/1 var(--display); margin: 0.15rem 0 0; color: var(--status-color, var(--ink)); }
+.tstatus .since { color: var(--muted); }
+.tstatus .about { margin: 0.5rem 0 0; max-width: 60ch; }
+.tstatus .facts { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.95rem; }
+.strip { display: flex; gap: 2px; margin-top: 1rem; max-width: 520px; }
+.strip i { flex: 1; height: 0.7rem; border-radius: 2px; background: var(--rule); }
+.strip-cap { display: flex; justify-content: space-between; max-width: 520px; color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
 
 /* Hero: today's form */
 .hero { padding: 2.25rem 0 2rem; border-bottom: 1px solid var(--rule); }
@@ -108,8 +144,9 @@ th { font-weight: 500; color: var(--muted); font-size: 0.88rem; }
 td.num, th.num { text-align: right; }
 td.name { white-space: normal; }
 .dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; margin-right: 0.4rem; background: var(--nohr); }
-.dot.easy { background: var(--easy); }
-.dot.hard { background: var(--hard); }
+.dot.low { background: var(--low-aerobic); }
+.dot.high { background: var(--high-aerobic); }
+.dot.anaerobic { background: var(--anaerobic); }
 
 .empty { padding: 4rem 0; max-width: 56ch; }
 .empty h1 { font: 700 3rem/1 var(--display); margin: 0 0 0.75rem; }
@@ -133,6 +170,18 @@ td.name { white-space: normal; }
   <div id="notice" class="notice" role="status" hidden></div>
 
   <main id="main" hidden>
+    <section class="tstatus" id="tstatus" aria-labelledby="tsLabel" hidden>
+      <p class="eyebrow">Garmin training status</p>
+      <div class="tstatus-row">
+        <h2 id="tsLabel"></h2>
+        <span class="since" id="tsSince"></span>
+      </div>
+      <p class="about" id="tsAbout"></p>
+      <p class="facts" id="tsFacts"></p>
+      <div class="strip" id="tsStrip" role="img"></div>
+      <div class="strip-cap"><span>4 weeks ago</span><span>Today</span></div>
+    </section>
+
     <section class="hero" aria-labelledby="state">
       <h1 class="state" id="state"></h1>
       <p class="advice" id="advice"></p>
@@ -151,7 +200,7 @@ td.name { white-space: normal; }
       <section>
         <h2>Weekly running</h2>
         <p class="sub" id="weeklySub"></p>
-        <div class="chart"><canvas id="weeklyChart" aria-label="Running kilometres per week, split into easy and hard" role="img"></canvas></div>
+        <div class="chart"><canvas id="weeklyChart" aria-label="Running kilometres per week, split by training effect" role="img"></canvas></div>
         <div class="legend" id="weeklyLegend"></div>
       </section>
 

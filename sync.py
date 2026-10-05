@@ -3,6 +3,7 @@
 Run on its own with `python sync.py`, or let app.py run it on a timer.
 """
 import logging
+import re
 import threading
 import time
 from datetime import date, datetime, timedelta
@@ -48,6 +49,7 @@ def parse_activity(a):
         "training_load": a.get("activityTrainingLoad"),
         "aerobic_te": a.get("aerobicTrainingEffect"),
         "anaerobic_te": a.get("anaerobicTrainingEffect"),
+        "te_label": a.get("trainingEffectLabel"),
         "raw": a,
     }
 
@@ -60,6 +62,30 @@ def _try(fn, *args):
             raise
         log.debug("%s%s failed: %s", fn.__name__, args, e)
         return None
+
+
+def _primary(by_device):
+    """Garmin keys some metrics by device; prefer the primary training device."""
+    rows = [r for r in (by_device or {}).values() if isinstance(r, dict)]
+    return next((r for r in rows if r.get("primaryTrainingDevice")), rows[0] if rows else {})
+
+
+def fetch_training_status(client, day):
+    ts = _try(client.get_training_status, day.isoformat()) or {}
+    s = _primary(_get(ts, "mostRecentTrainingStatus", "latestTrainingStatusData"))
+    acute = s.get("acuteTrainingLoadDTO") or {}
+    # The phrase ("PRODUCTIVE_3", "RECOVERY_2", ...) names the status; the suffix is just a message variant.
+    phrase = s.get("trainingStatusFeedbackPhrase")
+    status = "PAUSED" if s.get("trainingPaused") else re.sub(r"_\d+$", "", phrase) if phrase else None
+    return {
+        "training_status": status,
+        "training_status_since": s.get("sinceDate"),
+        "acute_load": acute.get("dailyTrainingLoadAcute"),
+        "acute_load_min": acute.get("minTrainingLoadChronic"),
+        "acute_load_max": acute.get("maxTrainingLoadChronic"),
+        "acwr_status": acute.get("acwrStatus"),
+        "vo2max": _get(ts, "mostRecentVO2Max", "generic", "vo2MaxPreciseValue"),
+    }
 
 
 def fetch_day(client, day):
@@ -94,6 +120,7 @@ def fetch_day(client, day):
         "sleep_s": sleep_dto.get("sleepTimeSeconds"),
         "sleep_score": _get(sleep_dto, "sleepScores", "overall", "value"),
         "readiness": readiness,
+        **fetch_training_status(client, day),
     }
 
 
@@ -123,6 +150,16 @@ def run_sync(db_path=None):
             conn.commit()
             day += timedelta(days=1)
             time.sleep(0.4)  # be gentle with Garmin's rate limits
+
+        # Training status was added later: fill four weeks of history once, for the status strip.
+        if not db.get_meta(conn, "training_status_backfilled"):
+            day = today - timedelta(days=27)
+            while day < day_start:
+                db.upsert_daily(conn, {"date": day.isoformat(), **fetch_training_status(client, day)})
+                conn.commit()
+                day += timedelta(days=1)
+                time.sleep(0.4)
+            db.set_meta(conn, "training_status_backfilled", "1")
 
         db.set_meta(conn, "last_sync_date", today.isoformat())
         db.set_meta(conn, "last_sync_at", datetime.now().isoformat(timespec="seconds"))

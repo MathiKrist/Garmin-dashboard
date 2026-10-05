@@ -61,9 +61,48 @@ function render() {
   $("empty").hidden = true;
   $("main").hidden = false;
 
+  renderTrainingStatus();
   renderHero();
   renderCharts();
   renderActivities();
+}
+
+// Garmin's own colors per status
+const STATUS_COLORS = {
+  PEAKING: "--st-peaking", PRODUCTIVE: "--st-productive", MAINTAINING: "--st-maintaining",
+  RECOVERY: "--st-recovery", UNPRODUCTIVE: "--st-unproductive", STRAINED: "--st-strained",
+  OVERREACHING: "--st-overreaching", DETRAINING: "--st-detraining",
+};
+const statusColor = (code) => `var(${STATUS_COLORS[code] || "--nohr"})`;
+const statusLabel = (code) => code ? code.charAt(0) + code.slice(1).toLowerCase().replace(/_/g, " ") : "No data";
+
+// Garmin's load focus groups: [key, label, color token]
+const FOCUS = [["low", "Low aerobic", "--low-aerobic"], ["high", "High aerobic", "--high-aerobic"], ["anaerobic", "Anaerobic", "--anaerobic"]];
+
+function renderTrainingStatus() {
+  const ts = data.training_status;
+  $("tstatus").hidden = !ts;
+  if (!ts) return;
+  $("tsLabel").textContent = ts.label;
+  $("tsLabel").style.setProperty("--status-color", statusColor(ts.code));
+  $("tsSince").textContent = ts.since ? `since ${fmtDay(ts.since)}` : "";
+  $("tsAbout").textContent = ts.about;
+
+  const facts = [];
+  if (ts.acute_load != null) {
+    let load = `Acute load ${Math.round(ts.acute_load)}`;
+    if (ts.acute_min != null && ts.acute_max != null) load += ` (optimal ${Math.round(ts.acute_min)}–${Math.round(ts.acute_max)})`;
+    if (ts.acwr_status) load += `, ${ts.acwr_status.toLowerCase().replace(/_/g, " ")}`;
+    facts.push(load);
+  }
+  if (ts.vo2max != null) facts.push(`VO2 max ${round(ts.vo2max)}`);
+  $("tsFacts").textContent = facts.join(" · ");
+
+  $("tsStrip").innerHTML = ts.history
+    .map((d) => `<i style="${d.status ? `background:${statusColor(d.status)}` : ""}" title="${fmtDay(d.date)}: ${statusLabel(d.status)}"></i>`)
+    .join("");
+  $("tsStrip").setAttribute("aria-label", "Training status per day, last 4 weeks: " +
+    ts.history.filter((d) => d.status).map((d) => `${fmtShort(d.date)} ${statusLabel(d.status)}`).join(", "));
 }
 
 function renderHero() {
@@ -120,7 +159,7 @@ function alpha(hex, a) {
 
 function renderCharts() {
   Chart.defaults.font.family = css("--body");
-  const easy = css("--easy"), hard = css("--hard"), fit = css("--fitness"), fat = css("--fatigue"), nohr = css("--nohr"), muted = css("--muted");
+  const easy = css("--easy"), fit = css("--fitness"), fat = css("--fatigue"), nohr = css("--nohr"), muted = css("--muted");
 
   // Fitness and fatigue
   const fx = data.fitness;
@@ -145,16 +184,12 @@ function renderCharts() {
 
   // Weekly running
   const w = data.weeks;
-  const anyNoHr = w.some((x) => x.no_hr_km > 0);
-  $("weeklySub").textContent = `Kilometres per week. A run counts as easy when its average heart rate is under ${data.threshold} bpm.` +
-    (data.easy_share_4w != null ? ` Last 4 weeks: ${data.easy_share_4w}% easy.` : "");
-  $("weeklyLegend").innerHTML = `<span><i style="background:${easy}"></i>Easy (under ${data.threshold} bpm)</span><span><i style="background:${hard}"></i>Hard</span>` +
-    (anyNoHr ? `<span><i style="background:${nohr}"></i>No heart rate</span>` : "");
-  const sets = [
-    { label: "Easy", data: w.map((x) => x.easy_km), backgroundColor: easy },
-    { label: "Hard", data: w.map((x) => x.hard_km), backgroundColor: hard },
-  ];
-  if (anyNoHr) sets.push({ label: "No heart rate", data: w.map((x) => x.no_hr_km), backgroundColor: nohr });
+  const anyUnknown = w.some((x) => x.unknown_km > 0);
+  $("weeklySub").textContent = "Kilometres per week, split by Garmin's training effect for each run." +
+    (data.low_share_4w != null ? ` Last 4 weeks: ${data.low_share_4w}% low aerobic.` : "");
+  const sets = FOCUS.map(([key, label, color]) => ({ label, data: w.map((x) => x[`${key}_km`]), backgroundColor: css(color) }));
+  if (anyUnknown) sets.push({ label: "Unknown", data: w.map((x) => x.unknown_km), backgroundColor: nohr });
+  $("weeklyLegend").innerHTML = sets.map((s) => `<span><i style="background:${s.backgroundColor}"></i>${s.label}</span>`).join("");
   const wopts = baseOptions();
   wopts.scales.x.stacked = true;
   wopts.scales.y.stacked = true;
@@ -202,13 +237,15 @@ function renderCharts() {
 }
 
 function renderActivities() {
-  $("actSub").textContent = `Green dot: easy run, average under ${data.threshold} bpm. Orange: at or above it.`;
+  $("actSub").innerHTML = "Dot colour is Garmin's training effect: " +
+    FOCUS.map(([key, label]) => `<span class="dot ${key}" aria-hidden="true"></span>${label.toLowerCase()}`).join(", ") +
+    `. Runs without a Garmin label use average heart rate against ${data.threshold} bpm.`;
   $("actBody").innerHTML = data.activities.map((a) => {
-    const dot = a.easy === true ? "easy" : a.easy === false ? "hard" : "";
     const typeName = a.type.replace(/_/g, " ");
+    const effect = a.te_label ? statusLabel(a.te_label).replace("Vo2max", "VO2 max") : FOCUS.find((f) => f[0] === a.focus)?.[1];
     return `<tr>
       <td>${fmtDay(a.date)}</td>
-      <td class="name"><span class="dot ${dot}" aria-hidden="true"></span>${escapeHtml(a.name || typeName)}</td>
+      <td class="name"><span class="dot ${a.focus || ""}" ${effect ? `title="${effect}"` : ""} aria-hidden="true"></span>${escapeHtml(a.name || typeName)}</td>
       <td class="num">${a.km ? a.km.toFixed(2) + " km" : ""}</td>
       <td class="num">${fmtDuration(a.duration_s)}</td>
       <td class="num">${fmtPace(a.pace_s_per_km)}</td>
