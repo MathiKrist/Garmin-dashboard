@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Training</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F2F4F1;
+  --ink: #21302B;
+  --muted: #66716B;
+  --rule: #D5DBD5;
+  --panel: #FAFBF9;
+  --easy: #2F8C78;
+  --hard: #D98A1F;
+  --fitness: #2C4F86;
+  --fatigue: #C24A5A;
+  --nohr: #A9B2AC;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #131A18;
+    --ink: #E3EAE6;
+    --muted: #93A099;
+    --rule: #2B3632;
+    --panel: #18211E;
+    --easy: #4FB59D;
+    --hard: #E9A443;
+    --fitness: #7FA3DB;
+    --fatigue: #E07383;
+    --nohr: #55615B;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1rem/1.5 var(--body);
+  font-variant-numeric: tabular-nums;
+  padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+
+header.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 1.25rem 0 0.75rem; border-bottom: 1px solid var(--rule);
+}
+.brand { font: 600 1.35rem/1 var(--display); letter-spacing: 0.01em; }
+.brand small { font: 400 0.9rem var(--body); color: var(--muted); margin-left: 0.6rem; }
+.sync { display: flex; align-items: center; gap: 0.9rem; color: var(--muted); font-size: 0.9rem; }
+button {
+  font: 500 0.95rem var(--body); color: var(--ink); background: transparent;
+  border: 1px solid var(--ink); border-radius: 999px; padding: 0.4rem 1rem; cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+button:disabled { opacity: 0.55; cursor: progress; }
+:focus-visible { outline: 2px solid var(--fitness); outline-offset: 3px; }
+
+.notice {
+  margin: 1rem 0 0; padding: 0.75rem 1rem; border-left: 3px solid var(--fatigue);
+  background: var(--panel); max-width: 72ch;
+}
+.notice.info { border-color: var(--fitness); }
+
+/* Hero: today's form */
+.hero { padding: 2.25rem 0 2rem; border-bottom: 1px solid var(--rule); }
+.state {
+  font: 700 clamp(4.5rem, 15vw, 9.5rem)/0.85 var(--display);
+  letter-spacing: -0.02em; margin: 0; color: var(--state-color, var(--ink));
+}
+.advice { font-size: 1.2rem; margin: 0.9rem 0 0; max-width: 46ch; }
+.form-nums { margin: 0.4rem 0 0; color: var(--muted); }
+
+.today {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin: 2rem 0 0; gap: 1.25rem 0;
+}
+.today div { padding: 0 1.25rem; border-left: 1px solid var(--rule); }
+.today div:first-child { border-left: 0; padding-left: 0; }
+.today dd { margin: 0; font: 600 2.4rem/1 var(--display); }
+.today dd span { font: 500 1rem var(--body); color: var(--muted); margin-left: 0.15rem; }
+.today dt { color: var(--muted); font-size: 0.9rem; margin-top: 0.35rem; }
+.today .note { display: block; color: var(--ink); font-size: 0.85rem; }
+
+/* Chart sections */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem 2.5rem; padding-top: 2.5rem; }
+section h2 { font: 600 1.6rem/1.1 var(--display); margin: 0 0 0.3rem; }
+section p.sub { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; max-width: 60ch; }
+.chart { position: relative; height: 260px; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.75rem; font-size: 0.88rem; color: var(--muted); }
+.legend i { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -0.1rem; }
+.legend i.line { height: 3px; border-radius: 0; vertical-align: 0.2rem; }
+
+/* Activities */
+.activities { padding-top: 3rem; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 640px; }
+th, td { text-align: left; padding: 0.6rem 0.75rem 0.6rem 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font-weight: 500; color: var(--muted); font-size: 0.88rem; }
+td.num, th.num { text-align: right; }
+td.name { white-space: normal; }
+.dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; margin-right: 0.4rem; background: var(--nohr); }
+.dot.easy { background: var(--easy); }
+.dot.hard { background: var(--hard); }
+
+.empty { padding: 4rem 0; max-width: 56ch; }
+.empty h1 { font: 700 3rem/1 var(--display); margin: 0 0 0.75rem; }
+
+@media (max-width: 820px) {
+  .grid { grid-template-columns: 1fr; }
+  .today div:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .sync span { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Training<small id="demo" hidden>Demo data</small></div>
+    <div class="sync">
+      <span id="synced"></span>
+      <button id="syncBtn" type="button">Sync now</button>
+    </div>
+  </header>
+  <div id="notice" class="notice" role="status" hidden></div>
+
+  <main id="main" hidden>
+    <section class="hero" aria-labelledby="state">
+      <h1 class="state" id="state"></h1>
+      <p class="advice" id="advice"></p>
+      <p class="form-nums" id="formNums"></p>
+      <dl class="today" id="today"></dl>
+    </section>
+
+    <div class="grid">
+      <section>
+        <h2>Fitness and fatigue</h2>
+        <p class="sub">Fitness is your 6-week average training load, fatigue the 1-week average. The bars underneath show form: fitness minus fatigue. Above zero means you are fresh.</p>
+        <div class="chart" style="height:310px"><canvas id="fitnessChart" aria-label="Fitness, fatigue and form over the last 120 days" role="img"></canvas></div>
+        <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Fitness</span><span><i class="line" style="background:var(--fatigue)"></i>Fatigue</span><span><i style="background:var(--easy);opacity:.5"></i>Form</span></div>
+      </section>
+
+      <section>
+        <h2>Weekly running</h2>
+        <p class="sub" id="weeklySub"></p>
+        <div class="chart"><canvas id="weeklyChart" aria-label="Running kilometres per week, split into easy and hard" role="img"></canvas></div>
+        <div class="legend" id="weeklyLegend"></div>
+      </section>
+
+      <section>
+        <h2>Heart rate variability</h2>
+        <p class="sub">Nightly HRV against your normal range. Several nights below it usually means you're carrying fatigue or stress.</p>
+        <div class="chart"><canvas id="hrvChart" aria-label="Nightly HRV and resting heart rate, last 60 days" role="img"></canvas></div>
+        <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>HRV</span><span><i style="background:var(--fitness);opacity:.15"></i>Normal range</span><span><i class="line" style="background:var(--fatigue)"></i>Resting HR</span></div>
+      </section>
+
+      <section>
+        <h2>Sleep and readiness</h2>
+        <p class="sub">Hours slept each night, with Garmin's training readiness score for the morning after.</p>
+        <div class="chart"><canvas id="sleepChart" aria-label="Sleep hours and training readiness, last 60 days" role="img"></canvas></div>
+        <div class="legend"><span><i style="background:var(--nohr)"></i>Sleep</span><span><i class="line" style="background:var(--easy)"></i>Readiness</span></div>
+      </section>
+    </div>
+
+    <section class="activities">
+      <h2>Recent activities</h2>
+      <p class="sub" id="actSub"></p>
+      <div class="scroll"><table>
+        <thead><tr><th>Date</th><th>Activity</th><th class="num">Distance</th><th class="num">Time</th><th class="num">Pace</th><th class="num">Avg HR</th><th class="num">Load</th></tr></thead>
+        <tbody id="actBody"></tbody>
+      </table></div>
+    </section>
+  </main>
+
+  <div id="empty" class="empty" hidden>
+    <h1>No training data yet</h1>
+    <p id="emptyText">The first sync pulls up to six months of activities from Garmin and can take a few minutes. This page updates when it's done.</p>
+  </div>
+</div>
+<script src="/static/chart.umd.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
