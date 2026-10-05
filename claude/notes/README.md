@@ -7,8 +7,8 @@ Built with FastAPI, SQLite and Chart.js. No cloud, no accounts beyond your own G
 ## What it shows
 
 - **Training status**: Garmin's own status (Productive, Maintaining, Recovery, Unproductive…) with what it means, acute load against Garmin's optimal range, VO2 max, and a four-week strip of daily statuses.
-- **Form today**: a one-word state (Fresh, Balanced, Building, Overloaded…) from fitness vs. fatigue, plus readiness, HRV, sleep, resting HR and Body Battery.
-- **Fitness and fatigue**: 42-day (CTL) and 7-day (ATL) exponentially weighted training load, with form (CTL − ATL) as bars underneath.
+- **Last night and today**: readiness, HRV, sleep and resting HR.
+- **Fitness and fatigue**: today's form as a one-word state (Fresh, Balanced, Building, Overloaded…), and 42-day (CTL) and 7-day (ATL) exponentially weighted training load, with form (CTL − ATL) as bars underneath.
 - **Weekly running**: km per week for the last 12 weeks, split into low aerobic, high aerobic and anaerobic by Garmin's training effect for each run (average HR against your aerobic threshold when Garmin has no label).
 - **HRV**: nightly HRV against Garmin's baseline range, with resting HR overlaid.
 - **Sleep and readiness**: hours slept and Garmin's training readiness score.
@@ -99,4 +99,4 @@ pause
 
 ## Notes
 
-The form states and the 0.8–1.3 load ratio are rules of thumb, not medical advice. HRV range, readiness and Body Battery are Garmin's own numbers, shown as they come.
+The form states and the 0.8–1.3 load ratio are rules of thumb, not medical advice. HRV range and readiness are Garmin's own numbers, shown as they come.

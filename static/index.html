@@ -102,22 +102,26 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .tstatus .since { color: var(--muted); }
 .tstatus .about { margin: 0.5rem 0 0; max-width: 60ch; }
 .tstatus .facts { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.95rem; }
-.strip { display: flex; gap: 2px; margin-top: 1rem; max-width: 520px; }
-.strip i { flex: 1; height: 0.7rem; border-radius: 2px; background: var(--rule); }
-.strip-cap { display: flex; justify-content: space-between; max-width: 520px; color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+.weeks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 clamp(0.6rem, 2.5vw, 1.25rem); margin-top: 1.1rem; max-width: 620px; }
+.week .days { display: flex; gap: 3px; }
+.week .days i { flex: 1; height: 1.1rem; border-radius: 2px; background: var(--rule); }
+.week .days i.today { outline: 2px solid var(--ink); outline-offset: 1px; }
+.week span { display: block; margin-top: 0.35rem; color: var(--muted); font-size: 0.8rem; }
+.status-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.85rem; }
+.status-legend i { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -0.05rem; }
 
-/* Hero: today's form */
-.hero { padding: 2.25rem 0 2rem; border-bottom: 1px solid var(--rule); }
-.state {
-  font: 700 clamp(4.5rem, 15vw, 9.5rem)/0.85 var(--display);
-  letter-spacing: -0.02em; margin: 0; color: var(--state-color, var(--ink));
-}
-.advice { font-size: 1.2rem; margin: 0.9rem 0 0; max-width: 46ch; }
-.form-nums { margin: 0.4rem 0 0; color: var(--muted); }
+/* Today: sleep and recovery */
+.hero { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
+
+/* Form, inside the fitness and fatigue section */
+.form-now { margin: 0 0 0.75rem; }
+.form-now .state { font: 600 1.6rem/1.1 var(--display); color: var(--state-color, var(--ink)); }
+.form-now .advice { display: block; margin-top: 0.15rem; }
+.form-now .form-nums { display: block; color: var(--muted); font-size: 0.95rem; }
 
 .today {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  margin: 2rem 0 0; gap: 1.25rem 0;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  margin: 0; gap: 1.25rem 0;
 }
 .today div { padding: 0 1.25rem; border-left: 1px solid var(--rule); }
 .today div:first-child { border-left: 0; padding-left: 0; }
@@ -153,6 +157,7 @@ td.name { white-space: normal; }
 
 @media (max-width: 820px) {
   .grid { grid-template-columns: 1fr; }
+  .today { grid-template-columns: repeat(2, 1fr); }
   .today div:nth-child(odd) { border-left: 0; padding-left: 0; }
   .sync span { display: none; }
 }
@@ -170,6 +175,10 @@ td.name { white-space: normal; }
   <div id="notice" class="notice" role="status" hidden></div>
 
   <main id="main" hidden>
+    <section class="hero" aria-label="Last night and today">
+      <dl class="today" id="today"></dl>
+    </section>
+
     <section class="tstatus" id="tstatus" aria-labelledby="tsLabel" hidden>
       <p class="eyebrow">Garmin training status</p>
       <div class="tstatus-row">
@@ -178,20 +187,16 @@ td.name { white-space: normal; }
       </div>
       <p class="about" id="tsAbout"></p>
       <p class="facts" id="tsFacts"></p>
-      <div class="strip" id="tsStrip" role="img"></div>
-      <div class="strip-cap"><span>4 weeks ago</span><span>Today</span></div>
-    </section>
-
-    <section class="hero" aria-labelledby="state">
-      <h1 class="state" id="state"></h1>
-      <p class="advice" id="advice"></p>
-      <p class="form-nums" id="formNums"></p>
-      <dl class="today" id="today"></dl>
+      <div class="weeks" id="tsWeeks" role="img"></div>
+      <div class="status-legend" id="tsLegend"></div>
     </section>
 
     <div class="grid">
       <section>
         <h2>Fitness and fatigue</h2>
+        <p class="form-now">Form today: <span class="state" id="state"></span>
+          <span class="advice" id="advice"></span>
+          <span class="form-nums" id="formNums"></span></p>
         <p class="sub">Fitness is your 6-week average training load, fatigue the 1-week average. The bars underneath show form: fitness minus fatigue. Above zero means you are fresh.</p>
         <div class="chart" style="height:310px"><canvas id="fitnessChart" aria-label="Fitness, fatigue and form over the last 120 days" role="img"></canvas></div>
         <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Fitness</span><span><i class="line" style="background:var(--fatigue)"></i>Fatigue</span><span><i style="background:var(--easy);opacity:.5"></i>Form</span></div>

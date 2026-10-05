@@ -98,11 +98,21 @@ function renderTrainingStatus() {
   if (ts.vo2max != null) facts.push(`VO2 max ${round(ts.vo2max)}`);
   $("tsFacts").textContent = facts.join(" · ");
 
-  $("tsStrip").innerHTML = ts.history
-    .map((d) => `<i style="${d.status ? `background:${statusColor(d.status)}` : ""}" title="${fmtDay(d.date)}: ${statusLabel(d.status)}"></i>`)
-    .join("");
-  $("tsStrip").setAttribute("aria-label", "Training status per day, last 4 weeks: " +
+  // The last 28 days in blocks of 7, counted back from today
+  const weeks = [0, 7, 14, 21].map((i) => ts.history.slice(i, i + 7));
+  $("tsWeeks").innerHTML = weeks.map((week, w) => {
+    const days = week.map((d) => {
+      const style = d.status ? ` style="background:${statusColor(d.status)}"` : "";
+      return `<i class="${d.date === data.generated ? "today" : ""}"${style} title="${fmtDay(d.date)}: ${statusLabel(d.status)}"></i>`;
+    }).join("");
+    const label = w === 3 ? "Last 7 days" : `${fmtShort(week[0].date)} – ${fmtShort(week[6].date)}`;
+    return `<div class="week"><div class="days">${days}</div><span>${label}</span></div>`;
+  }).join("");
+  $("tsWeeks").setAttribute("aria-label", "Training status per day, last 4 weeks: " +
     ts.history.filter((d) => d.status).map((d) => `${fmtShort(d.date)} ${statusLabel(d.status)}`).join(", "));
+
+  const seen = Object.keys(STATUS_COLORS).filter((code) => ts.history.some((d) => d.status === code));
+  $("tsLegend").innerHTML = seen.map((code) => `<span><i style="background:${statusColor(code)}"></i>${statusLabel(code)}</span>`).join("");
 }
 
 function renderHero() {
@@ -124,7 +134,6 @@ function renderHero() {
     ["HRV last night", t.hrv_last_night != null ? `${round(t.hrv_last_night)}<span>ms</span>` : null, hrvNote],
     ["Sleep", fmtSleep(t.sleep_s), t.sleep_score != null ? `Score ${round(t.sleep_score)}` : ""],
     ["Resting HR", t.resting_hr != null ? `${round(t.resting_hr)}<span>bpm</span>` : null, ""],
-    ["Body Battery", t.bb_high != null ? round(t.bb_high) : null, t.bb_low != null ? `Low of ${round(t.bb_low)}` : ""],
   ].filter((i) => i[1] != null);
   $("today").innerHTML = items
     .map(([label, val, note]) => `<div><dd>${val}</dd><dt>${label}${note ? `<span class="note">${note}</span>` : ""}</dt></div>`)
