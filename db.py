@@ -44,7 +44,17 @@ CREATE TABLE IF NOT EXISTS daily (
     acute_load_min REAL,
     acute_load_max REAL,
     acwr_status    TEXT,
-    vo2max         REAL
+    vo2max         REAL,
+    load_low           REAL,
+    load_low_min       REAL,
+    load_low_max       REAL,
+    load_high          REAL,
+    load_high_min      REAL,
+    load_high_max      REAL,
+    load_anaerobic     REAL,
+    load_anaerobic_min REAL,
+    load_anaerobic_max REAL,
+    load_focus         TEXT
 );
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
@@ -60,11 +70,14 @@ DAILY_COLS = [
     "hrv_high", "hrv_status", "sleep_s", "sleep_score", "bb_high", "bb_low",
     "stress_avg", "steps", "readiness", "training_status", "training_status_since",
     "acute_load", "acute_load_min", "acute_load_max", "acwr_status", "vo2max",
+    "load_low", "load_low_min", "load_low_max", "load_high", "load_high_min", "load_high_max", "load_anaerobic", "load_anaerobic_min", "load_anaerobic_max", "load_focus",
 ]
 # Columns added after the first release; connect() adds them to older databases.
 DAILY_ADDED = {
     "training_status": "TEXT", "training_status_since": "TEXT", "acute_load": "REAL",
     "acute_load_min": "REAL", "acute_load_max": "REAL", "acwr_status": "TEXT", "vo2max": "REAL",
+    **{c: "REAL" for c in ("load_low", "load_low_min", "load_low_max", "load_high", "load_high_min", "load_high_max", "load_anaerobic", "load_anaerobic_min", "load_anaerobic_max")},
+    "load_focus": "TEXT",
 }
 
 

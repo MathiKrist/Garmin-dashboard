@@ -74,6 +74,7 @@ def fetch_training_status(client, day):
     ts = _try(client.get_training_status, day.isoformat()) or {}
     s = _primary(_get(ts, "mostRecentTrainingStatus", "latestTrainingStatusData"))
     acute = s.get("acuteTrainingLoadDTO") or {}
+    lb = _primary(_get(ts, "mostRecentTrainingLoadBalance", "metricsTrainingLoadBalanceDTOMap"))
     # The phrase ("PRODUCTIVE_3", "RECOVERY_2", ...) names the status; the suffix is just a message variant.
     phrase = s.get("trainingStatusFeedbackPhrase")
     status = "PAUSED" if s.get("trainingPaused") else re.sub(r"_\d+$", "", phrase) if phrase else None
@@ -85,6 +86,17 @@ def fetch_training_status(client, day):
         "acute_load_max": acute.get("maxTrainingLoadChronic"),
         "acwr_status": acute.get("acwrStatus"),
         "vo2max": _get(ts, "mostRecentVO2Max", "generic", "vo2MaxPreciseValue"),
+        # Load focus: the last four weeks of load per zone, against Garmin's optimal range for each
+        "load_low": lb.get("monthlyLoadAerobicLow"),
+        "load_low_min": lb.get("monthlyLoadAerobicLowTargetMin"),
+        "load_low_max": lb.get("monthlyLoadAerobicLowTargetMax"),
+        "load_high": lb.get("monthlyLoadAerobicHigh"),
+        "load_high_min": lb.get("monthlyLoadAerobicHighTargetMin"),
+        "load_high_max": lb.get("monthlyLoadAerobicHighTargetMax"),
+        "load_anaerobic": lb.get("monthlyLoadAnaerobic"),
+        "load_anaerobic_min": lb.get("monthlyLoadAnaerobicTargetMin"),
+        "load_anaerobic_max": lb.get("monthlyLoadAnaerobicTargetMax"),
+        "load_focus": lb.get("trainingBalanceFeedbackPhrase"),
     }
 
 

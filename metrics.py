@@ -39,19 +39,26 @@ def trimp(duration_s, avg_hr, rest_hr, max_hr):
     return duration_s / 60 * hrr * 0.64 * math.exp(1.92 * hrr)
 
 
-def _form_state(ctl, tsb):
-    if ctl < 5:
+# Form as % of fitness: (name, lower bound, advice). The chart draws these as bands.
+FORM_ZONES = [
+    ("Rested", 25, "Very little recent fatigue. Fine before a race or after a hard block, but fitness starts to slip if it lasts."),
+    ("Fresh", 5, "Recovered and ready. A good day for a hard session or a race."),
+    ("Balanced", -10, "Training roughly matches what you're used to. Normal sessions are fine."),
+    ("Building", -30, "You're carrying fatigue from training more than usual. That's how fitness grows; keep the easy days easy."),
+    ("Overloaded", None, "Fatigue is high compared to your fitness. An easy day or rest would help."),
+]
+
+
+def _form_pct(ctl, atl):
+    return round((ctl - atl) / ctl * 100, 1) if ctl >= 5 else None
+
+
+def _form_state(pct):
+    if pct is None:
         return "Warming up", "Not enough training history yet. Form gets meaningful after a few weeks of data."
-    pct = tsb / ctl * 100
-    if pct > 25:
-        return "Rested", "Very little recent fatigue. Fitness will start to slip if this lasts."
-    if pct > 5:
-        return "Fresh", "A good day for a hard session or a race."
-    if pct > -10:
-        return "Balanced", "Steady training. Normal sessions are fine."
-    if pct > -30:
-        return "Building", "Productive fatigue. Keep the easy days easy."
-    return "Overloaded", "Fatigue is high compared to your fitness. An easy day or rest would help."
+    for name, low, advice in FORM_ZONES:
+        if low is None or pct > low:
+            return name, advice
 
 
 # Garmin's training statuses, with a plain-language summary of what Garmin means by each.
@@ -67,6 +74,39 @@ TRAINING_STATUS = {
     "PAUSED": ("Paused", "Training status is paused, for example during illness or a training break."),
     "NO_STATUS": ("No status", "Garmin needs a week or two of activities with VO2 max estimates to work out a status."),
 }
+
+
+# Garmin's load focus zones: phrase prefix -> (key, name, what to add when short of it)
+LOAD_ZONES = {
+    "AEROBIC_LOW": ("low", "low aerobic", "easy runs and long runs at a conversational pace"),
+    "AEROBIC_HIGH": ("high", "high aerobic", "tempo runs, threshold intervals or VO2 max intervals"),
+    "ANAEROBIC": ("anaerobic", "anaerobic", "short, very hard intervals of 30 seconds to 2 minutes, or strides and sprints"),
+}
+
+
+def _load_focus_text(phrase):
+    """Garmin's phrase ("AEROBIC_HIGH_SHORTAGE", "BALANCED", ...) -> (title, advice, zone key)."""
+    phrase = phrase or ""
+    for prefix, (key, name, tip) in LOAD_ZONES.items():
+        if phrase.startswith(prefix + "_SHORTAGE"):
+            return f"Short on {name}", f"Your {name} load is below its optimal range. Add more {tip}.", key
+        if phrase.startswith(prefix + "_FOCUS"):
+            return f"Focused on {name}", f"Most of your load is {name}. Mix in the other zones to keep improving.", key
+    if phrase.startswith("BALANCED"):
+        return "Balanced", "All three zones are in their optimal range. Keep training the way you are.", None
+    return phrase.replace("_", " ").capitalize() or "No load focus yet", "", None
+
+
+def _load_focus(days, today):
+    recent = [d for d in days if d.get("load_low") is not None and d["date"] >= (today - timedelta(days=2)).isoformat()]
+    if not recent:
+        return None
+    cur = recent[-1]
+    title, advice, key = _load_focus_text(cur.get("load_focus"))
+    zones = [{"key": k, "label": name.capitalize(), "value": cur.get(f"load_{k}"),
+              "min": cur.get(f"load_{k}_min"), "max": cur.get(f"load_{k}_max")}
+             for k, name, _ in LOAD_ZONES.values()]
+    return {"title": title, "advice": advice, "zone": key, "zones": zones, "as_of": cur["date"]}
 
 
 def _training_status(days, today):
@@ -137,10 +177,11 @@ def build_dashboard(db_path=None):
             ctl += (load - ctl) * k_ctl
             atl += (load - atl) * k_atl
             fitness.append({"date": d.isoformat(), "load": round(load, 1),
-                            "ctl": round(ctl, 1), "atl": round(atl, 1), "tsb": round(ctl - atl, 1)})
+                            "ctl": round(ctl, 1), "atl": round(atl, 1), "tsb": round(ctl - atl, 1),
+                            "form_pct": _form_pct(ctl, atl)})
             d += timedelta(days=1)
-    now = fitness[-1] if fitness else {"ctl": 0, "atl": 0, "tsb": 0}
-    state, advice = _form_state(now["ctl"], now["tsb"])
+    now = fitness[-1] if fitness else {"ctl": 0, "atl": 0, "tsb": 0, "form_pct": None}
+    state, advice = _form_state(now["form_pct"])
     ratio = round(now["atl"] / now["ctl"], 2) if now["ctl"] >= 5 else None
 
     # Weekly running volume, split by Garmin's load focus
@@ -184,6 +225,8 @@ def build_dashboard(db_path=None):
     today_vals = {f: latest(f) for f in (
         "readiness", "hrv_last_night", "hrv_weekly_avg", "hrv_low", "hrv_high",
         "hrv_status", "sleep_s", "sleep_score", "resting_hr", "bb_high", "bb_low", "stress_avg")}
+    week_rhr = [d["resting_hr"] for d in days if d.get("resting_hr") and d["date"] > (today - timedelta(days=7)).isoformat()]
+    today_vals["resting_hr_7d"] = round(sum(week_rhr) / len(week_rhr)) if week_rhr else None
 
     recent_acts = []
     for a in reversed(acts[-25:]):
@@ -203,9 +246,11 @@ def build_dashboard(db_path=None):
         "meta": meta,
         "has_data": bool(acts or days),
         "form": {"state": state, "advice": advice, "ctl": now["ctl"], "atl": now["atl"],
-                 "tsb": now["tsb"], "ratio": ratio},
+                 "tsb": now["tsb"], "pct": now["form_pct"], "ratio": ratio},
+        "form_zones": [{"name": n, "min": low} for n, low, _ in FORM_ZONES],
         "today": today_vals,
         "training_status": _training_status(days, today),
+        "load_focus": _load_focus(days, today),
         "low_share_4w": low_share,
         "fitness": fitness[-120:],
         "weeks": weeks,

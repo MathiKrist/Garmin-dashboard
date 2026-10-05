@@ -63,6 +63,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--paper);
@@ -71,7 +72,7 @@ body {
   font-variant-numeric: tabular-nums;
   padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
 }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+.wrap { max-width: 1600px; margin: 0 auto; padding: 0 clamp(1.25rem, 3vw, 2.5rem) 4rem; }
 
 header.top {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
@@ -95,7 +96,11 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .notice.info { border-color: var(--fitness); }
 
 /* Garmin training status */
-.tstatus { padding: 1.75rem 0 1.5rem; border-bottom: 1px solid var(--rule); }
+.tstatus { display: grid; gap: 2rem; padding: 1.75rem 0 1.5rem; border-bottom: 1px solid var(--rule); }
+@media (min-width: 1000px) {
+  .tstatus { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3rem; }
+  .focus { border-left: 1px solid var(--rule); padding-left: 3rem; }
+}
 .tstatus .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .tstatus-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1.25rem; }
 .tstatus h2 { font: 700 clamp(2.6rem, 8vw, 4rem)/1 var(--display); margin: 0.15rem 0 0; color: var(--status-color, var(--ink)); }
@@ -110,14 +115,30 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .status-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.85rem; }
 .status-legend i { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -0.05rem; }
 
+/* Garmin load focus */
+.focus h3 { font: 700 clamp(1.9rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; color: var(--focus-color, var(--ink)); }
+.focus .about { margin: 0.5rem 0 0; max-width: 60ch; }
+.frows { display: grid; gap: 0.8rem; margin-top: 1.2rem; max-width: 600px; }
+.frow { display: grid; grid-template-columns: 6.5rem 3rem minmax(0, 1fr) 4.5rem; align-items: center; gap: 0.75rem; font-size: 0.95rem; }
+.frow .fval { text-align: right; font-weight: 600; }
+.frow .fstate { color: var(--muted); font-size: 0.85rem; }
+.track { position: relative; height: 1.15rem; }
+.track .range { position: absolute; top: 0; bottom: 0; border: 1.5px dashed var(--muted); border-radius: 999px; }
+.track .fill { position: absolute; left: 0; top: 50%; height: 0.55rem; transform: translateY(-50%); border-radius: 999px; }
+.status-legend i.range-key { width: 1.5rem; background: none; border: 1.5px dashed var(--muted); border-radius: 999px; }
+
 /* Today: sleep and recovery */
 .hero { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
 
 /* Form, inside the fitness and fatigue section */
-.form-now { margin: 0 0 0.75rem; }
+.form-now { margin: 0 0 0.5rem; }
 .form-now .state { font: 600 1.6rem/1.1 var(--display); color: var(--state-color, var(--ink)); }
 .form-now .advice { display: block; margin-top: 0.15rem; }
-.form-now .form-nums { display: block; color: var(--muted); font-size: 0.95rem; }
+.reading { margin: 0 0 0.5rem; max-width: 60ch; }
+.grid .wide { grid-column: 1 / -1; }
+/* Side-by-side sections line their charts up, whatever the text above them */
+.grid > section { display: flex; flex-direction: column; }
+.grid > section .chart { margin-top: auto; }
 
 .today {
   display: grid; grid-template-columns: repeat(4, 1fr);
@@ -135,8 +156,11 @@ button:disabled { opacity: 0.55; cursor: progress; }
 section h2 { font: 600 1.6rem/1.1 var(--display); margin: 0 0 0.3rem; }
 section p.sub { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; max-width: 60ch; }
 .chart { position: relative; height: 260px; }
+@media (min-width: 1300px) { .chart { height: 320px; } }
 .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.75rem; font-size: 0.88rem; color: var(--muted); }
 .legend i { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -0.1rem; }
+.act-legend { margin: -0.25rem 0 1rem; }
+.act-legend i { border-radius: 50%; }
 .legend i.line { height: 3px; border-radius: 0; vertical-align: 0.2rem; }
 
 /* Activities */
@@ -179,7 +203,8 @@ td.name { white-space: normal; }
       <dl class="today" id="today"></dl>
     </section>
 
-    <section class="tstatus" id="tstatus" aria-labelledby="tsLabel" hidden>
+    <section class="tstatus" id="tstatus" hidden>
+      <div id="tsMain" aria-labelledby="tsLabel">
       <p class="eyebrow">Garmin training status</p>
       <div class="tstatus-row">
         <h2 id="tsLabel"></h2>
@@ -189,17 +214,31 @@ td.name { white-space: normal; }
       <p class="facts" id="tsFacts"></p>
       <div class="weeks" id="tsWeeks" role="img"></div>
       <div class="status-legend" id="tsLegend"></div>
+      </div>
+
+      <aside class="focus" id="focus" aria-labelledby="focusTitle" hidden>
+        <p class="eyebrow">Garmin load focus · last 4 weeks</p>
+        <h3 id="focusTitle"></h3>
+        <p class="about" id="focusAdvice"></p>
+        <div class="frows" id="focusRows"></div>
+        <div class="status-legend"><span><i class="range-key"></i>Optimal range</span></div>
+      </aside>
     </section>
 
     <div class="grid">
       <section>
-        <h2>Fitness and fatigue</h2>
-        <p class="form-now">Form today: <span class="state" id="state"></span>
-          <span class="advice" id="advice"></span>
-          <span class="form-nums" id="formNums"></span></p>
-        <p class="sub">Fitness is your 6-week average training load, fatigue the 1-week average. The bars underneath show form: fitness minus fatigue. Above zero means you are fresh.</p>
-        <div class="chart" style="height:310px"><canvas id="fitnessChart" aria-label="Fitness, fatigue and form over the last 120 days" role="img"></canvas></div>
-        <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Fitness</span><span><i class="line" style="background:var(--fatigue)"></i>Fatigue</span><span><i style="background:var(--easy);opacity:.5"></i>Form</span></div>
+        <h2>Fitness</h2>
+        <p class="reading" id="fitnessReading"></p>
+        <p class="sub">Your daily training load averaged over the last 6 weeks: what your body is used to. A line that rises over weeks and months means you're getting fitter.</p>
+        <div class="chart"><canvas id="fitnessChart" aria-label="Fitness over the last 120 days" role="img"></canvas></div>
+      </section>
+
+      <section>
+        <h2>Form</h2>
+        <p class="form-now">Today: <span class="state" id="state"></span>
+          <span class="advice" id="advice"></span></p>
+        <p class="sub">Form compares your last 7 days of training (fatigue) with your fitness. Below zero you've trained more than you're used to and are carrying fatigue, which is how fitness grows; above zero you're fresh. The bands show what each level means.</p>
+        <div class="chart"><canvas id="formChart" aria-label="Form over the last 120 days, against the form bands" role="img"></canvas></div>
       </section>
 
       <section>
@@ -216,7 +255,7 @@ td.name { white-space: normal; }
         <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>HRV</span><span><i style="background:var(--fitness);opacity:.15"></i>Normal range</span><span><i class="line" style="background:var(--fatigue)"></i>Resting HR</span></div>
       </section>
 
-      <section>
+      <section class="wide">
         <h2>Sleep and readiness</h2>
         <p class="sub">Hours slept each night, with Garmin's training readiness score for the morning after.</p>
         <div class="chart"><canvas id="sleepChart" aria-label="Sleep hours and training readiness, last 60 days" role="img"></canvas></div>
@@ -227,6 +266,7 @@ td.name { white-space: normal; }
     <section class="activities">
       <h2>Recent activities</h2>
       <p class="sub" id="actSub"></p>
+      <div class="legend act-legend" id="actLegend"></div>
       <div class="scroll"><table>
         <thead><tr><th>Date</th><th>Activity</th><th class="num">Distance</th><th class="num">Time</th><th class="num">Pace</th><th class="num">Avg HR</th><th class="num">Load</th></tr></thead>
         <tbody id="actBody"></tbody>

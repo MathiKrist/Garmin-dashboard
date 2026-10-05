@@ -79,9 +79,34 @@ const statusLabel = (code) => code ? code.charAt(0) + code.slice(1).toLowerCase(
 // Garmin's load focus groups: [key, label, color token]
 const FOCUS = [["low", "Low aerobic", "--low-aerobic"], ["high", "High aerobic", "--high-aerobic"], ["anaerobic", "Anaerobic", "--anaerobic"]];
 
+function renderLoadFocus() {
+  const lf = data.load_focus;
+  $("focus").hidden = !lf;
+  if (!lf) return;
+  $("focusTitle").textContent = lf.title;
+  const zoneColor = (key) => FOCUS.find((f) => f[0] === key)?.[2];
+  $("focusTitle").style.setProperty("--focus-color", lf.zone ? `var(${zoneColor(lf.zone)})` : "var(--ink)");
+  $("focusAdvice").textContent = lf.advice;
+  // One shared scale, so the bars compare across zones
+  const top = Math.max(...lf.zones.flatMap((z) => [z.value || 0, z.max || 0])) * 1.08 || 1;
+  const pct = (v) => `${(v / top) * 100}%`;
+  $("focusRows").innerHTML = lf.zones.map((z) => {
+    const v = z.value || 0;
+    const state = z.min == null ? "" : v < z.min ? "Below" : v > z.max ? "Above" : "In range";
+    const range = z.min == null ? "" : `<i class="range" style="left:${pct(z.min)};width:${pct(z.max - z.min)}"></i>`;
+    const tip = z.min == null ? "" : ` (optimal ${Math.round(z.min)}–${Math.round(z.max)})`;
+    return `<div class="frow" title="${z.label}: ${Math.round(v)}${tip}">
+      <span>${z.label}</span><span class="fval">${Math.round(v)}</span>
+      <div class="track">${range}<i class="fill" style="width:${pct(v)};background:var(${zoneColor(z.key)})"></i></div>
+      <span class="fstate">${state}</span></div>`;
+  }).join("");
+}
+
 function renderTrainingStatus() {
   const ts = data.training_status;
-  $("tstatus").hidden = !ts;
+  $("tstatus").hidden = !ts && !data.load_focus;
+  $("tsMain").hidden = !ts;
+  renderLoadFocus();
   if (!ts) return;
   $("tsLabel").textContent = ts.label;
   $("tsLabel").style.setProperty("--status-color", statusColor(ts.code));
@@ -115,15 +140,51 @@ function renderTrainingStatus() {
   $("tsLegend").innerHTML = seen.map((code) => `<span><i style="background:${statusColor(code)}"></i>${statusLabel(code)}</span>`).join("");
 }
 
+const FORM_COLORS = { Rested: "--hard", Fresh: "--easy", Balanced: "--nohr", Building: "--fitness", Overloaded: "--fatigue" };
+
+// One plain-language sentence on the fitness trend over the last four weeks.
+function fitnessReading(f) {
+  const fx = data.fitness;
+  if (f.ctl < 5 || fx.length < 29) return "";
+  const now = Math.round(f.ctl), before = Math.round(fx[fx.length - 29].ctl);
+  const change = Math.round((now - before) / before * 100);
+  if (change >= 3) return `Fitness is ${now}, up from ${before} four weeks ago (+${change}%). You're getting fitter.`;
+  if (change <= -3) return `Fitness is ${now}, down from ${before} four weeks ago (${change}%). Normal during a recovery week or taper; if it keeps falling, you're losing fitness.`;
+  return `Fitness is ${now}, about the same as four weeks ago (${before}). You're holding your fitness.`;
+}
+
+// Chart.js plugin: shades the form bands behind the line and names them in the right margin.
+const formBands = {
+  id: "formBands",
+  beforeDatasetsDraw(chart) {
+    const { ctx, chartArea: a, scales: { y } } = chart;
+    const zones = data.form_zones;
+    const clamp = (px) => Math.max(a.top, Math.min(a.bottom, px));
+    ctx.save();
+    zones.forEach((z, i) => {
+      const top = i === 0 ? a.top : clamp(y.getPixelForValue(zones[i - 1].min));
+      const bottom = z.min == null ? a.bottom : clamp(y.getPixelForValue(z.min));
+      if (bottom - top < 1) return;
+      ctx.fillStyle = alpha(css(FORM_COLORS[z.name]), 0.14);
+      ctx.fillRect(a.left, top, a.right - a.left, bottom - top);
+      if (bottom - top >= 14) {
+        ctx.fillStyle = css("--muted");
+        ctx.font = `500 11px ${css("--body")}`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(z.name, a.right + 8, (top + bottom) / 2);
+      }
+    });
+    ctx.restore();
+  },
+};
+
 function renderHero() {
   const f = data.form, t = data.today;
-  const colors = { Fresh: "--easy", Rested: "--easy", Balanced: "--ink", Building: "--fitness", Overloaded: "--fatigue" };
-  $("state").textContent = f.state;
-  $("state").style.setProperty("--state-color", `var(${colors[f.state] || "--ink"})`);
+  $("state").textContent = f.pct != null ? `${f.state} (${f.pct > 0 ? "+" : ""}${Math.round(f.pct)}%)` : f.state;
+  $("state").style.setProperty("--state-color", `var(${FORM_COLORS[f.state] || "--ink"})`);
   $("advice").textContent = f.advice;
-  $("formNums").textContent = f.ctl >= 5
-    ? `Fitness ${Math.round(f.ctl)}, fatigue ${Math.round(f.atl)}, form ${Math.round(f.tsb) > 0 ? "+" : ""}${Math.round(f.tsb) || 0}. Load ratio ${f.ratio.toFixed(2)} (0.8 to 1.3 is the usual safe range).`
-    : "";
+  $("fitnessReading").textContent = fitnessReading(f);
 
   let hrvNote = "";
   if (t.hrv_last_night != null && t.hrv_low != null && t.hrv_high != null) {
@@ -133,7 +194,7 @@ function renderHero() {
     ["Readiness", t.readiness != null ? round(t.readiness) : null, ""],
     ["HRV last night", t.hrv_last_night != null ? `${round(t.hrv_last_night)}<span>ms</span>` : null, hrvNote],
     ["Sleep", fmtSleep(t.sleep_s), t.sleep_score != null ? `Score ${round(t.sleep_score)}` : ""],
-    ["Resting HR", t.resting_hr != null ? `${round(t.resting_hr)}<span>bpm</span>` : null, ""],
+    ["Resting HR", t.resting_hr != null ? `${round(t.resting_hr)}<span>bpm</span>` : null, t.resting_hr_7d != null ? `7-day avg: ${t.resting_hr_7d} bpm` : ""],
   ].filter((i) => i[1] != null);
   $("today").innerHTML = items
     .map(([label, val, note]) => `<div><dd>${val}</dd><dt>${label}${note ? `<span class="note">${note}</span>` : ""}</dt></div>`)
@@ -172,23 +233,38 @@ function renderCharts() {
 
   // Fitness and fatigue
   const fx = data.fitness;
-  // Chart.js stacks axes in key order, bottom first: form strip below, fitness above.
-  const fopts = baseOptions();
-  fopts.scales = {
-    x: fopts.scales.x,
-    y2: { stack: "fit", stackWeight: 1.5, offset: true, grid: { color: css("--rule") }, ticks: { color: muted, maxTicksLimit: 3 }, border: { display: false } },
-    y: { stack: "fit", stackWeight: 3, offset: true, grid: { color: css("--rule") }, ticks: { color: muted }, border: { display: false } },
-  };
+  const fxLabels = fx.map((d) => fmtShort(d.date));
   draw("fitnessChart", {
+    type: "line",
     data: {
-      labels: fx.map((d) => fmtShort(d.date)),
+      labels: fxLabels,
       datasets: [
-        { type: "line", label: "Fitness", data: fx.map((d) => d.ctl), borderColor: fit, borderWidth: 2.5, pointRadius: 0, tension: 0.3, yAxisID: "y" },
-        { type: "line", label: "Fatigue", data: fx.map((d) => d.atl), borderColor: alpha(fat, 0.8), borderWidth: 1.25, pointRadius: 0, tension: 0.3, yAxisID: "y" },
-        { type: "bar", label: "Form", data: fx.map((d) => d.tsb), backgroundColor: fx.map((d) => alpha(d.tsb >= 0 ? easy : fat, 0.55)), yAxisID: "y2", barPercentage: 1, categoryPercentage: 1 },
+        { label: "Fitness", data: fx.map((d) => d.ctl), borderColor: fit, backgroundColor: alpha(fit, 0.1), fill: "origin", borderWidth: 2.5,
+          tension: 0.3, pointRadius: fx.map((_, i) => (i === fx.length - 1 ? 4 : 0)), pointBackgroundColor: fit },
       ],
     },
-    options: fopts,
+    options: baseOptions(),
+  });
+
+  // Form, against the bands
+  const pcts = fx.map((d) => d.form_pct).filter((v) => v != null);
+  const formOpts = baseOptions({
+    y: {
+      min: Math.floor(Math.min(-45, ...pcts) / 10) * 10, max: Math.ceil(Math.max(40, ...pcts) / 10) * 10,
+      grid: { display: false }, ticks: { color: muted, callback: (v) => `${v > 0 ? "+" : ""}${v}%` }, border: { display: false },
+    },
+  });
+  formOpts.layout = { padding: { right: 72 } };
+  formOpts.plugins.tooltip.callbacks = { label: (c) => ` Form: ${c.parsed.y > 0 ? "+" : ""}${Math.round(c.parsed.y)}%` };
+  draw("formChart", {
+    type: "line",
+    data: {
+      labels: fxLabels,
+      datasets: [{ label: "Form", data: fx.map((d) => d.form_pct), borderColor: css("--ink"), borderWidth: 2, tension: 0.3, spanGaps: true,
+        pointRadius: fx.map((_, i) => (i === fx.length - 1 ? 4 : 0)), pointBackgroundColor: css("--ink") }],
+    },
+    options: formOpts,
+    plugins: [formBands],
   });
 
   // Weekly running
@@ -246,9 +322,8 @@ function renderCharts() {
 }
 
 function renderActivities() {
-  $("actSub").innerHTML = "Dot colour is Garmin's training effect: " +
-    FOCUS.map(([key, label]) => `<span class="dot ${key}" aria-hidden="true"></span>${label.toLowerCase()}`).join(", ") +
-    `. Runs without a Garmin label use average heart rate against ${data.threshold} bpm.`;
+  $("actSub").textContent = `The dot shows Garmin's training effect for each run. Runs without a Garmin label use average heart rate against ${data.threshold} bpm.`;
+  $("actLegend").innerHTML = FOCUS.map(([, label, color]) => `<span><i style="background:var(${color})"></i>${label}</span>`).join("");
   $("actBody").innerHTML = data.activities.map((a) => {
     const typeName = a.type.replace(/_/g, " ");
     const effect = a.te_label ? statusLabel(a.te_label).replace("Vo2max", "VO2 max") : FOCUS.find((f) => f[0] === a.focus)?.[1];

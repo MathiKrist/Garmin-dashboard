@@ -78,6 +78,9 @@ def seed(db_path, days=180):
             "training_status": status, "training_status_since": since,
             "acute_load": round(sum(loads[-7:])), "acute_load_min": 300, "acute_load_max": 560,
             "acwr_status": "LOW" if sum(loads[-7:]) < 300 else "OPTIMAL", "vo2max": round(50 + (1 - i / days) * 2, 1),
+            "load_low": 760, "load_low_min": 300, "load_low_max": 820, "load_high": 690, "load_high_min": 640,
+            "load_high_max": 1160, "load_anaerobic": 40, "load_anaerobic_min": 170, "load_anaerobic_max": 510,
+            "load_focus": "ANAEROBIC_SHORTAGE",
         })
     now = datetime.now().isoformat(timespec="seconds")
     db.set_meta(conn, "last_sync_at", now)
