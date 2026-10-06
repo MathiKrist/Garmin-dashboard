@@ -100,6 +100,17 @@ def fetch_training_status(client, day):
     }
 
 
+def fetch_vo2max_history(client, start, end):
+    """One row per day Garmin updated the VO2 max estimate."""
+    rows = _try(client.get_max_metrics_range, start.isoformat(), end.isoformat()) or []
+    out = []
+    for r in rows:
+        g = _get(r, "generic") or {}
+        if g.get("calendarDate") and g.get("vo2MaxPreciseValue"):
+            out.append({"date": g["calendarDate"], "vo2max": g["vo2MaxPreciseValue"]})
+    return out
+
+
 def fetch_day(client, day):
     d = day.isoformat()
     stats = _try(client.get_stats, d) or {}
@@ -170,6 +181,16 @@ def run_sync(db_path=None):
                 day += timedelta(days=1)
                 time.sleep(0.4)
             db.set_meta(conn, "training_status_backfilled", "1")
+
+        # VO2 max history for its chart: one request covers years, so fetch it once.
+        if not db.get_meta(conn, "vo2max_backfilled"):
+            start = today - timedelta(days=config.VO2MAX_BACKFILL_DAYS)
+            rows = fetch_vo2max_history(client, start, today)
+            for row in rows:
+                db.upsert_daily(conn, row)
+            if rows:  # an empty answer may be a failed request; try again next sync
+                db.set_meta(conn, "vo2max_backfilled", "1")
+            conn.commit()
 
         db.set_meta(conn, "last_sync_date", today.isoformat())
         db.set_meta(conn, "last_sync_at", datetime.now().isoformat(timespec="seconds"))

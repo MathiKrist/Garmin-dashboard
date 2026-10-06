@@ -11,6 +11,7 @@ Built with FastAPI, SQLite and Chart.js. No cloud, no accounts beyond your own G
 - **Last night and today**: readiness, HRV, sleep and resting HR (with its 7-day average).
 - **Fitness**: 42-day (CTL) exponentially weighted training load, with its change over the last four weeks.
 - **Form**: fitness minus fatigue (7-day ATL) as a % of fitness, shown next to fitness, drawn over bands (Overloaded, Building, Balanced, Fresh, Rested), with today's state.
+- **VO2 max**: Garmin's VO2 max estimate per week, up to `VO2MAX_BACKFILL_DAYS` back (fetched once in a single request), compared with three and twelve months ago.
 - **Weekly running**: km per week for the last 12 weeks, split into low aerobic, high aerobic and anaerobic by Garmin's training effect for each run (average HR against your aerobic threshold when Garmin has no label).
 - **HRV**: nightly HRV against Garmin's baseline range, with resting HR overlaid.
 - **Sleep and readiness**: hours slept and Garmin's training readiness score.
@@ -85,6 +86,7 @@ pause
 | `MAX_HR` | 195 | Only used for TRIMP when Garmin has no load |
 | `ACTIVITY_BACKFILL_DAYS` | 180 | How far back the first activity sync goes |
 | `DAILY_BACKFILL_DAYS` | 60 | How far back the first daily sync goes |
+| `VO2MAX_BACKFILL_DAYS` | 1095 | How far back VO2 max history is fetched, once, for its chart |
 | `SYNC_INTERVAL_MINUTES` | 60 | Background sync interval (minimum 5) |
 | `HOST` | 0.0.0.0 | `0.0.0.0` = reachable on LAN, `127.0.0.1` = this machine only |
 | `PORT` | 8000 | Server port |

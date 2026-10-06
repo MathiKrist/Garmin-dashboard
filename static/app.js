@@ -272,6 +272,8 @@ function renderCharts() {
     plugins: [formBands],
   });
 
+  renderVo2max();
+
   // Weekly running
   const w = data.weeks;
   const anyUnknown = w.some((x) => x.unknown_km > 0);
@@ -323,6 +325,55 @@ function renderCharts() {
       y: { min: 0, grid: { color: css("--rule") }, ticks: { color: muted }, border: { display: false } },
       y2: { position: "right", min: 0, max: 100, grid: { display: false }, ticks: { color: muted }, border: { display: false } },
     }),
+  });
+}
+
+// One plain-language sentence on where VO2 max stands against 3 and 12 months ago.
+function vo2Reading(v) {
+  const now = round(v.now, 1);
+  const vs = (before, when) => {
+    if (before == null) return null;
+    const diff = Math.round((v.now - before) * 10) / 10;
+    if (Math.abs(diff) < 0.5) return `about the same as ${when} (${round(before, 1)})`;
+    return `${diff > 0 ? "up" : "down"} ${Math.abs(diff).toFixed(1)} from ${round(before, 1)} ${when}`;
+  };
+  const parts = [vs(v.ago_3m, "three months ago"), vs(v.ago_12m, "a year ago")].filter(Boolean);
+  let text = `VO2 max is ${now}` + (parts.length ? `, ${parts.join(", and ")}.` : ".");
+  if (v.peak > v.now + 0.4) text += ` Your highest this year was ${round(v.peak, 1)}.`;
+  return text;
+}
+
+function renderVo2max() {
+  const v = data.vo2max;
+  $("vo2Section").hidden = !v;
+  if (!v) return;
+  $("vo2Reading").textContent = vo2Reading(v);
+  const fit = css("--fitness");
+  const vals = v.weeks.map((x) => x.vo2max).filter((x) => x != null);
+  const o = baseOptions({
+    y: { suggestedMin: Math.floor(Math.min(...vals) - 1), suggestedMax: Math.ceil(Math.max(...vals) + 1),
+      grid: { color: css("--rule") }, ticks: { color: css("--muted"), precision: 0 }, border: { display: false } },
+  });
+  // One tick at the first week of each month (every 2nd or 3rd month over long ranges); the tooltip names the week
+  const sameYear = v.weeks[0].week.slice(0, 4) === data.generated.slice(0, 4);
+  const fmtMonth = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", sameYear ? { month: "short" } : { month: "short", year: "2-digit" });
+  const step = v.weeks.length > 80 ? 3 : v.weeks.length > 60 ? 2 : 1;
+  const month = (i) => v.weeks[i].week.slice(0, 7);
+  const tickAt = (i) => i > 0 && month(i) !== month(i - 1) && Number(month(i).slice(5)) % step === 0;
+  o.scales.x.ticks = { ...o.scales.x.ticks, autoSkip: false, callback: (i) => (tickAt(i) ? fmtMonth(v.weeks[i].week) : null) };
+  o.plugins.tooltip.callbacks = {
+    title: (items) => `Week of ${fmtShort(v.weeks[items[0].dataIndex].week)}`,
+    label: (c) => ` VO2 max: ${c.parsed.y.toFixed(1)}`,
+  };
+  draw("vo2Chart", {
+    type: "line",
+    data: {
+      labels: v.weeks.map((x) => x.week),
+      datasets: [{ label: "VO2 max", data: v.weeks.map((x) => x.vo2max), borderColor: fit, backgroundColor: alpha(fit, 0.1),
+        fill: "start", borderWidth: 2, stepped: "before", spanGaps: true,
+        pointRadius: v.weeks.map((_, i) => (i === v.weeks.length - 1 ? 4 : 0)), pointBackgroundColor: fit }],
+    },
+    options: o,
   });
 }
 

@@ -133,6 +133,37 @@ def _training_status(days, today):
     }
 
 
+def _vo2max(days, today):
+    """Garmin's VO2 max at the end of each week, plus where it stood 3 and 12 months ago."""
+    points = [(d["date"], d["vo2max"]) for d in days if d.get("vo2max")]
+    if len(points) < 2:
+        return None
+    first = date.fromisoformat(points[0][0])
+    week_end = first + timedelta(days=6 - first.weekday())  # Sunday of the first week
+    weeks, i, value = [], 0, None
+    while True:
+        end = min(week_end, today)
+        while i < len(points) and points[i][0] <= end.isoformat():
+            value = points[i][1]
+            i += 1
+        weeks.append({"week": (week_end - timedelta(days=6)).isoformat(), "vo2max": value})
+        if week_end >= today:
+            break
+        week_end += timedelta(days=7)
+
+    def as_of(day):
+        before = [v for d, v in points if d <= day.isoformat()]
+        return before[-1] if before else None
+
+    year_ago = (today - timedelta(days=365)).isoformat()
+    return {
+        "now": points[-1][1], "updated": points[-1][0],
+        "peak": max(v for d, v in points if d >= year_ago) if points[-1][0] >= year_ago else points[-1][1],
+        "ago_3m": as_of(today - timedelta(days=91)), "ago_12m": as_of(today - timedelta(days=365)),
+        "weeks": weeks[-53:],  # the chart shows the last year
+    }
+
+
 def build_dashboard(db_path=None):
     conn = db.connect(db_path or config.DB_PATH)
     try:
@@ -251,6 +282,7 @@ def build_dashboard(db_path=None):
         "today": today_vals,
         "training_status": _training_status(days, today),
         "load_focus": _load_focus(days, today),
+        "vo2max": _vo2max(days, today),
         "low_share_4w": low_share,
         "fitness": fitness[-120:],
         "weeks": weeks,
