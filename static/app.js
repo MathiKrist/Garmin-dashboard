@@ -5,7 +5,8 @@ let pollTimer = null;
 
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const fmtDay = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-const fmtShort = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const fmtDayYear = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+const fmtShort =(iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const round = (v, d = 0) => (v == null ? null : Number(v).toFixed(d));
 
 function fmtDuration(s) {
@@ -377,23 +378,143 @@ function renderVo2max() {
   });
 }
 
+// Sport groups from metrics.SPORTS, in the order the filter shows them
+const SPORTS = [
+  ["run", "Running"], ["walk", "Walking"], ["hike", "Hiking"], ["bike", "Cycling"], ["swim", "Swimming"],
+  ["strength", "Strength"], ["cardio", "Gym & cardio"], ["disc_golf", "Disc golf"], ["yoga", "Yoga"],
+  ["winter", "Winter sports"], ["other", "Other"],
+];
+const PAGE = 25;
+let sport = "all";
+try { sport = localStorage.getItem("sport") || "all"; } catch {}
+let shown = PAGE;
+
+const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoDay(d); };
+function fmtHours(s) {
+  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+// Pace for foot sports, speed on the bike, per 100 m in the pool
+function fmtSpeed(a) {
+  if (!a.speed) return "";
+  if (a.sport === "bike") return `${(a.speed * 3.6).toFixed(1)} km/h`;
+  if (a.sport === "swim") return fmtPace(100 / a.speed).replace("/km", "/100m");
+  if (["run", "walk", "hike"].includes(a.sport)) return fmtPace(1000 / a.speed);
+  return "";
+}
+
+// Garmin's primary training effect label -> [name, load focus group for the dot color]
+const EFFECTS = {
+  RECOVERY: ["Recovery", "low"], AEROBIC_BASE: ["Base", "low"], TEMPO: ["Tempo", "high"],
+  LACTATE_THRESHOLD: ["Threshold", "high"], VO2MAX: ["VO2 max", "high"],
+  ANAEROBIC_CAPACITY: ["Anaerobic", "anaerobic"], SPRINT: ["Sprint", "anaerobic"],
+};
+
+// Garmin's label where there is one; for runs without it, the focus from average HR (marked as such)
+function effectCell(a) {
+  let name, group;
+  if (a.te_label) {
+    [name, group] = EFFECTS[a.te_label] || [statusLabel(a.te_label), ""];
+  } else if (a.focus) {
+    name = `${FOCUS.find((f) => f[0] === a.focus)[1]} (HR)`;
+    group = a.focus;
+  } else {
+    return "";
+  }
+  return `<span class="dot ${group}" aria-hidden="true"></span>${name}`;
+}
+
+function setSport(s) {
+  sport = s;
+  shown = PAGE;
+  try { localStorage.setItem("sport", s); } catch {}
+  renderActivities();
+}
+
 function renderActivities() {
-  $("actSub").textContent = `The dot shows Garmin's training effect for each run. Runs without a Garmin label use average heart rate against ${data.threshold} bpm.`;
-  $("actLegend").innerHTML = FOCUS.map(([, label, color]) => `<span><i style="background:var(${color})"></i>${label}</span>`).join("");
-  $("actBody").innerHTML = data.activities.map((a) => {
+  const acts = data.activities;
+  const counts = {};
+  acts.forEach((a) => { counts[a.sport] = (counts[a.sport] || 0) + 1; });
+  if (sport !== "all" && !counts[sport]) sport = "all";
+  const options = [["all", "All"], ...SPORTS.filter(([key]) => counts[key])];
+  $("sportFilter").innerHTML = options.map(([key, label]) =>
+    `<button type="button" data-sport="${key}" aria-pressed="${key === sport}">${label}<span>${key === "all" ? acts.length : counts[key]}</span></button>`).join("");
+
+  const list = sport === "all" ? acts : acts.filter((a) => a.sport === sport);
+  $("paceHead").textContent = sport === "bike" ? "Speed" : sport === "all" ? "Pace / speed" : "Pace";
+  $("actBody").innerHTML = list.slice(0, shown).map((a) => {
     const typeName = a.type.replace(/_/g, " ");
-    const effect = a.te_label ? statusLabel(a.te_label).replace("Vo2max", "VO2 max") : FOCUS.find((f) => f[0] === a.focus)?.[1];
     return `<tr>
-      <td>${fmtDay(a.date)}</td>
-      <td class="name"><span class="dot ${a.focus || ""}" ${effect ? `title="${effect}"` : ""} aria-hidden="true"></span>${escapeHtml(a.name || typeName)}</td>
+      <td>${a.date.slice(0, 4) === data.generated.slice(0, 4) ? fmtDay(a.date) : fmtDayYear(a.date)}</td>
+      <td class="name">${escapeHtml(a.name || typeName)}</td>
+      <td>${effectCell(a)}</td>
       <td class="num">${a.km ? a.km.toFixed(2) + " km" : ""}</td>
       <td class="num">${fmtDuration(a.duration_s)}</td>
-      <td class="num">${fmtPace(a.pace_s_per_km)}</td>
+      <td class="num">${fmtSpeed(a)}</td>
       <td class="num">${a.avg_hr ? Math.round(a.avg_hr) : ""}</td>
       <td class="num">${a.load ? Math.round(a.load) : ""}</td>
     </tr>`;
   }).join("");
+  $("actMore").hidden = list.length <= shown;
+  $("actMore").textContent = `Show more (${list.length - shown} left)`;
+
+  renderVolume(list);
 }
+
+// Strava-style totals for the selected sport: this week day by day, and this year
+function renderVolume(list) {
+  const today = data.generated;
+  const monday = addDays(today, -((new Date(today + "T12:00:00").getDay() + 6) % 7));
+  const year = today.slice(0, 4);
+  const sum = (as, f) => as.reduce((t, a) => t + (a[f] || 0), 0);
+  // Distance where the sport has it (running, cycling…), otherwise time (strength, yoga…)
+  const byKm = sum(list.filter((a) => a.date.startsWith(year)), "km") > 0;
+  const value = (as) => (byKm ? sum(as, "km") : sum(as, "duration_s"));
+  const big = (v) => (byKm ? `${v.toFixed(1)}<span>km</span>` : fmtHours(v).replace(/(\d+)([hm])/g, "$1<span>$2</span>"));
+  const small = (v) => (byKm ? `${v.toFixed(1)} km` : fmtHours(v));
+  const between = (from, to) => list.filter((a) => a.date >= from && a.date < to);
+  const count = (n) => `${n} ${n === 1 ? "activity" : "activities"}`;
+
+  const label = sport === "all" ? "All activities" : SPORTS.find(([key]) => key === sport)[1];
+  $("volSport").textContent = label;
+
+  const week = between(monday, addDays(monday, 7));
+  $("volWeek").innerHTML = big(value(week));
+  const prev4 = value(between(addDays(monday, -28), monday)) / 4;
+  const weekNote = [count(week.length)];
+  if (byKm && week.length) weekNote.push(fmtHours(sum(week, "duration_s")));
+  if (prev4 > 0) weekNote.push(`4-week avg ${small(prev4)}`);
+  $("volWeekNote").textContent = weekNote.join(" · ");
+
+  const days = [...Array(7)].map((_, i) => {
+    const iso = addDays(monday, i);
+    return { iso, v: value(list.filter((a) => a.date === iso)) };
+  });
+  const top = Math.max(...days.map((d) => d.v)) || 1;
+  $("volDays").innerHTML = days.map((d, i) => {
+    const cls = d.iso === today ? "is-today" : d.iso > today ? "future" : "";
+    const h = d.v ? Math.max(6, (d.v / top) * 100) : 0;
+    return `<div class="${cls}" title="${fmtDay(d.iso)}: ${d.v ? small(d.v) : "rest"}"><div class="bar"><i style="height:${h}%"></i></div><span class="day">${"MTWTFSS"[i]}</span></div>`;
+  }).join("");
+  $("volDays").setAttribute("aria-label", `${label} this week by day: ` + days.filter((d) => d.iso <= today).map((d) => `${fmtDay(d.iso)} ${d.v ? small(d.v) : "rest"}`).join(", "));
+
+  const yr = list.filter((a) => a.date.startsWith(year));
+  $("volYear").innerHTML = big(value(yr));
+  const elev = sum(yr, "elev_m");
+  const yearNote = [count(yr.length)];
+  if (byKm) yearNote.push(fmtHours(sum(yr, "duration_s")));
+  if (byKm && elev >= 1) yearNote.push(`${Math.round(elev).toLocaleString("en-GB")} m climbed`);
+  if (data.activities_from > `${year}-01-01`) yearNote.push(`synced from ${fmtShort(data.activities_from)}`);
+  $("volYearNote").textContent = yearNote.join(" · ");
+}
+
+$("sportFilter").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-sport]");
+  if (b) setSport(b.dataset.sport);
+});
+$("actMore").addEventListener("click", () => { shown += PAGE; renderActivities(); });
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);

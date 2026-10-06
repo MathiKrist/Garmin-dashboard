@@ -14,6 +14,26 @@ def is_run(activity_type):
     return "running" in (activity_type or "")
 
 
+# Garmin type key -> sport group for the activity filter. First match wins; keys are matched as substrings.
+SPORTS = [
+    ("run", ("running",)),
+    ("bike", ("cycling", "biking", "virtual_ride", "bmx")),
+    ("swim", ("swimming",)),
+    ("walk", ("walking",)),
+    ("hike", ("hiking", "mountaineering")),
+    ("strength", ("strength",)),
+    ("disc_golf", ("disc_golf",)),
+    ("yoga", ("yoga", "pilates", "breathwork", "meditation")),
+    ("cardio", ("cardio", "hiit", "elliptical", "stair", "rowing", "fitness_equipment", "floor_climbing", "jump_rope", "boxing")),
+    ("winter", ("ski", "snowboard", "snowshoe", "skating")),
+]
+
+
+def sport_of(activity_type):
+    t = activity_type or ""
+    return next((sport for sport, keys in SPORTS if any(k in t for k in keys)), "other")
+
+
 # Garmin's primary training effect label -> its load focus group.
 FOCUS = {
     "RECOVERY": "low", "AEROBIC_BASE": "low",
@@ -259,15 +279,13 @@ def build_dashboard(db_path=None):
     week_rhr = [d["resting_hr"] for d in days if d.get("resting_hr") and d["date"] > (today - timedelta(days=7)).isoformat()]
     today_vals["resting_hr_7d"] = round(sum(week_rhr) / len(week_rhr)) if week_rhr else None
 
+    # Every activity, newest first, so the page can filter by sport and total up this week and this year
     recent_acts = []
-    for a in reversed(acts[-25:]):
-        pace = None
-        if is_run(a["type"]) and a["avg_speed"]:
-            pace = 1000 / a["avg_speed"]  # seconds per km
+    for a in reversed(acts):
         recent_acts.append({
-            "date": a["date"], "start": a["start_local"], "type": a["type"], "name": a["name"],
-            "km": round((a["distance_m"] or 0) / 1000, 2), "duration_s": a["duration_s"],
-            "pace_s_per_km": pace, "avg_hr": a["avg_hr"], "load": a["load"],
+            "date": a["date"], "start": a["start_local"], "type": a["type"], "sport": sport_of(a["type"]),
+            "name": a["name"], "km": round((a["distance_m"] or 0) / 1000, 2), "duration_s": a["duration_s"],
+            "speed": a["avg_speed"], "elev_m": a["elev_gain"], "avg_hr": a["avg_hr"], "load": a["load"],
             "focus": a["focus"], "te_label": a["te_label"],
         })
 
@@ -288,4 +306,5 @@ def build_dashboard(db_path=None):
         "weeks": weeks,
         "trends": trends,
         "activities": recent_acts,
+        "activities_from": acts[0]["date"] if acts else None,  # the first synced activity, for "this year" totals
     }

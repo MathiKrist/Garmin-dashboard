@@ -15,6 +15,7 @@ import db
 
 log = logging.getLogger("sync")
 _lock = threading.Lock()
+ACTIVITY_PAGE = 100  # activities per request when fetching the full history
 
 
 def _get(d, *path):
@@ -164,6 +165,25 @@ def run_sync(db_path=None):
             db.upsert_activity(conn, parse_activity(a))
         conn.commit()
         log.info("Synced %d activities since %s", len(activities), act_start)
+
+        # Full activity history: page back through everything on Garmin once, newest first.
+        # The offset is saved per page, so a rate limit just resumes from there on the next sync.
+        if not db.get_meta(conn, "activity_history_done"):
+            offset = int(db.get_meta(conn, "activity_history_offset") or 0)
+            while True:
+                page = client.get_activities(offset, ACTIVITY_PAGE)
+                page = page if isinstance(page, list) else []
+                for a in page:
+                    db.upsert_activity(conn, parse_activity(a))
+                offset += len(page)
+                db.set_meta(conn, "activity_history_offset", str(offset))
+                conn.commit()
+                if len(page) < ACTIVITY_PAGE:
+                    break
+                time.sleep(1)
+            db.set_meta(conn, "activity_history_done", "1")
+            conn.commit()
+            log.info("Activity history complete: %d activities", offset)
 
         day = day_start
         while day <= today:

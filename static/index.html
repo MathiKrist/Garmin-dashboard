@@ -160,8 +160,6 @@ section p.sub { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; max-w
 @media (min-width: 1300px) { .chart { height: 320px; } }
 .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.75rem; font-size: 0.88rem; color: var(--muted); }
 .legend i { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -0.1rem; }
-.act-legend { margin: -0.25rem 0 1rem; }
-.act-legend i { border-radius: 50%; }
 .legend i.line { height: 3px; border-radius: 0; vertical-align: 0.2rem; }
 
 /* Activities */
@@ -176,6 +174,34 @@ td.name { white-space: normal; }
 .dot.low { background: var(--low-aerobic); }
 .dot.high { background: var(--high-aerobic); }
 .dot.anaerobic { background: var(--anaerobic); }
+
+/* Sport filter, like Garmin Connect's row of activity buttons */
+.sports { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 1.25rem; }
+.sports button { border-color: var(--rule); padding: 0.35rem 0.9rem; }
+.sports button span { color: var(--muted); margin-left: 0.35rem; font-size: 0.85rem; }
+.sports button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.sports button[aria-pressed="true"] span { color: inherit; opacity: 0.75; }
+.sports button:hover:not([aria-pressed="true"]) span { color: inherit; }
+.act-layout { display: grid; gap: 2.5rem; }
+@media (min-width: 1000px) { .act-layout { grid-template-columns: minmax(0, 1fr) 300px; } }
+.act-list { min-width: 0; }
+button.more { margin-top: 1rem; }
+
+/* Weekly and yearly totals, like Strava's side panel */
+.volume { align-self: start; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 1.25rem 1.5rem; }
+.volume .eyebrow { margin: 0 0 0.25rem; color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.vol-block { padding: 1rem 0; text-align: center; }
+.vol-block + .vol-block { border-top: 1px solid var(--rule); }
+.vol-block h3 { margin: 0; font: 500 0.85rem var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.vol-big { margin: 0.2rem 0 0; font: 600 2.4rem/1.05 var(--display); }
+.vol-big span { font: 500 1rem var(--body); color: var(--muted); margin-left: 0.2rem; }
+.vol-note { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.vol-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.35rem; margin-top: 1rem; }
+.vol-days .bar { height: 3.5rem; display: flex; align-items: flex-end; border-bottom: 2px solid var(--rule); }
+.vol-days .bar i { display: block; width: 100%; background: var(--fitness); border-radius: 2px 2px 0 0; }
+.vol-days .day { display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--muted); }
+.vol-days .is-today .day { color: var(--ink); font-weight: 600; }
+.vol-days .future .bar { border-bottom-style: dashed; }
 
 .empty { padding: 4rem 0; max-width: 56ch; }
 .empty h1 { font: 700 3rem/1 var(--display); margin: 0 0 0.75rem; }
@@ -273,12 +299,30 @@ td.name { white-space: normal; }
 
     <section class="activities">
       <h2>Recent activities</h2>
-      <p class="sub" id="actSub"></p>
-      <div class="legend act-legend" id="actLegend"></div>
-      <div class="scroll"><table>
-        <thead><tr><th>Date</th><th>Activity</th><th class="num">Distance</th><th class="num">Time</th><th class="num">Pace</th><th class="num">Avg HR</th><th class="num">Load</th></tr></thead>
-        <tbody id="actBody"></tbody>
-      </table></div>
+      <div class="sports" id="sportFilter" role="group" aria-label="Filter by sport"></div>
+      <div class="act-layout">
+        <div class="act-list">
+          <div class="scroll"><table>
+            <thead><tr><th>Date</th><th>Activity</th><th>Effect</th><th class="num">Distance</th><th class="num">Time</th><th class="num" id="paceHead">Pace</th><th class="num">Avg HR</th><th class="num">Load</th></tr></thead>
+            <tbody id="actBody"></tbody>
+          </table></div>
+          <button type="button" class="more" id="actMore" hidden>Show more</button>
+        </div>
+        <aside class="volume" aria-label="Activity totals">
+          <p class="eyebrow" id="volSport"></p>
+          <div class="vol-block">
+            <h3>This week</h3>
+            <p class="vol-big" id="volWeek"></p>
+            <p class="vol-note" id="volWeekNote"></p>
+            <div class="vol-days" id="volDays" role="img"></div>
+          </div>
+          <div class="vol-block">
+            <h3>This year</h3>
+            <p class="vol-big" id="volYear"></p>
+            <p class="vol-note" id="volYearNote"></p>
+          </div>
+        </aside>
+      </div>
     </section>
   </main>
 
