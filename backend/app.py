@@ -1,7 +1,7 @@
 """Serve the dashboard on your local network.
 
-    python app.py          # real Garmin data (run login.py first)
-    python app.py --demo   # fake data, to try the dashboard without Garmin
+    python backend/app.py          # real Garmin data (run backend/login.py first)
+    python backend/app.py --demo   # fake data, to try the dashboard without Garmin
 """
 import argparse
 import base64
@@ -30,7 +30,7 @@ args, _ = parser.parse_known_args()
 
 DEMO = args.demo
 DB_PATH = config.BASE_DIR / "data" / "demo.db" if DEMO else config.DB_PATH
-STATIC = config.BASE_DIR / "static"
+STATIC = config.BASE_DIR / "frontend"
 
 
 def _sync_loop():

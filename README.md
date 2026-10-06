@@ -24,20 +24,29 @@ Training load comes from Garmin when available; otherwise it falls back to Banis
 
 ```
 .
-├── app.py          # FastAPI server, background sync loop, password gate
-├── sync.py         # Garmin Connect → SQLite (can also run on its own)
-├── metrics.py      # Turns raw tables into dashboard numbers; maps Garmin activity types to sports
-├── db.py           # SQLite schema and upserts
-├── config.py       # Reads settings from .env
-├── login.py        # One-time Garmin login, stores a token
-├── demo.py         # Seeds fake data for --demo mode
-├── .env.example    # Copy to .env and adjust
-├── data/           # athlete.db (and demo.db) live here
-└── static/
-    ├── index.html
-    ├── app.js
-    └── chart.umd.js
+├── Start dashboard.bat   # Double-click launcher (the desktop shortcut points here)
+├── README.md
+├── requirements.txt
+├── .env.example          # Copy to .env and adjust
+├── backend/              # Python: server, Garmin sync and the numbers
+│   ├── app.py            # FastAPI server, background sync loop, password gate
+│   ├── sync.py           # Garmin Connect → SQLite (can also run on its own)
+│   ├── metrics.py        # Turns raw tables into dashboard numbers; maps Garmin activity types to sports
+│   ├── db.py             # SQLite schema and upserts
+│   ├── config.py         # Reads settings from .env
+│   ├── login.py          # One-time Garmin login, stores a token
+│   └── demo.py           # Seeds fake data for --demo mode
+├── frontend/             # The page the browser loads (served at /static)
+│   ├── index.html
+│   ├── app.js
+│   └── vendor/
+│       └── chart.umd.js  # Chart.js, bundled so it works offline
+├── assets/
+│   └── dashboard.ico     # Icon for the desktop shortcut
+└── data/                 # athlete.db (and demo.db) live here; not in git
 ```
+
+Run everything from the project folder; paths in `.env` (like `DB_PATH`) are relative to it.
 
 ## Setup
 
@@ -46,16 +55,16 @@ Requires Python 3.10+.
 ```bash
 pip install fastapi uvicorn garminconnect python-dotenv
 copy .env.example .env        # Windows (use cp on Linux/macOS)
-python login.py               # once; stores a token in TOKEN_DIR
+python backend/login.py       # once; stores a token in TOKEN_DIR
 ```
 
-Your Garmin password never goes in `.env`. `login.py` stores a token, and the sync reuses it.
+Your Garmin password never goes in `.env`. `backend/login.py` stores a token, and the sync reuses it.
 
 ## Running
 
 ```bash
-python app.py          # real Garmin data
-python app.py --demo   # generated demo data, no Garmin needed
+python backend/app.py          # real Garmin data
+python backend/app.py --demo   # generated demo data, no Garmin needed
 ```
 
 On start it prints two addresses: `http://localhost:8000` for this machine and a LAN address for phones and other devices on the same wifi. On Windows you may need to allow Python through the firewall the first time.
@@ -67,19 +76,12 @@ Once, the sync also pages back through your whole Garmin activity history (100 a
 To sync without the server:
 
 ```bash
-python sync.py
+python backend/sync.py
 ```
 
 ### Windows shortcut
 
-A `.bat` file in the project folder can start the dashboard with a double-click, for example:
-
-```bat
-@echo off
-cd /d "%~dp0"
-python app.py
-pause
-```
+`Start dashboard.bat` in the project folder starts the dashboard with a double-click and opens it in the browser. It uses the Python in `.venv`. The desktop shortcut points at this file and takes its icon from `assets/dashboard.ico`, so keep both where they are or update the shortcut.
 
 ## Configuration (`.env`)
 
@@ -99,7 +101,7 @@ pause
 
 ## Troubleshooting
 
-- **"Not logged in to Garmin"**: run `python login.py` on the machine that runs the server. Tokens expire eventually; just log in again.
+- **"Not logged in to Garmin"**: run `python backend/login.py` on the machine that runs the server. Tokens expire eventually; just log in again.
 - **"Too many requests" / 429**: Garmin is rate-limiting. Wait a while and sync again; the sync resumes from the last successful date.
 - **Can't open it from a phone**: check that `HOST=0.0.0.0`, both devices are on the same network, and the Windows firewall allows Python.
 - **Start over**: stop the server and delete `data/athlete.db`. The next sync backfills again.

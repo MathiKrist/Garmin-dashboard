@@ -21,7 +21,7 @@ def main():
         prompt_mfa=lambda: input("MFA code from Garmin: ").strip(),
     )
     client.login(config.TOKEN_DIR)
-    print(f"Logged in as {client.get_full_name() or email}. You can now run: python app.py")
+    print(f"Logged in as {client.get_full_name() or email}. You can now run: python backend/app.py")
 
 
 if __name__ == "__main__":

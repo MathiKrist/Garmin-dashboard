@@ -1,6 +1,6 @@
 """Pull activities and daily recovery data from Garmin Connect into SQLite.
 
-Run on its own with `python sync.py`, or let app.py run it on a timer.
+Run on its own with `python backend/sync.py`, or let app.py run it on a timer.
 """
 import logging
 import re
@@ -220,7 +220,7 @@ def run_sync(db_path=None):
     except Exception as e:
         msg = str(e) or e.__class__.__name__
         if "Username and password are required" in msg or "garth" in msg:
-            msg = "Not logged in to Garmin. Run `python login.py` on the server machine."
+            msg = "Not logged in to Garmin. Run `python backend/login.py` on the server machine."
         log.error("Sync failed: %s", msg)
         db.set_meta(conn, "last_error", msg)
         db.set_meta(conn, "last_error_at", datetime.now().isoformat(timespec="seconds"))

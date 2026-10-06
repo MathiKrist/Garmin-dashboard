@@ -61,7 +61,7 @@ function render() {
     $("main").hidden = true;
     $("empty").hidden = false;
     if (!data.syncing && !data.meta.last_sync_at) $("emptyText").textContent =
-      "Nothing synced yet. Run python login.py on the server machine if you haven't, then press Sync now.";
+      "Nothing synced yet. Run python backend/login.py on the server machine if you haven't, then press Sync now.";
     return;
   }
   $("empty").hidden = true;
@@ -534,6 +534,6 @@ setInterval(refresh, 5 * 60 * 1000);
 document.addEventListener("visibilitychange", refresh);
 load().catch(() => {
   $("notice").className = "notice";
-  $("notice").textContent = "Couldn't reach the dashboard server. Check that python app.py is still running.";
+  $("notice").textContent = "Couldn't reach the dashboard server. Check that python backend/app.py is still running.";
   $("notice").hidden = false;
 });
