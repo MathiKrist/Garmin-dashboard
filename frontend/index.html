@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <style>
 :root {
   --paper: #F2F4F1;
@@ -96,11 +97,9 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .notice.info { border-color: var(--fitness); }
 
 /* Garmin training status */
-.tstatus { display: grid; gap: 2rem; padding: 1.75rem 0 1.5rem; border-bottom: 1px solid var(--rule); }
-@media (min-width: 1000px) {
-  .tstatus { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3rem; }
-  .focus { border-left: 1px solid var(--rule); padding-left: 3rem; }
-}
+.tstatus { display: grid; gap: 1.75rem; padding: 1.75rem 0 1.5rem; align-content: start; }
+.focus { border-top: 1px solid var(--rule); padding-top: 1.75rem; }
+#tsMain[hidden] + .focus { border-top: 0; padding-top: 0; }
 .tstatus .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .tstatus-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1.25rem; }
 .tstatus h2 { font: 700 clamp(2.6rem, 8vw, 4rem)/1 var(--display); margin: 0.15rem 0 0; color: var(--status-color, var(--ink)); }
@@ -126,6 +125,33 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .track .range { position: absolute; top: 0; bottom: 0; border: 1.5px dashed var(--muted); border-radius: 999px; }
 .track .fill { position: absolute; left: 0; top: 50%; height: 0.55rem; transform: translateY(-50%); border-radius: 999px; }
 .status-legend i.range-key { width: 1.5rem; background: none; border: 1.5px dashed var(--muted); border-radius: 999px; }
+
+/* Overview: training status and load focus on the left, the last activity on the right */
+.overview { display: grid; border-bottom: 1px solid var(--rule); }
+.overview > :not([hidden]) + .last { border-top: 1px solid var(--rule); }
+@media (min-width: 1000px) {
+  .overview { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3rem; }
+  .overview:has(> [hidden]) { grid-template-columns: minmax(0, 1fr); }
+  .overview > :not([hidden]) + .last { border-top: 0; border-left: 1px solid var(--rule); padding-left: 3rem; }
+}
+
+/* Last activity, with its route when it has GPS */
+.last { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.75rem 0 1.5rem; min-width: 0; }
+.last .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.last h2 { font: 700 clamp(2rem, 6vw, 3rem)/1.05 var(--display); margin: 0.15rem 0 0; overflow-wrap: anywhere; }
+.last-effect { margin: 0.4rem 0 0; }
+.last-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: 1.25rem; margin: 0; }
+.last-stats dd { margin: 0; font: 600 2rem/1 var(--display); white-space: nowrap; }
+.last-stats dd span { font: 500 0.95rem var(--body); color: var(--muted); margin-left: 0.15rem; }
+.last-stats dt { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
+/* Grows to line up with the bottom of the status column */
+.last-map { flex: 1; min-height: 280px; border-radius: 6px; overflow: hidden; }
+.last-map.leaflet-container { background: var(--panel); font: 400 0.72rem var(--body); }
+.last-map .leaflet-bar { border: 1px solid var(--rule); box-shadow: none; }
+.last-map .leaflet-bar a { background: var(--panel); color: var(--ink); border-bottom-color: var(--rule); }
+.last-map .leaflet-bar a:hover { background: var(--paper); }
+.last-map .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent); color: var(--muted); }
+.last-map .leaflet-control-attribution a { color: inherit; }
 
 /* Today: sleep and recovery */
 .hero { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
@@ -230,27 +256,39 @@ button.more { margin-top: 1rem; }
       <dl class="today" id="today"></dl>
     </section>
 
-    <section class="tstatus" id="tstatus" hidden>
-      <div id="tsMain" aria-labelledby="tsLabel">
-      <p class="eyebrow">Garmin training status</p>
-      <div class="tstatus-row">
-        <h2 id="tsLabel"></h2>
-        <span class="since" id="tsSince"></span>
-      </div>
-      <p class="about" id="tsAbout"></p>
-      <p class="facts" id="tsFacts"></p>
-      <div class="weeks" id="tsWeeks" role="img"></div>
-      <div class="status-legend" id="tsLegend"></div>
-      </div>
+    <div class="overview">
+      <section class="tstatus" id="tstatus" hidden>
+        <div id="tsMain" aria-labelledby="tsLabel">
+        <p class="eyebrow">Garmin training status</p>
+        <div class="tstatus-row">
+          <h2 id="tsLabel"></h2>
+          <span class="since" id="tsSince"></span>
+        </div>
+        <p class="about" id="tsAbout"></p>
+        <p class="facts" id="tsFacts"></p>
+        <div class="weeks" id="tsWeeks" role="img"></div>
+        <div class="status-legend" id="tsLegend"></div>
+        </div>
 
-      <aside class="focus" id="focus" aria-labelledby="focusTitle" hidden>
-        <p class="eyebrow">Garmin load focus · last 4 weeks</p>
-        <h3 id="focusTitle"></h3>
-        <p class="about" id="focusAdvice"></p>
-        <div class="frows" id="focusRows"></div>
-        <div class="status-legend"><span><i class="range-key"></i>Optimal range</span></div>
-      </aside>
-    </section>
+        <aside class="focus" id="focus" aria-labelledby="focusTitle" hidden>
+          <p class="eyebrow">Garmin load focus · last 4 weeks</p>
+          <h3 id="focusTitle"></h3>
+          <p class="about" id="focusAdvice"></p>
+          <div class="frows" id="focusRows"></div>
+          <div class="status-legend"><span><i class="range-key"></i>Optimal range</span></div>
+        </aside>
+      </section>
+
+      <section class="last" id="lastAct" aria-labelledby="lastName" hidden>
+        <header>
+          <p class="eyebrow" id="lastWhen"></p>
+          <h2 id="lastName"></h2>
+          <p class="last-effect" id="lastEffect"></p>
+        </header>
+        <dl class="last-stats" id="lastStats"></dl>
+        <div class="last-map" id="lastMap" role="img" hidden></div>
+      </section>
+    </div>
 
     <div class="grid">
       <section>
@@ -332,6 +370,7 @@ button.more { margin-top: 1rem; }
   </div>
 </div>
 <script src="/static/vendor/chart.umd.js"></script>
+<script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

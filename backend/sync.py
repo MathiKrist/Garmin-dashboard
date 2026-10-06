@@ -16,6 +16,7 @@ import db
 log = logging.getLogger("sync")
 _lock = threading.Lock()
 ACTIVITY_PAGE = 100  # activities per request when fetching the full history
+TRACK_ACTIVITIES = 5  # GPS tracks are fetched for this many of the newest activities
 
 
 def _get(d, *path):
@@ -101,6 +102,16 @@ def fetch_training_status(client, day):
     }
 
 
+def fetch_track(client, activity_id):
+    """The activity's GPS points as [[lat, lon], ...], or None if the request failed."""
+    details = _try(client.get_activity_details, activity_id, 1, 1000)
+    if details is None:
+        return None
+    points = _get(details, "geoPolylineDTO", "polyline") or []
+    return [[round(p["lat"], 6), round(p["lon"], 6)] for p in points
+            if isinstance(p, dict) and p.get("lat") is not None and p.get("lon") is not None]
+
+
 def fetch_vo2max_history(client, start, end):
     """One row per day Garmin updated the VO2 max estimate."""
     rows = _try(client.get_max_metrics_range, start.isoformat(), end.isoformat()) or []
@@ -165,6 +176,17 @@ def run_sync(db_path=None):
             db.upsert_activity(conn, parse_activity(a))
         conn.commit()
         log.info("Synced %d activities since %s", len(activities), act_start)
+
+        # GPS tracks for the newest activities, for the map in the last activity panel
+        missing = conn.execute(
+            "SELECT id FROM (SELECT id, raw FROM activities ORDER BY start_local DESC LIMIT ?) "
+            "WHERE json_extract(raw, '$.hasPolyline') = 1 AND id NOT IN (SELECT activity_id FROM tracks)",
+            (TRACK_ACTIVITIES,)).fetchall()
+        for row in missing:
+            points = fetch_track(client, row["id"])
+            if points is not None:  # a failed request is retried next sync
+                db.set_track(conn, row["id"], points)
+                conn.commit()
 
         # Full activity history: page back through everything on Garmin once, newest first.
         # The offset is saved per page, so a rate limit just resumes from there on the next sync.

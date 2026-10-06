@@ -67,6 +67,7 @@ function render() {
   $("empty").hidden = true;
   $("main").hidden = false;
 
+  renderLastActivity();
   renderTrainingStatus();
   renderHero();
   renderCharts();
@@ -205,6 +206,66 @@ function renderHero() {
   $("today").innerHTML = items
     .map(([label, val, note]) => `<div><dd>${val}</dd><dt>${label}${note ? `<span class="note">${note}</span>` : ""}</dt></div>`)
     .join("");
+}
+
+// The newest activity at the top: name, when, the sport's stats, and its route on a map when it has GPS
+function renderLastActivity() {
+  const a = data.last_activity;
+  $("lastAct").hidden = !a;
+  if (!a) return;
+  const days = Math.round((new Date(data.generated + "T12:00:00") - new Date(a.date + "T12:00:00")) / 864e5);
+  const day = days === 0 ? "Today" : days === 1 ? "Yesterday" : COLUMNS.date[2](a);
+  $("lastWhen").textContent = ["Last activity", `${day}${a.start ? `, ${a.start.slice(11, 16)}` : ""}`, a.location].filter(Boolean).join(" · ");
+  $("lastName").textContent = a.name || a.type.replace(/_/g, " ");
+  $("lastEffect").innerHTML = effectCell(a);
+  $("lastEffect").hidden = !$("lastEffect").innerHTML;
+  // The sport's table columns minus ascent and load, with the unit set small ("5.08 km" -> 5.08 <span>km</span>)
+  $("lastStats").innerHTML = (SPORT_COLUMNS[a.sport] || SPORT_COLUMNS.other)
+    .filter((key) => !["date", "name", "effect", "ascent", "load"].includes(key))
+    .map((key) => [COLUMNS[key][0], String(COLUMNS[key][2](a))])
+    .filter(([, v]) => v !== "")
+    .map(([label, v]) => `<div><dd>${v.replace(/\s(\S*[a-z]\S*)$/i, "<span>$1</span>")}</dd><dt>${label}</dt></div>`)
+    .join("");
+  renderMap(a.track);
+}
+
+// Esri's muted grey basemaps (no API key needed), so the route is what stands out; light or dark to match the page
+const TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_{style}_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+let map = null, tiles = null, route = null;
+function fitRoute() {
+  map.invalidateSize();
+  map.fitBounds(route.getBounds(), { padding: [24, 24], animate: false });
+}
+function renderMap(track) {
+  const el = $("lastMap");
+  el.hidden = !(track?.length > 1 && window.L);  // no GPS, or Leaflet didn't load
+  if (el.hidden) return;
+  const style = matchMedia("(prefers-color-scheme: dark)").matches ? "Dark" : "Light";
+  if (!map) {
+    map = L.map(el, { scrollWheelZoom: false, attributionControl: false });
+    // The panel settles its size after the map is made (fonts load, the map stretches to the status column),
+    // so refit the whole route whenever the map's size changes
+    new ResizeObserver(() => { if (route && el.offsetHeight) fitRoute(); }).observe(el);
+    L.control.attribution({ prefix: false }).addTo(map);
+    tiles = L.tileLayer(TILES, {
+      style, maxZoom: 16,  // Esri's grey canvas stops at zoom 16
+      attribution: "Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
+    }).addTo(map);
+  } else if (tiles.options.style !== style) {
+    tiles.options.style = style;
+    tiles.redraw();
+  }
+  route?.remove();
+  const line = css("--hard"), paper = css("--paper");
+  const dot = (p, color) => L.circleMarker(p, { radius: 5.5, color: paper, weight: 2.5, fillColor: color, fillOpacity: 1 });
+  route = L.featureGroup([
+    L.polyline(track, { color: paper, weight: 8, opacity: 0.85, lineJoin: "round", lineCap: "round" }),  // casing
+    L.polyline(track, { color: line, weight: 4, lineJoin: "round", lineCap: "round" }),
+    dot(track[track.length - 1], css("--fatigue")),
+    dot(track[0], css("--easy")),
+  ]).addTo(map);
+  fitRoute();
+  el.setAttribute("aria-label", `Map of the route: ${data.last_activity.name || "last activity"}`);
 }
 
 function baseOptions(extra = {}) {
@@ -447,7 +508,7 @@ const COLUMNS = {
 // Which columns each sport shows, in order
 const SPORT_COLUMNS = {
   all: ["date", "name", "effect", "distance", "time", "pace", "hr", "load"],
-  run: ["date", "name", "effect", "distance", "time", "pace", "ascent", "hr", "load"],
+  run: ["date", "name", "effect", "distance", "time", "pace", "hr", "load"],
   walk: ["date", "name", "distance", "time", "pace", "ascent", "hr"],
   hike: ["date", "name", "distance", "time", "ascent", "pace", "hr", "load"],
   bike: ["date", "name", "effect", "distance", "time", "speed", "ascent", "hr", "load"],
@@ -557,7 +618,7 @@ $("syncBtn").addEventListener("click", async () => {
   setTimeout(load, 1500);
 });
 
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => data && renderCharts());
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (data) { renderCharts(); renderLastActivity(); } });
 // Pick up background syncs: check every 5 minutes, and right away when the tab comes back into view.
 const refresh = () => { if (!document.hidden) load().catch(() => {}); };
 setInterval(refresh, 5 * 60 * 1000);

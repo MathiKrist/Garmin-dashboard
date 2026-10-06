@@ -1,4 +1,5 @@
 """Generate believable fake training data so the dashboard can be tried without Garmin."""
+import math
 import random
 from datetime import date, datetime, timedelta
 
@@ -21,7 +22,7 @@ def seed(db_path, days=180):
     if db.get_meta(conn, "demo_date") == date.today().isoformat():
         conn.close()
         return
-    conn.executescript("DELETE FROM activities; DELETE FROM daily; DELETE FROM meta;")
+    conn.executescript("DELETE FROM activities; DELETE FROM daily; DELETE FROM tracks; DELETE FROM meta;")
     rng = random.Random(7)
     today = date.today()
     fatigue = 0.0
@@ -82,8 +83,25 @@ def seed(db_path, days=180):
             "load_high_max": 1160, "load_anaerobic": 40, "load_anaerobic_min": 170, "load_anaerobic_max": 510,
             "load_focus": "ANAEROBIC_SHORTAGE",
         })
+    # A GPS loop for the newest run, so the last activity panel has a map
+    last_run = conn.execute("SELECT id, distance_m FROM activities WHERE type = 'running' ORDER BY start_local DESC LIMIT 1").fetchone()
+    if last_run:
+        db.set_track(conn, last_run["id"], demo_track(rng, last_run["distance_m"] / 1000))
     now = datetime.now().isoformat(timespec="seconds")
     db.set_meta(conn, "last_sync_at", now)
     db.set_meta(conn, "demo_date", today.isoformat())
     conn.commit()
     conn.close()
+
+
+def demo_track(rng, km, lat=55.3959, lon=10.3883, points=240):
+    """A wobbly loop of about `km` around central Odense."""
+    r = km / (2 * math.pi)
+    wobble = [(rng.uniform(0.05, 0.15), rng.uniform(0, 2 * math.pi), k) for k in (3, 5, 7)]
+    track = []
+    for i in range(points + 1):
+        t = 2 * math.pi * i / points
+        rr = r * (1 + sum(a * math.sin(k * t + ph) for a, ph, k in wobble))
+        track.append([round(lat + rr * math.sin(t) / 111.3, 6),
+                      round(lon + rr * 1.3 * (math.cos(t) - 1) / (111.3 * math.cos(math.radians(lat))), 6)])
+    return track

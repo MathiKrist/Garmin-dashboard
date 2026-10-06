@@ -190,8 +190,10 @@ def build_dashboard(db_path=None):
         acts = [dict(r) for r in conn.execute(
             "SELECT id, start_local, date, type, name, distance_m, duration_s, avg_hr, "
             "max_hr, avg_speed, elev_gain, training_load, aerobic_te, te_label, "
-            "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps FROM activities "
+            "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps, "
+            "json_extract(raw, '$.locationName') AS location FROM activities "
             "WHERE date IS NOT NULL AND date != '' ORDER BY start_local")]
+        track = db.get_track(conn, acts[-1]["id"]) if acts else None
         days = [dict(r) for r in conn.execute("SELECT * FROM daily ORDER BY date")]
         meta = {
             "last_sync_at": db.get_meta(conn, "last_sync_at"),
@@ -308,5 +310,7 @@ def build_dashboard(db_path=None):
         "weeks": weeks,
         "trends": trends,
         "activities": recent_acts,
+        # The newest activity, with its GPS track when it has one (for the map at the top)
+        "last_activity": {**recent_acts[0], "location": acts[-1]["location"], "track": track or None} if acts else None,
         "activities_from": acts[0]["date"] if acts else None,  # the first synced activity, for "this year" totals
     }

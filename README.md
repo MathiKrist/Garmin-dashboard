@@ -6,16 +6,17 @@ Built with FastAPI, SQLite and Chart.js. No cloud, no accounts beyond your own G
 
 ## What it shows
 
+- **Last night and today** (top row): readiness, HRV, sleep and resting HR (with its 7-day average).
 - **Training status**: Garmin's own status (Productive, Maintaining, Recovery, Unproductive…) with what it means, acute load against Garmin's optimal range, VO2 max, and a four-week strip of daily statuses.
-- **Load focus**: Garmin's last-four-weeks load in low aerobic, high aerobic and anaerobic against the optimal range for each, with what to train next.
-- **Last night and today**: readiness, HRV, sleep and resting HR (with its 7-day average).
+- **Load focus**: Garmin's last-four-weeks load in low aerobic, high aerobic and anaerobic against the optimal range for each, with what to train next. Training status and load focus sit in the left column under the top row.
+- **Last activity**: in the right column next to them: your newest activity's name, when and where, Garmin's training effect, and the same stats as its sport's table columns, minus ascent and load. If it was recorded with GPS, its route is drawn on Esri's grey basemap (light or dark to match the page; the map tiles need internet). Routes are fetched from Garmin during the sync for the 5 newest activities and stored in the `tracks` table.
 - **Fitness**: 42-day (CTL) exponentially weighted training load, with its change over the last four weeks.
 - **Form**: fitness minus fatigue (7-day ATL) as a % of fitness, shown next to fitness, drawn over bands (Overloaded, Building, Balanced, Fresh, Rested), with today's state.
 - **VO2 max**: Garmin's VO2 max estimate per week, up to `VO2MAX_BACKFILL_DAYS` back (fetched once in a single request), compared with three and twelve months ago.
 - **Weekly running**: km per week for the last 12 weeks, split into low aerobic, high aerobic and anaerobic by Garmin's training effect for each run (average HR against your aerobic threshold when Garmin has no label).
 - **HRV**: nightly HRV against Garmin's baseline range, with resting HR overlaid.
 - **Sleep and readiness**: hours slept and Garmin's training readiness score.
-- **Recent activities**: every activity synced from Garmin, 25 at a time with **Show more**. Buttons filter by sport (running, walking, hiking, cycling, swimming, strength, gym & cardio, disc golf, yoga, winter sports, other); only sports you have get a button, sorted by how many activities each has (Other last). The columns depend on the sport: running shows effect, distance, time, pace, ascent, avg HR and load; cycling shows speed instead of pace; strength shows time, sets, reps, avg HR and load; yoga just time and avg HR; and so on (`SPORT_COLUMNS` in `frontend/app.js`). A column that is empty for every row shown is left out. The **Effect** column (running, cycling, swimming, gym & cardio) shows Garmin's training effect label (Base, Tempo, Threshold, VO2 max…) with a dot in its load focus color. Runs without a Garmin label show the focus from average HR, marked "(HR)". Dates from earlier years include the year.
+- **Recent activities**: every activity synced from Garmin, 25 at a time with **Show more**. Buttons filter by sport (running, walking, hiking, cycling, swimming, strength, gym & cardio, disc golf, yoga, winter sports, other); only sports you have get a button, sorted by how many activities each has (Other last). The columns depend on the sport: running shows effect, distance, time, pace, avg HR and load; cycling shows speed instead of pace; strength shows time, sets, reps, avg HR and load; yoga just time and avg HR; and so on (`SPORT_COLUMNS` in `frontend/app.js`). A column that is empty for every row shown is left out. The **Effect** column (running, cycling, swimming, gym & cardio) shows Garmin's training effect label (Base, Tempo, Threshold, VO2 max…) with a dot in its load focus color. Runs without a Garmin label show the focus from average HR, marked "(HR)". Dates from earlier years include the year.
 - **This week / This year**: a side panel next to the activities, following the sport filter. This week shows the total so far, a bar per day and the 4-week average; this year shows distance, time, metres climbed and count. Sports without distance (strength, yoga…) count time instead.
 
 Training load comes from Garmin when available; otherwise it falls back to Banister TRIMP using `MAX_HR` and your median resting HR.
@@ -40,7 +41,8 @@ Training load comes from Garmin when available; otherwise it falls back to Banis
 │   ├── index.html
 │   ├── app.js
 │   └── vendor/
-│       └── chart.umd.js  # Chart.js, bundled so it works offline
+│       ├── chart.umd.js  # Chart.js, bundled so it works offline
+│       └── leaflet/      # Leaflet, for the last activity's map
 ├── assets/
 │   └── dashboard.ico     # Icon for the desktop shortcut
 └── data/                 # athlete.db (and demo.db) live here; not in git
