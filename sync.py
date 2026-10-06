@@ -107,13 +107,11 @@ def fetch_day(client, day):
     sleep = _try(client.get_sleep_data, d) or {}
     ready = _try(client.get_training_readiness, d)
 
-    readiness = None
+    # Garmin can return several scores per day (e.g. last evening's update and the morning one); take the newest.
     if isinstance(ready, dict):
         ready = [ready]
-    for r in ready or []:
-        if isinstance(r, dict) and r.get("score") is not None:
-            readiness = r["score"]
-            break
+    scored = [r for r in ready or [] if isinstance(r, dict) and r.get("score") is not None]
+    readiness = max(scored, key=lambda r: r.get("timestamp") or "")["score"] if scored else None
 
     hs = hrv.get("hrvSummary") or {}
     sleep_dto = sleep.get("dailySleepDTO") or {}

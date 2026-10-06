@@ -25,10 +25,15 @@ function fmtSleep(s) {
   return `${h}<span>h</span> ${m}<span>min</span>`;
 }
 
+let lastJson = "";
 async function load() {
   const res = await fetch("/api/dashboard");
-  data = await res.json();
-  render();
+  const text = await res.text();
+  if (text !== lastJson) {  // skip redrawing the charts when nothing changed
+    lastJson = text;
+    data = JSON.parse(text);
+    render();
+  }
   clearTimeout(pollTimer);
   if (data.syncing) pollTimer = setTimeout(load, 5000);
 }
@@ -351,6 +356,10 @@ $("syncBtn").addEventListener("click", async () => {
 });
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => data && renderCharts());
+// Pick up background syncs: check every 5 minutes, and right away when the tab comes back into view.
+const refresh = () => { if (!document.hidden) load().catch(() => {}); };
+setInterval(refresh, 5 * 60 * 1000);
+document.addEventListener("visibilitychange", refresh);
 load().catch(() => {
   $("notice").className = "notice";
   $("notice").textContent = "Couldn't reach the dashboard server. Check that python app.py is still running.";
