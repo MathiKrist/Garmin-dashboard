@@ -189,7 +189,8 @@ def build_dashboard(db_path=None):
     try:
         acts = [dict(r) for r in conn.execute(
             "SELECT id, start_local, date, type, name, distance_m, duration_s, avg_hr, "
-            "max_hr, avg_speed, elev_gain, training_load, aerobic_te, te_label FROM activities "
+            "max_hr, avg_speed, elev_gain, training_load, aerobic_te, te_label, "
+            "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps FROM activities "
             "WHERE date IS NOT NULL AND date != '' ORDER BY start_local")]
         days = [dict(r) for r in conn.execute("SELECT * FROM daily ORDER BY date")]
         meta = {
@@ -286,6 +287,7 @@ def build_dashboard(db_path=None):
             "date": a["date"], "start": a["start_local"], "type": a["type"], "sport": sport_of(a["type"]),
             "name": a["name"], "km": round((a["distance_m"] or 0) / 1000, 2), "duration_s": a["duration_s"],
             "speed": a["avg_speed"], "elev_m": a["elev_gain"], "avg_hr": a["avg_hr"], "load": a["load"],
+            "sets": a["sets"], "reps": a["reps"],
             "focus": a["focus"], "te_label": a["te_label"],
         })
 

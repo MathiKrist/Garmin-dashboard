@@ -378,7 +378,7 @@ function renderVo2max() {
   });
 }
 
-// Sport groups from metrics.SPORTS, in the order the filter shows them
+// Sport groups from metrics.SPORTS, with their button labels (the filter sorts them by count)
 const SPORTS = [
   ["run", "Running"], ["walk", "Walking"], ["hike", "Hiking"], ["bike", "Cycling"], ["swim", "Swimming"],
   ["strength", "Strength"], ["cardio", "Gym & cardio"], ["disc_golf", "Disc golf"], ["yoga", "Yoga"],
@@ -396,7 +396,7 @@ function fmtHours(s) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
-// Pace for foot sports, speed on the bike, per 100 m in the pool
+// Pace for foot sports, per 100 m in the pool; speed on the bike (only mixed in the All list)
 function fmtSpeed(a) {
   if (!a.speed) return "";
   if (a.sport === "bike") return `${(a.speed * 3.6).toFixed(1)} km/h`;
@@ -412,9 +412,12 @@ const EFFECTS = {
   ANAEROBIC_CAPACITY: ["Anaerobic", "anaerobic"], SPRINT: ["Sprint", "anaerobic"],
 };
 
-// Garmin's label where there is one; for runs without it, the focus from average HR (marked as such)
+// Garmin's label where there is one; for runs without it, the focus from average HR (marked as such).
+// Only for endurance sports: on strength, yoga or a walk the label says little.
+const EFFECT_SPORTS = ["run", "bike", "swim", "cardio"];
 function effectCell(a) {
   let name, group;
+  if (!EFFECT_SPORTS.includes(a.sport)) return "";
   if (a.te_label) {
     [name, group] = EFFECTS[a.te_label] || [statusLabel(a.te_label), ""];
   } else if (a.focus) {
@@ -425,6 +428,37 @@ function effectCell(a) {
   }
   return `<span class="dot ${group}" aria-hidden="true"></span>${name}`;
 }
+
+// Table columns: key -> [header, right-aligned, cell]. A cell returns "" when it has nothing to show.
+const COLUMNS = {
+  date: ["Date", false, (a) => (a.date.slice(0, 4) === data.generated.slice(0, 4) ? fmtDay(a.date) : fmtDayYear(a.date))],
+  name: ["Activity", false, (a) => escapeHtml(a.name || a.type.replace(/_/g, " "))],
+  effect: ["Effect", false, effectCell],
+  distance: ["Distance", true, (a) => (a.km ? `${a.km.toFixed(2)} km` : "")],
+  time: ["Time", true, (a) => fmtDuration(a.duration_s)],
+  pace: ["Pace", true, fmtSpeed],
+  speed: ["Speed", true, (a) => (a.speed ? `${(a.speed * 3.6).toFixed(1)} km/h` : "")],
+  ascent: ["Ascent", true, (a) => (a.elev_m >= 1 ? `${Math.round(a.elev_m)} m` : "")],
+  sets: ["Sets", true, (a) => a.sets ?? ""],
+  reps: ["Reps", true, (a) => a.reps ?? ""],
+  hr: ["Avg HR", true, (a) => (a.avg_hr ? Math.round(a.avg_hr) : "")],
+  load: ["Load", true, (a) => (a.load ? Math.round(a.load) : "")],
+};
+// Which columns each sport shows, in order
+const SPORT_COLUMNS = {
+  all: ["date", "name", "effect", "distance", "time", "pace", "hr", "load"],
+  run: ["date", "name", "effect", "distance", "time", "pace", "ascent", "hr", "load"],
+  walk: ["date", "name", "distance", "time", "pace", "ascent", "hr"],
+  hike: ["date", "name", "distance", "time", "ascent", "pace", "hr", "load"],
+  bike: ["date", "name", "effect", "distance", "time", "speed", "ascent", "hr", "load"],
+  swim: ["date", "name", "effect", "distance", "time", "pace", "hr", "load"],
+  strength: ["date", "name", "time", "sets", "reps", "hr", "load"],
+  cardio: ["date", "name", "effect", "time", "hr", "load"],
+  disc_golf: ["date", "name", "distance", "time", "hr"],
+  yoga: ["date", "name", "time", "hr"],
+  winter: ["date", "name", "distance", "time", "speed", "ascent", "hr", "load"],
+  other: ["date", "name", "distance", "time", "hr", "load"],
+};
 
 function setSport(s) {
   sport = s;
@@ -438,25 +472,21 @@ function renderActivities() {
   const counts = {};
   acts.forEach((a) => { counts[a.sport] = (counts[a.sport] || 0) + 1; });
   if (sport !== "all" && !counts[sport]) sport = "all";
-  const options = [["all", "All"], ...SPORTS.filter(([key]) => counts[key])];
+  // Most-used sports first; "Other" always last
+  const options = [["all", "All"], ...SPORTS.filter(([key]) => counts[key])
+    .sort((a, b) => (a[0] === "other") - (b[0] === "other") || counts[b[0]] - counts[a[0]])];
   $("sportFilter").innerHTML = options.map(([key, label]) =>
     `<button type="button" data-sport="${key}" aria-pressed="${key === sport}">${label}<span>${key === "all" ? acts.length : counts[key]}</span></button>`).join("");
 
   const list = sport === "all" ? acts : acts.filter((a) => a.sport === sport);
-  $("paceHead").textContent = sport === "bike" ? "Speed" : sport === "all" ? "Pace / speed" : "Pace";
-  $("actBody").innerHTML = list.slice(0, shown).map((a) => {
-    const typeName = a.type.replace(/_/g, " ");
-    return `<tr>
-      <td>${a.date.slice(0, 4) === data.generated.slice(0, 4) ? fmtDay(a.date) : fmtDayYear(a.date)}</td>
-      <td class="name">${escapeHtml(a.name || typeName)}</td>
-      <td>${effectCell(a)}</td>
-      <td class="num">${a.km ? a.km.toFixed(2) + " km" : ""}</td>
-      <td class="num">${fmtDuration(a.duration_s)}</td>
-      <td class="num">${fmtSpeed(a)}</td>
-      <td class="num">${a.avg_hr ? Math.round(a.avg_hr) : ""}</td>
-      <td class="num">${a.load ? Math.round(a.load) : ""}</td>
-    </tr>`;
-  }).join("");
+  const rows = list.slice(0, shown);
+  // The sport's columns, minus any that are empty for every row shown (e.g. sets when Garmin didn't record them)
+  const cols = (SPORT_COLUMNS[sport] || SPORT_COLUMNS.other).map((key) => [key, ...COLUMNS[key]])
+    .filter(([key, , , cell]) => key === "date" || key === "name" || rows.some((a) => cell(a) !== ""));
+  if (sport === "all") cols.find((c) => c[0] === "pace")?.splice(1, 1, "Pace / speed");
+  $("actHead").innerHTML = `<tr>${cols.map(([, head, num]) => `<th${num ? ' class="num"' : ""}>${head}</th>`).join("")}</tr>`;
+  $("actBody").innerHTML = rows.map((a) =>
+    `<tr>${cols.map(([key, , num, cell]) => `<td${num ? ' class="num"' : key === "name" ? ' class="name"' : ""}>${cell(a)}</td>`).join("")}</tr>`).join("");
   $("actMore").hidden = list.length <= shown;
   $("actMore").textContent = `Show more (${list.length - shown} left)`;
 
