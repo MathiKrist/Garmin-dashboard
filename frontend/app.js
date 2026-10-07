@@ -484,7 +484,8 @@ function renderVo2max() {
     data: {
       labels: v.weeks.map((x) => x.week),
       datasets: [{ label: "VO2 max", data: v.weeks.map((x) => x.vo2max), borderColor: fit, backgroundColor: alpha(fit, 0.1),
-        fill: "start", borderWidth: 2, stepped: "before", spanGaps: true,
+        fill: "start", borderWidth: 2, spanGaps: true,
+        tension: 0.4, cubicInterpolationMode: "monotone",  // smooth curve that never overshoots past the real values
         pointRadius: v.weeks.map((_, i) => (i === v.weeks.length - 1 ? 4 : 0)), pointBackgroundColor: fit }],
     },
     options: o,

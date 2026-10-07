@@ -12,7 +12,7 @@ Built with FastAPI, SQLite and Chart.js. No cloud, no accounts beyond your own G
 - **Last activity**: in the right column next to them: your newest activity's name, when and where, Garmin's training effect, and the same stats as its sport's table columns, minus ascent and load. If it was recorded with GPS, its route is drawn as a glowing orange line, replayed once from start to finish when the page loads (skipped with reduced motion), on Esri's grey basemap (light or dark to match the page; the map tiles need internet). Routes are fetched from Garmin during the sync for the 5 newest activities and stored in the `tracks` table.
 - **Fitness**: 42-day (CTL) exponentially weighted training load, with its change over the last four weeks.
 - **Form**: fitness minus fatigue (7-day ATL) as a % of fitness, shown next to fitness, drawn over bands (Overloaded, Building, Balanced, Fresh, Rested), with today's state.
-- **VO2 max**: Garmin's VO2 max estimate per week, up to `VO2MAX_BACKFILL_DAYS` back (fetched once in a single request), compared with three and twelve months ago.
+- **VO2 max**: Garmin's VO2 max estimate per week as a smooth line, up to `VO2MAX_BACKFILL_DAYS` back (fetched once in a single request), compared with three and twelve months ago.
 - **Weekly running**: km per week for the last 12 weeks, split into low aerobic, high aerobic and anaerobic by Garmin's training effect for each run (average HR against your aerobic threshold when Garmin has no label).
 - **HRV**: nightly HRV against Garmin's baseline range, with resting HR overlaid.
 - **Sleep and readiness**: hours slept and Garmin's training readiness score.
