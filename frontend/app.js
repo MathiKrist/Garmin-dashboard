@@ -219,65 +219,75 @@ function renderLastActivity() {
   $("lastName").textContent = a.name || a.type.replace(/_/g, " ");
   $("lastEffect").innerHTML = effectCell(a);
   $("lastEffect").hidden = !$("lastEffect").innerHTML;
-  // The sport's table columns minus ascent and load, with the unit set small ("5.08 km" -> 5.08 <span>km</span>)
-  $("lastStats").innerHTML = (SPORT_COLUMNS[a.sport] || SPORT_COLUMNS.other)
+  $("lastStats").innerHTML = headlineStats(a);
+  lastMap.show(a.track, a.name || "last activity");
+}
+
+// The sport's table columns minus ascent and load, with the unit set small ("5.08 km" -> 5.08 <span>km</span>)
+function headlineStats(a) {
+  return (SPORT_COLUMNS[a.sport] || SPORT_COLUMNS.other)
     .filter((key) => !["date", "name", "effect", "ascent", "load"].includes(key))
     .map((key) => [COLUMNS[key][0], String(COLUMNS[key][2](a))])
     .filter(([, v]) => v !== "")
     .map(([label, v]) => `<div><dd>${v.replace(/\s(\S*[a-z]\S*)$/i, "<span>$1</span>")}</dd><dt>${label}</dt></div>`)
     .join("");
-  renderMap(a.track);
 }
 
 // Esri's muted grey basemaps (no API key needed), so the route is what stands out; light or dark to match the page
 const TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_{style}_Gray_Base/MapServer/tile/{z}/{y}/{x}";
-let map = null, tiles = null, route = null;
-function fitRoute() {
-  map.invalidateSize();
-  map.fitBounds(route.getBounds(), { padding: [24, 24], animate: false });
-}
-function renderMap(track) {
-  const el = $("lastMap");
-  el.hidden = !(track?.length > 1 && window.L);  // no GPS, or Leaflet didn't load
-  if (el.hidden) return;
-  const style = matchMedia("(prefers-color-scheme: dark)").matches ? "Dark" : "Light";
-  if (!map) {
-    map = L.map(el, { scrollWheelZoom: false, attributionControl: false });
-    // The panel settles its size after the map is made (fonts load, the map stretches to the status column),
-    // so refit the whole route whenever the map's size changes
-    new ResizeObserver(() => { if (route && el.offsetHeight) fitRoute(); }).observe(el);
-    L.control.attribution({ prefix: false }).addTo(map);
-    tiles = L.tileLayer(TILES, {
-      style, maxZoom: 16,  // Esri's grey canvas stops at zoom 16
-      attribution: "Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
-    }).addTo(map);
-  } else if (tiles.options.style !== style) {
-    tiles.options.style = style;
-    tiles.redraw();
+
+// A glowing route map in `el`; show(track) draws a route (hiding the map when there's no GPS) and replays it once
+function routeMap(el) {
+  let map = null, tiles = null, route = null, stopReplay = null;
+  const fitRoute = () => {
+    map.invalidateSize();
+    map.fitBounds(route.getBounds(), { padding: [24, 24], animate: false });
+  };
+  function show(track, name) {
+    el.hidden = !(track?.length > 1 && window.L);  // no GPS, or Leaflet didn't load
+    if (el.hidden) return;
+    const style = matchMedia("(prefers-color-scheme: dark)").matches ? "Dark" : "Light";
+    if (!map) {
+      map = L.map(el, { scrollWheelZoom: false, attributionControl: false });
+      // The panel settles its size after the map is made (fonts load, the map stretches to the status column,
+      // the popup opens), so refit the whole route whenever the map's size changes
+      new ResizeObserver(() => { if (route && el.offsetHeight) fitRoute(); }).observe(el);
+      L.control.attribution({ prefix: false }).addTo(map);
+      tiles = L.tileLayer(TILES, {
+        style, maxZoom: 16,  // Esri's grey canvas stops at zoom 16
+        attribution: "Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
+      }).addTo(map);
+    } else if (tiles.options.style !== style) {
+      tiles.options.style = style;
+      tiles.redraw();
+    }
+    stopReplay?.();
+    route?.remove();
+    const line = css("--route"), paper = css("--paper");
+    const dot = (p, color, extra) => L.circleMarker(p, { radius: 5.5, color: paper, weight: 2.5, fillColor: color, fillOpacity: 1, ...extra });
+    const stroke = (weight, opacity, extra) => L.polyline(track, { color: line, weight, opacity, lineJoin: "round", lineCap: "round", interactive: false, ...extra });
+    const lines = [
+      stroke(14, 0.12),  // glow: two wide faint halos fading out from the line
+      stroke(8, 0.25),
+      stroke(3.5, 1, { className: "route-glow" }),
+      stroke(1.2, 0.9, { color: "#FFE0B0" }),  // hot pale centre, like a lit filament
+    ];
+    // Distance covered at each GPS point, so the replay's runner moves at an even speed
+    const along = [0];
+    for (let i = 1; i < track.length; i++) along.push(along[i - 1] + metres(track[i - 1], track[i]));
+    const finish = dot(track[track.length - 1], css("--fatigue"));
+    route = L.featureGroup([...lines, finish, dot(track[0], css("--easy"))]).addTo(map);
+    if (el.offsetHeight) fitRoute();  // a map in a closed popup is fitted by the ResizeObserver when it opens
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const runner = dot(track[0], "#FFFFFF", { radius: 6, color: line, className: "route-glow" });
+      stopReplay = replayRoute({ map, track, along, lines, finish, runner });
+    }
+    el.setAttribute("aria-label", `Map of the route: ${name}`);
   }
-  stopReplay?.();
-  route?.remove();
-  const line = css("--route"), paper = css("--paper");
-  const dot = (p, color, extra) => L.circleMarker(p, { radius: 5.5, color: paper, weight: 2.5, fillColor: color, fillOpacity: 1, ...extra });
-  const stroke = (weight, opacity, extra) => L.polyline(track, { color: line, weight, opacity, lineJoin: "round", lineCap: "round", interactive: false, ...extra });
-  const lines = [
-    stroke(14, 0.12),  // glow: two wide faint halos fading out from the line
-    stroke(8, 0.25),
-    stroke(3.5, 1, { className: "route-glow" }),
-    stroke(1.2, 0.9, { color: "#FFE0B0" }),  // hot pale centre, like a lit filament
-  ];
-  // Distance covered at each GPS point, so the replay's runner moves at an even speed
-  const along = [0];
-  for (let i = 1; i < track.length; i++) along.push(along[i - 1] + metres(track[i - 1], track[i]));
-  const finish = dot(track[track.length - 1], css("--fatigue"));
-  route = L.featureGroup([...lines, finish, dot(track[0], css("--easy"))]).addTo(map);
-  fitRoute();
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    const runner = dot(track[0], "#FFFFFF", { radius: 6, color: line, className: "route-glow" });
-    stopReplay = replayRoute({ track, along, lines, finish, runner });
-  }
-  el.setAttribute("aria-label", `Map of the route: ${data.last_activity.name || "last activity"}`);
+  return { show, stop: () => stopReplay?.() };
 }
+const lastMap = routeMap($("lastMap"));
+const modalMap = routeMap($("modalMap"));
 
 // Metres between two [lat, lon] points (flat-earth approximation, plenty for points a few metres apart)
 function metres([lat1, lon1], [lat2, lon2]) {
@@ -293,9 +303,8 @@ function pointAt(track, along, m, from = 0) {
 }
 
 // Draws the route from start to finish once, with a glowing dot running at its head; returns a function that stops it and shows the whole route
-let stopReplay = null;
 const REPLAY_MS = 3500;
-function replayRoute({ track, along, lines, finish, runner }) {
+function replayRoute({ map, track, along, lines, finish, runner }) {
   const total = along[along.length - 1], paths = lines.map((l) => l.getElement());
   runner.addTo(map);
   finish.getElement().style.opacity = 0;
@@ -314,7 +323,6 @@ function replayRoute({ track, along, lines, finish, runner }) {
     runner.remove();
     paths.forEach((p) => { p.style.strokeDasharray = p.style.strokeDashoffset = ""; });
     finish.getElement().style.opacity = "";
-    stopReplay = null;
   };
   frame = requestAnimationFrame(step);
   return stop;
@@ -599,8 +607,10 @@ function renderActivities() {
     .filter(([key, , , cell]) => key === "date" || key === "name" || rows.some((a) => cell(a) !== ""));
   if (sport === "all") cols.find((c) => c[0] === "pace")?.splice(1, 1, "Pace / speed");
   $("actHead").innerHTML = `<tr>${cols.map(([, head, num]) => `<th${num ? ' class="num"' : ""}>${head}</th>`).join("")}</tr>`;
-  $("actBody").innerHTML = rows.map((a) =>
-    `<tr>${cols.map(([key, , num, cell]) => `<td${num ? ' class="num"' : key === "name" ? ' class="name"' : ""}>${cell(a)}</td>`).join("")}</tr>`).join("");
+  // The whole row opens the activity; the name is a button so it can be reached with the keyboard too
+  $("actBody").innerHTML = rows.map((a) => `<tr data-id="${a.id}">${cols.map(([key, , num, cell]) => key === "name"
+    ? `<td class="name"><button type="button" class="act-link">${cell(a)}</button></td>`
+    : `<td${num ? ' class="num"' : ""}>${cell(a)}</td>`).join("")}</tr>`).join("");
   $("actMore").hidden = list.length <= shown;
   $("actMore").textContent = `Show more (${list.length - shown} left)`;
 
@@ -659,6 +669,180 @@ $("sportFilter").addEventListener("click", (e) => {
   if (b) setSport(b.dataset.sport);
 });
 $("actMore").addEventListener("click", () => { shown += PAGE; renderActivities(); });
+$("actBody").addEventListener("click", (e) => {
+  const row = e.target.closest("tr[data-id]");
+  if (row) openActivity(Number(row.dataset.id));
+});
+
+// ---- Activity popup: the list's summary straight away, then every stat, the route and the laps once they've loaded
+
+const modal = $("actModal");
+let modalAct = null, modalDetail = null;
+
+async function openActivity(id) {
+  const a = data.activities.find((x) => x.id === id);
+  if (!a) return;
+  modalAct = a;
+  modalDetail = null;
+  $("modalWhen").textContent = [COLUMNS.date[2](a) + (a.start ? `, ${a.start.slice(11, 16)}` : ""), a.location].filter(Boolean).join(" · ");
+  $("modalName").textContent = a.name || a.type.replace(/_/g, " ");
+  $("modalEffect").innerHTML = effectCell(a);
+  $("modalEffect").hidden = !$("modalEffect").innerHTML;
+  $("modalStats").innerHTML = headlineStats(a);
+  $("modalDetails").innerHTML = "";
+  $("modalMap").hidden = true;
+  showModalStatus("Loading details…");
+  if (!modal.open) modal.showModal();
+  modal.querySelector(".modal-box").scrollTop = 0;
+  try {
+    const res = await fetch(`/api/activity/${id}`);
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+    if (modalAct !== a) return;  // another activity was opened meanwhile
+    modalDetail = d;
+    renderModalDetail();
+  } catch {
+    if (modalAct === a) showModalStatus("Couldn't load the details. Check that the dashboard server is still running.");
+  }
+}
+
+function showModalStatus(text) {
+  $("modalStatus").textContent = text || "";
+  $("modalStatus").hidden = !text;
+}
+
+function closeModal() {
+  modal.close();
+}
+modal.addEventListener("close", () => { modalMap.stop(); modalAct = modalDetail = null; });
+$("modalClose").addEventListener("click", closeModal);
+// The dialog itself only receives clicks on its backdrop, as .modal-box covers everything inside it.
+// The press has to start there too, so selecting text and letting go outside doesn't close it.
+let pressedOutside = false;
+modal.addEventListener("pointerdown", (e) => { pressedOutside = e.target === modal; });
+modal.addEventListener("click", (e) => { if (e.target === modal && pressedOutside) closeModal(); });
+
+// Garmin's training effect messages ("IMPROVING_AEROBIC_BASE_8") as words
+const teMessage = (m) => (m ? statusLabel(m.replace(/_\d+$/, "")) : "");
+const num = (v, digits = 0, unit = "") => (v == null ? null : `${Number(v).toFixed(digits)}${unit ? ` ${unit}` : ""}`);
+const signed = (v, unit = "") => (v == null ? null : `${v > 0 ? "+" : ""}${Math.round(v)}${unit ? ` ${unit}` : ""}`);
+
+// Garmin's zone colors, grey to red
+const ZONE_COLORS = ["--z1", "--z2", "--z3", "--z4", "--z5"];
+function zoneBars(zones, label) {
+  const total = zones.reduce((t, s) => t + (s || 0), 0);
+  const top = Math.max(...zones) || 1;
+  return `<div class="zones" role="img" aria-label="${label}: ${zones.map((s, i) => `zone ${i + 1} ${fmtDuration(s) || "0:00"}`).join(", ")}">` +
+    zones.map((s, i) => `<div class="zrow"><span>Zone ${i + 1}</span>
+      <div class="zbar"><i style="width:${((s || 0) / top) * 100}%;background:var(${ZONE_COLORS[i]})"></i></div>
+      <span class="zval">${fmtDuration(s) || "0:00"}<small>${Math.round(((s || 0) / total) * 100)}%</small></span></div>`).join("") +
+    "</div>";
+}
+
+// Lap table columns: [header, cell]; columns that are empty for every lap are left out
+const LAP_COLUMNS = [
+  ["Lap", (l, i) => i + 1],
+  ["Distance", (l) => (l.km ? `${l.km.toFixed(2)} km` : "")],
+  ["Time", (l) => fmtDuration(l.duration_s)],
+  ["Pace", (l, i, a) => fmtSpeed({ sport: a.sport, speed: l.speed })],
+  ["Avg HR", (l) => (l.avg_hr ? Math.round(l.avg_hr) : "")],
+  ["Max HR", (l) => (l.max_hr ? Math.round(l.max_hr) : "")],
+  ["Ascent", (l) => (l.elev_gain != null ? `${Math.round(l.elev_gain)} m` : "")],
+  ["Cadence", (l) => (l.cadence ? Math.round(l.cadence) : "")],
+  ["Power", (l) => (l.power ? `${Math.round(l.power)} W` : "")],
+];
+function lapTable(d) {
+  const cols = LAP_COLUMNS.filter(([, cell]) => d.laps.some((l, i) => cell(l, i, d) !== ""));
+  if (d.sport === "bike") cols.find((c) => c[0] === "Pace")?.splice(0, 1, "Speed");
+  return `<div class="scroll"><table class="laps"><thead><tr>${cols.map(([h], i) => `<th${i ? ' class="num"' : ""}>${h}</th>`).join("")}</tr></thead>
+    <tbody>${d.laps.map((l, li) => `<tr>${cols.map(([, cell], i) => `<td${i ? ' class="num"' : ""}>${cell(l, li, d)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+function renderModalDetail() {
+  const d = modalDetail, s = d.stats;
+  showModalStatus(d.details_error);
+  modalMap.show(d.track, d.name || "activity");
+
+  const row = (label, value) => (value == null || value === "" ? "" : `<div><dt>${label}</dt><dd>${value}</dd></div>`);
+  const group = (title, rows, extra = "", cls = "") => {
+    const body = rows.join("");
+    return body || extra ? `<section class="dgroup ${cls}"><h3>${title}</h3>${body ? `<dl>${body}</dl>` : ""}${extra}</section>` : "";
+  };
+  const foot = ["run", "walk", "hike"].includes(d.sport);
+  const speedOf = (v) => (v ? fmtSpeed({ sport: d.sport, speed: v }) : null);
+  // Garmin counts vigorous minutes double
+  const intensity = s.moderate_min != null || s.vigorous_min != null
+    ? `${(s.moderate_min || 0) + 2 * (s.vigorous_min || 0)}<small>${s.moderate_min || 0} moderate · ${s.vigorous_min || 0} vigorous</small>` : null;
+
+  const groups = [
+    group("Time and effort", [
+      row("Moving time", fmtDuration(d.duration_s)),
+      row("Elapsed time", s.elapsed_s && Math.abs(s.elapsed_s - d.duration_s) >= 5 ? fmtDuration(s.elapsed_s) : null),
+      row("Training load", d.load ? Math.round(d.load) : null),
+      row("Calories", num(s.calories, 0, "kcal")),
+      row("Body Battery", signed(s.body_battery)),
+      row("Est. sweat loss", num(s.water_ml, 0, "ml")),
+      row("Intensity minutes", intensity),
+    ]),
+    group("Training effect", [
+      row("Aerobic", s.aerobic_te != null ? `${num(s.aerobic_te, 1)}<small>${teMessage(s.aerobic_msg)}</small>` : null),
+      row("Anaerobic", s.anaerobic_te != null ? `${num(s.anaerobic_te, 1)}<small>${teMessage(s.anaerobic_msg)}</small>` : null),
+      row("VO2 max", num(s.vo2max)),
+    ]),
+    group("Heart rate", [
+      row("Average", num(d.avg_hr, 0, "bpm")),
+      row("Max", num(s.max_hr, 0, "bpm")),
+    ], d.hr_zones ? zoneBars(d.hr_zones, "Time in heart rate zones") : ""),
+    group(d.sport === "bike" ? "Speed" : "Pace", [
+      row(d.sport === "bike" ? "Average" : "Average pace", speedOf(d.speed)),
+      row(d.sport === "bike" ? "Max" : "Best pace", speedOf(s.max_speed)),
+      row("Grade-adjusted pace", d.sport === "run" ? speedOf(s.gap_speed) : null),
+    ]),
+    group("Running dynamics", foot ? [
+      row("Cadence", num(s.cadence, 0, "spm")),
+      row("Max cadence", num(s.max_cadence, 0, "spm")),
+      row("Stride length", s.stride_cm ? num(s.stride_cm / 100, 2, "m") : null),
+      row("Steps", s.steps ? Math.round(s.steps).toLocaleString("en-GB") : null),
+      row("Ground contact", num(s.gct_ms, 0, "ms")),
+      row("Contact balance", s.gct_balance ? `${num(s.gct_balance, 1)}% L / ${num(100 - s.gct_balance, 1)}% R` : null),
+      row("Vertical oscillation", num(s.vert_osc_cm, 1, "cm")),
+      row("Vertical ratio", num(s.vert_ratio, 1, "%")),
+    ] : []),
+    group("Cadence", d.sport === "bike" ? [
+      row("Average", num(s.bike_cadence, 0, "rpm")),
+      row("Max", num(s.max_bike_cadence, 0, "rpm")),
+    ] : []),
+    group("Power", [
+      row("Average", num(s.power, 0, "W")),
+      row("Normalized", num(s.norm_power, 0, "W")),
+      row("Max", num(s.max_power, 0, "W")),
+    ], d.power_zones ? zoneBars(d.power_zones, "Time in power zones") : ""),
+    group("Swimming", d.sport === "swim" ? [
+      row("Pool length", num(s.pool_m, 0, "m")),
+      row("Lengths", s.lengths),
+      row("Strokes", s.strokes),
+      row("Avg SWOLF", num(s.swolf)),
+      row("Distance per stroke", num(s.stroke_m, 2, "m")),
+      row("Stroke rate", num(s.swim_cadence, 0, "spm")),
+    ] : []),
+    group("Strength", [row("Sets", d.sets), row("Reps", d.reps)]),
+    group("Elevation", [
+      row("Ascent", d.elev_m != null ? num(d.elev_m, 0, "m") : null),
+      row("Descent", num(s.elev_loss, 0, "m")),
+      row("Lowest", num(s.min_elev, 0, "m")),
+      row("Highest", num(s.max_elev, 0, "m")),
+    ]),
+    group("Breathing", [
+      row("Average", num(s.resp, 0, "brpm")),
+      row("Lowest", num(s.min_resp, 0, "brpm")),
+      row("Highest", num(s.max_resp, 0, "brpm")),
+    ]),
+    group("Temperature", [row("Lowest", num(s.min_temp, 0, "°C")), row("Highest", num(s.max_temp, 0, "°C"))]),
+    group("Best efforts", d.best.map((b) => row(b.label, `${fmtDuration(b.s)}<small>${fmtPace(b.s / b.m * 1000)}</small>`))),
+  ];
+  $("modalDetails").innerHTML = groups.join("") +
+    (d.laps.length > 1 ? `<section class="dgroup wide"><h3>Laps</h3>${lapTable(d)}</section>` : "");
+}
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -671,7 +855,10 @@ $("syncBtn").addEventListener("click", async () => {
   setTimeout(load, 1500);
 });
 
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (data) { renderCharts(); renderLastActivity(); } });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (data) { renderCharts(); renderLastActivity(); }
+  if (modalDetail) modalMap.show(modalDetail.track, modalDetail.name || "activity");
+});
 // Pick up background syncs: check every 5 minutes, and right away when the tab comes back into view.
 const refresh = () => { if (!document.hidden) load().catch(() => {}); };
 setInterval(refresh, 5 * 60 * 1000);

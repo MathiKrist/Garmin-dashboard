@@ -22,7 +22,7 @@ def seed(db_path, days=180):
     if db.get_meta(conn, "demo_date") == date.today().isoformat():
         conn.close()
         return
-    conn.executescript("DELETE FROM activities; DELETE FROM daily; DELETE FROM tracks; DELETE FROM meta;")
+    conn.executescript("DELETE FROM activities; DELETE FROM daily; DELETE FROM tracks; DELETE FROM laps; DELETE FROM meta;")
     rng = random.Random(7)
     today = date.today()
     fatigue = 0.0
@@ -105,3 +105,31 @@ def demo_track(rng, km, lat=55.3959, lon=10.3883, points=240):
         track.append([round(lat + rr * math.sin(t) / 111.3, 6),
                       round(lon + rr * 1.3 * (math.cos(t) - 1) / (111.3 * math.cos(math.radians(lat))), 6)])
     return track
+
+
+def fill_details(db_path, activity_id):
+    """A made-up route and per-km laps for a demo run, the first time it's opened."""
+    conn = db.connect(db_path)
+    try:
+        a = conn.execute("SELECT * FROM activities WHERE id = ?", (activity_id,)).fetchone()
+        if not a or db.get_laps(conn, activity_id) is not None:
+            return
+        rng = random.Random(activity_id)
+        km = (a["distance_m"] or 0) / 1000
+        laps = []
+        if a["type"] == "running" and km > 0:
+            if db.get_track(conn, activity_id) is None:
+                db.set_track(conn, activity_id, demo_track(rng, km))
+            pace = a["duration_s"] / km
+            left = km
+            while left > 0.05:
+                lap_km = min(1.0, left)
+                lap_pace = pace * rng.uniform(0.95, 1.05)
+                laps.append({"km": round(lap_km, 2), "duration_s": lap_km * lap_pace, "speed": 1000 / lap_pace,
+                             "avg_hr": round(a["avg_hr"] + rng.uniform(-6, 6)), "elev_gain": round(rng.uniform(0, 12)),
+                             "cadence": round(rng.uniform(164, 178))})
+                left -= lap_km
+        db.set_laps(conn, activity_id, laps)
+        conn.commit()
+    finally:
+        conn.close()

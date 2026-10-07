@@ -1,4 +1,5 @@
 """Turn the raw tables into the numbers the dashboard shows."""
+import json
 import math
 from datetime import date, timedelta
 from statistics import median
@@ -184,15 +185,91 @@ def _vo2max(days, today):
     }
 
 
+ACTIVITY_SELECT = (
+    "id, start_local, date, type, name, distance_m, duration_s, avg_hr, max_hr, avg_speed, elev_gain, "
+    "training_load, aerobic_te, anaerobic_te, te_label, "
+    "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps, "
+    "json_extract(raw, '$.locationName') AS location"
+)
+
+
+def _add_load(a, rest_hr):
+    """Garmin's training load, or TRIMP when Garmin has none; plus the run's load focus."""
+    load = a["training_load"]
+    if load is None:
+        load = trimp(a["duration_s"], a["avg_hr"], rest_hr, config.MAX_HR)
+    a["load"] = round(load or 0, 1)
+    a["focus"] = run_focus(a, config.AEROBIC_THRESHOLD) if is_run(a["type"]) else None
+
+
+def _summary(a):
+    """What the activity list (and the top of the popup) shows for one activity."""
+    return {
+        "id": a["id"], "date": a["date"], "start": a["start_local"], "type": a["type"], "sport": sport_of(a["type"]),
+        "name": a["name"], "km": round((a["distance_m"] or 0) / 1000, 2), "duration_s": a["duration_s"],
+        "speed": a["avg_speed"], "elev_m": a["elev_gain"], "avg_hr": a["avg_hr"], "load": a["load"],
+        "sets": a["sets"], "reps": a["reps"], "location": a["location"],
+        "focus": a["focus"], "te_label": a["te_label"],
+    }
+
+
+# The popup's extra stats: our key -> Garmin's field in the activity summary
+DETAIL_FIELDS = {
+    "calories": "calories", "elapsed_s": "elapsedDuration", "max_speed": "maxSpeed", "gap_speed": "avgGradeAdjustedSpeed",
+    "cadence": "averageRunningCadenceInStepsPerMinute", "max_cadence": "maxRunningCadenceInStepsPerMinute",
+    "bike_cadence": "averageBikingCadenceInRevPerMinute", "max_bike_cadence": "maxBikingCadenceInRevPerMinute",
+    "steps": "steps", "stride_cm": "avgStrideLength", "gct_ms": "avgGroundContactTime", "gct_balance": "avgGroundContactBalance",
+    "vert_osc_cm": "avgVerticalOscillation", "vert_ratio": "avgVerticalRatio",
+    "power": "avgPower", "max_power": "maxPower", "norm_power": "normPower",
+    "elev_loss": "elevationLoss", "min_elev": "minElevation", "max_elev": "maxElevation",
+    "resp": "avgRespirationRate", "min_resp": "minRespirationRate", "max_resp": "maxRespirationRate",
+    "aerobic_msg": "aerobicTrainingEffectMessage", "anaerobic_msg": "anaerobicTrainingEffectMessage",
+    "vo2max": "vO2MaxValue", "body_battery": "differenceBodyBattery", "water_ml": "waterEstimated",
+    "moderate_min": "moderateIntensityMinutes", "vigorous_min": "vigorousIntensityMinutes", "lap_count": "lapCount",
+    "pool_m": "poolLength", "lengths": "activeLengths", "strokes": "strokes", "swolf": "averageSwolf",
+    "stroke_m": "avgStrokeDistance", "swim_cadence": "averageSwimCadenceInStrokesPerMinute",
+    "min_temp": "minTemperature", "max_temp": "maxTemperature",
+}
+# Garmin's fastest splits: metres -> label
+BEST_EFFORTS = {1000: "1 km", 1609: "1 mile", 5000: "5 km", 10000: "10 km", 21098: "Half marathon", 42195: "Marathon"}
+
+
+def build_activity(db_path, activity_id):
+    """One activity for the popup: its summary, every extra stat Garmin has, its route and its laps."""
+    conn = db.connect(db_path)
+    try:
+        row = conn.execute(f"SELECT {ACTIVITY_SELECT}, raw FROM activities WHERE id = ?", (activity_id,)).fetchone()
+        if not row:
+            return None
+        rests = [r[0] for r in conn.execute("SELECT resting_hr FROM daily WHERE resting_hr IS NOT NULL")]
+        track = db.get_track(conn, activity_id)
+        laps = db.get_laps(conn, activity_id)
+    finally:
+        conn.close()
+    a = dict(row)
+    raw = json.loads(a.pop("raw") or "null") or {}
+    _add_load(a, median(rests) if rests else 55)
+    stats = {key: raw.get(field) for key, field in DETAIL_FIELDS.items()}
+    stats.update(max_hr=a["max_hr"], aerobic_te=a["aerobic_te"], anaerobic_te=a["anaerobic_te"])
+    hr_zones = [raw.get(f"hrTimeInZone_{i}") for i in range(1, 6)]
+    power_zones = [raw.get(f"powerTimeInZone_{i}") for i in range(1, 6)]
+    return {
+        **_summary(a),
+        "stats": {k: v for k, v in stats.items() if v is not None},
+        "hr_zones": hr_zones if any(hr_zones) else None,
+        "power_zones": power_zones if any(power_zones) else None,
+        "best": [{"label": label, "m": m, "s": raw[f"fastestSplit_{m}"]}
+                 for m, label in BEST_EFFORTS.items() if raw.get(f"fastestSplit_{m}")],
+        "track": track or None,
+        "laps": laps or [],
+    }
+
+
 def build_dashboard(db_path=None):
     conn = db.connect(db_path or config.DB_PATH)
     try:
         acts = [dict(r) for r in conn.execute(
-            "SELECT id, start_local, date, type, name, distance_m, duration_s, avg_hr, "
-            "max_hr, avg_speed, elev_gain, training_load, aerobic_te, te_label, "
-            "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps, "
-            "json_extract(raw, '$.locationName') AS location FROM activities "
-            "WHERE date IS NOT NULL AND date != '' ORDER BY start_local")]
+            f"SELECT {ACTIVITY_SELECT} FROM activities WHERE date IS NOT NULL AND date != '' ORDER BY start_local")]
         track = db.get_track(conn, acts[-1]["id"]) if acts else None
         days = [dict(r) for r in conn.execute("SELECT * FROM daily ORDER BY date")]
         meta = {
@@ -211,11 +288,7 @@ def build_dashboard(db_path=None):
     # Load per activity and per day
     load_by_day = {}
     for a in acts:
-        load = a["training_load"]
-        if load is None:
-            load = trimp(a["duration_s"], a["avg_hr"], rest_hr, config.MAX_HR)
-        a["load"] = round(load or 0, 1)
-        a["focus"] = run_focus(a, threshold) if is_run(a["type"]) else None
+        _add_load(a, rest_hr)
         load_by_day[a["date"]] = load_by_day.get(a["date"], 0) + a["load"]
 
     # Fitness / fatigue / form
@@ -283,15 +356,7 @@ def build_dashboard(db_path=None):
     today_vals["resting_hr_7d"] = round(sum(week_rhr) / len(week_rhr)) if week_rhr else None
 
     # Every activity, newest first, so the page can filter by sport and total up this week and this year
-    recent_acts = []
-    for a in reversed(acts):
-        recent_acts.append({
-            "date": a["date"], "start": a["start_local"], "type": a["type"], "sport": sport_of(a["type"]),
-            "name": a["name"], "km": round((a["distance_m"] or 0) / 1000, 2), "duration_s": a["duration_s"],
-            "speed": a["avg_speed"], "elev_m": a["elev_gain"], "avg_hr": a["avg_hr"], "load": a["load"],
-            "sets": a["sets"], "reps": a["reps"],
-            "focus": a["focus"], "te_label": a["te_label"],
-        })
+    recent_acts = [_summary(a) for a in reversed(acts)]
 
     return {
         "generated": today.isoformat(),
@@ -311,6 +376,6 @@ def build_dashboard(db_path=None):
         "trends": trends,
         "activities": recent_acts,
         # The newest activity, with its GPS track when it has one (for the map at the top)
-        "last_activity": {**recent_acts[0], "location": acts[-1]["location"], "track": track or None} if acts else None,
+        "last_activity": {**recent_acts[0], "track": track or None} if acts else None,
         "activities_from": acts[0]["date"] if acts else None,  # the first synced activity, for "this year" totals
     }

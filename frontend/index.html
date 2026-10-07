@@ -35,6 +35,12 @@
   --st-strained: #E0559B;
   --st-overreaching: #D63A2E;
   --st-detraining: #7A807C;
+  /* Garmin's heart rate and power zone colors */
+  --z1: #A9B2AC;
+  --z2: #3FA9DE;
+  --z3: #2E9E4F;
+  --z4: #F08A24;
+  --z5: #D63A2E;
   --body: "Barlow", "Segoe UI", system-ui, sans-serif;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   color-scheme: light dark;
@@ -63,6 +69,11 @@
     --st-strained: #F27AB5;
     --st-overreaching: #EF5A4B;
     --st-detraining: #9AA19D;
+    --z1: #6E7A74;
+    --z2: #5BBDEB;
+    --z3: #4CC46C;
+    --z4: #F59A40;
+    --z5: #EF5A4B;
   }
 }
 * { box-sizing: border-box; }
@@ -215,6 +226,60 @@ td.name { white-space: normal; }
 .act-layout { display: grid; gap: 2.5rem; }
 @media (min-width: 1000px) { .act-layout { grid-template-columns: minmax(0, 1fr) 300px; } }
 .act-list { min-width: 0; }
+#actBody tr { cursor: pointer; }
+#actBody tr:hover td { background: var(--panel); }
+/* The activity name opens the popup; looks like plain text until hovered */
+button.act-link { all: unset; cursor: pointer; font-weight: 500; }
+button.act-link:hover, #actBody tr:hover button.act-link { text-decoration: underline; text-underline-offset: 3px; }
+button.act-link:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; border-radius: 2px; }
+
+/* Activity popup */
+.act-modal {
+  width: min(1040px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; overflow: hidden;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); color: var(--ink);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+.act-modal::backdrop { background: rgba(10, 16, 14, 0.55); backdrop-filter: blur(3px); }
+.act-modal[open] { animation: modal-in 180ms ease-out; }
+@keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .act-modal[open] { animation: none; } }
+body:has(.act-modal[open]) { overflow: hidden; }
+/* The box scrolls rather than the dialog, so its scrollbar isn't mistaken for a click outside */
+.modal-box {
+  display: flex; flex-direction: column; gap: 1.5rem; padding: 0 clamp(1.25rem, 3vw, 2.25rem) 2rem;
+  max-height: calc(100dvh - 2rem); overflow: hidden auto; overscroll-behavior: contain;
+}
+/* Stays at the top while the popup scrolls, so the close button is always in reach */
+.modal-head {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+  padding: 1.5rem 0 1rem; background: var(--paper); border-bottom: 1px solid var(--rule);
+}
+.modal-head .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.modal-head h2 { font: 700 clamp(1.8rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; overflow-wrap: anywhere; }
+button.close {
+  flex: none; width: 2.5rem; height: 2.5rem; padding: 0; border-color: var(--rule);
+  font: 400 1.7rem/1 var(--body); display: grid; place-items: center;
+}
+/* Leaflet's panes have z-indexes of 400+; isolate them so they scroll under the sticky header */
+.modal-map { flex: none; height: clamp(260px, 45vh, 420px); min-height: 0; isolation: isolate; }
+.modal-status { margin: 0; color: var(--muted); }
+.modal-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 1.75rem 2.5rem; }
+.dgroup { min-width: 0; }  /* lets the laps table scroll instead of widening the popup */
+.dgroup h3 { margin: 0 0 0.5rem; font: 600 1.25rem/1.1 var(--display); }
+.dgroup.wide { grid-column: 1 / -1; }
+.dgroup dl { margin: 0; }
+.dgroup dl div { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.4rem 0; border-bottom: 1px solid var(--rule); }
+.dgroup dt { color: var(--muted); font-size: 0.92rem; }
+.dgroup dd { margin: 0; font-weight: 600; text-align: right; }
+.dgroup dd small { display: block; font-weight: 400; color: var(--muted); font-size: 0.8rem; }
+.zones { display: grid; gap: 0.45rem; margin-top: 0.85rem; }
+.zrow { display: grid; grid-template-columns: 3.6rem minmax(0, 1fr) 5.5rem; align-items: center; gap: 0.6rem; font-size: 0.88rem; }
+.zrow > span:first-child { color: var(--muted); }
+.zbar { height: 0.7rem; border-radius: 999px; background: var(--rule); overflow: hidden; }
+.zbar i { display: block; height: 100%; border-radius: 999px; }
+.zval { text-align: right; font-weight: 600; }
+.zval small { font-weight: 400; color: var(--muted); margin-left: 0.4rem; }
+table.laps { min-width: 520px; }
 button.more { margin-top: 1rem; }
 
 /* Weekly and yearly totals, like Strava's side panel */
@@ -367,6 +432,23 @@ button.more { margin-top: 1rem; }
       </div>
     </section>
   </main>
+
+  <dialog class="act-modal" id="actModal" aria-labelledby="modalName">
+    <div class="modal-box">
+      <header class="modal-head">
+        <div>
+          <p class="eyebrow" id="modalWhen"></p>
+          <h2 id="modalName"></h2>
+          <p class="last-effect" id="modalEffect"></p>
+        </div>
+        <button type="button" class="close" id="modalClose" aria-label="Close">&times;</button>
+      </header>
+      <dl class="last-stats" id="modalStats"></dl>
+      <div class="last-map modal-map" id="modalMap" role="img" hidden></div>
+      <p class="modal-status" id="modalStatus" role="status" hidden></p>
+      <div class="modal-details" id="modalDetails"></div>
+    </div>
+  </dialog>
 
   <div id="empty" class="empty" hidden>
     <h1>No training data yet</h1>

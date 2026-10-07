@@ -112,6 +112,62 @@ def fetch_track(client, activity_id):
             if isinstance(p, dict) and p.get("lat") is not None and p.get("lon") is not None]
 
 
+def fetch_laps(client, activity_id):
+    """The activity's laps, or None if the request failed."""
+    splits = _try(client.get_activity_splits, activity_id)
+    if splits is None:
+        return None
+    return [{
+        "km": round((l.get("distance") or 0) / 1000, 3),
+        "duration_s": l.get("movingDuration") or l.get("duration"),
+        "speed": l.get("averageMovingSpeed") or l.get("averageSpeed"),
+        "avg_hr": l.get("averageHR"),
+        "max_hr": l.get("maxHR"),
+        "elev_gain": l.get("elevationGain"),
+        "cadence": l.get("averageRunCadence") or l.get("averageBikeCadence"),
+        "power": l.get("averagePower"),
+    } for l in splits.get("lapDTOs") or [] if isinstance(l, dict)]
+
+
+_shared_client = None  # logged in once and kept, for activities opened on the page
+
+
+def fetch_details(db_path, activity_id):
+    """Fetch an activity's GPS track and laps from Garmin if they aren't stored yet.
+    Returns None when all is well, or a message saying why they couldn't be fetched."""
+    global _shared_client
+    conn = db.connect(db_path)
+    try:
+        row = conn.execute("SELECT json_extract(raw, '$.hasPolyline') AS gps FROM activities WHERE id = ?",
+                           (activity_id,)).fetchone()
+        if not row:
+            return None
+        need_track = bool(row["gps"]) and db.get_track(conn, activity_id) is None
+        need_laps = db.get_laps(conn, activity_id) is None
+        if not (need_track or need_laps):
+            return None
+        _shared_client = _shared_client or _client()
+        if need_track:
+            points = fetch_track(_shared_client, activity_id)
+            if points is not None:  # a failed request is retried the next time the activity is opened
+                db.set_track(conn, activity_id, points)
+        if need_laps:
+            laps = fetch_laps(_shared_client, activity_id)
+            if laps is not None:
+                db.set_laps(conn, activity_id, laps)
+        conn.commit()
+        return None
+    except Exception as e:
+        _shared_client = None  # log in again next time
+        msg = str(e) or e.__class__.__name__
+        if "Username and password are required" in msg or "garth" in msg:
+            msg = "not logged in to Garmin"
+        log.warning("Fetching details for %s failed: %s", activity_id, msg)
+        return f"Couldn't fetch the route and laps from Garmin ({msg})."
+    finally:
+        conn.close()
+
+
 def fetch_vo2max_history(client, start, end):
     """One row per day Garmin updated the VO2 max estimate."""
     rows = _try(client.get_max_metrics_range, start.isoformat(), end.isoformat()) or []

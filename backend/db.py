@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS daily (
 -- GPS track per activity as JSON [[lat, lon], ...]; "[]" when the activity has none
 CREATE TABLE IF NOT EXISTS tracks (activity_id INTEGER PRIMARY KEY, points TEXT);
 
+-- Laps per activity as JSON [{km, duration_s, speed, ...}, ...]; fetched when the activity is first opened
+CREATE TABLE IF NOT EXISTS laps (activity_id INTEGER PRIMARY KEY, laps TEXT);
+
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
@@ -132,6 +135,15 @@ def set_track(conn, activity_id, points):
 def get_track(conn, activity_id):
     row = conn.execute("SELECT points FROM tracks WHERE activity_id = ?", (activity_id,)).fetchone()
     return json.loads(row["points"]) if row else None
+
+
+def set_laps(conn, activity_id, laps):
+    conn.execute("INSERT OR REPLACE INTO laps (activity_id, laps) VALUES (?, ?)", (activity_id, json.dumps(laps)))
+
+
+def get_laps(conn, activity_id):
+    row = conn.execute("SELECT laps FROM laps WHERE activity_id = ?", (activity_id,)).fetchone()
+    return json.loads(row["laps"]) if row else None
 
 
 def set_meta(conn, key, value):

@@ -83,6 +83,22 @@ def dashboard():
     return data
 
 
+@app.get("/api/activity/{activity_id}")
+def activity(activity_id: int):
+    """One activity with all its stats, route and laps, for the popup."""
+    if DEMO:
+        import demo
+        demo.fill_details(DB_PATH, activity_id)
+        error = None
+    else:
+        error = sync.fetch_details(DB_PATH, activity_id)
+    data = metrics.build_activity(DB_PATH, activity_id)
+    if data is None:
+        return JSONResponse({"error": "No such activity"}, status_code=404)
+    data["details_error"] = error
+    return data
+
+
 @app.post("/api/sync")
 def sync_now():
     if DEMO:
