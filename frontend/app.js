@@ -59,6 +59,7 @@ function render() {
 
   if (!data.has_data) {
     $("main").hidden = true;
+    $("nav").hidden = true;
     $("empty").hidden = false;
     if (!data.syncing && !data.meta.last_sync_at) $("emptyText").textContent =
       "Nothing synced yet. Run python backend/login.py on the server machine if you haven't, then press Sync now.";
@@ -66,13 +67,301 @@ function render() {
   }
   $("empty").hidden = true;
   $("main").hidden = false;
-
-  renderLastActivity();
-  renderTrainingStatus();
-  renderHero();
-  renderCharts();
-  renderActivities();
+  $("nav").hidden = false;
+  renderNav();
+  showPage();
 }
+
+// ---- Pages: the menu on the left picks one, kept in the address (#overview, #health, #activities, #sport/run)
+
+const PAGES = { overview: renderOverview, health: renderHealth, activities: renderActivities };
+function route() {
+  const [page, key] = location.hash.slice(1).split("/");
+  if (page === "sport" && hasPage(key)) return { page: "sport", key, id: `sport/${key}` };
+  return PAGES[page] ? { page, id: page } : { page: "overview", id: "overview" };
+}
+
+let shownPage = "";
+function showPage() {
+  const r = route();
+  // Show the page before drawing it, so its charts are drawn at their real size
+  document.querySelectorAll(".page").forEach((el) => { el.hidden = el.id !== `page-${r.page}`; });
+  document.querySelectorAll("#nav a").forEach((a) => {
+    if (a.dataset.page === r.id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+  if (r.page !== "overview") lastMap.stop();
+  if (r.page === "sport") renderSport(r.key); else PAGES[r.page]();
+  const title = r.page === "sport" ? sportLabel(r.key) : $(`page-${r.page}`).dataset.title;
+  document.title = r.page === "overview" ? "Training" : `${title} · Training`;
+  if (r.id !== shownPage) {  // a new page starts at the top; a background refresh of the same page keeps its place
+    if (shownPage) scrollTo(0, 0);
+    shownPage = r.id;
+  }
+}
+addEventListener("hashchange", () => { if (data?.has_data) showPage(); });
+
+function sportCounts() {
+  const counts = {};
+  data.activities.forEach((a) => { counts[a.sport] = (counts[a.sport] || 0) + 1; });
+  return counts;
+}
+// The sports you have, most-used first, "Other" always last: [[key, label], ...]
+function sportsByCount(counts = sportCounts()) {
+  return SPORTS.filter(([key]) => counts[key])
+    .sort((a, b) => (a[0] === "other") - (b[0] === "other") || counts[b[0]] - counts[a[0]]);
+}
+const sportLabel = (key) => SPORTS.find(([k]) => k === key)?.[1] || "Other";
+// Sports with a page of their own: done at least 3 times, and with something to follow over time. One-offs, Other
+// (a mix of types) and disc golf (Garmin keeps no scores) stay in the activities list instead.
+const NO_PAGE = ["other", "disc_golf"];
+const hasPage = (key, counts = sportCounts()) => counts[key] >= 3 && !NO_PAGE.includes(key);
+// The sport's color in the menu and on its page (sports without one use the neutral grey)
+const sportColor = (key) => css(`--sp-${key}`) || css("--nohr");
+
+function renderNav() {
+  const counts = sportCounts(), sports = sportsByCount(counts).filter(([key]) => hasPage(key, counts));
+  $("navActCount").textContent = data.activities.length;
+  $("navSportsLabel").hidden = !sports.length;
+  $("navSports").innerHTML = sports.map(([key, label]) => `<li><a href="#sport/${key}" data-page="sport/${key}">
+    <span class="label"><i class="swatch" style="background:${sportColor(key)}"></i>${label}</span><span class="count">${counts[key]}</span></a></li>`).join("");
+}
+
+// ---- Overview: the athlete's story, then the big picture
+
+function renderOverview() {
+  renderStory();
+  renderRace();
+  renderHero();
+  renderTrainingStatus();
+  renderLastActivity();
+  renderFitnessCharts();
+  const t = tableParts(data.activities.slice(0, 15), "all");
+  $("recentHead").innerHTML = t.head;
+  $("recentBody").innerHTML = t.body;
+  // Your main sport (the one you do most): its weekly chart, and this week and this year next to the activities
+  const main = sportsByCount().find(([key]) => key !== "other")?.[0];
+  $("weeklySection").hidden = $("ovVolume").hidden = !main;
+  if (!main) return;
+  const list = data.activities.filter((a) => a.sport === main), m = measureFor(list);
+  $("weeklyTitle").textContent = `Weekly ${sportLabel(main).toLowerCase()}`;
+  $("weeklySub").textContent = main === "run" ? lowShare(list) : "";
+  weeklyChart("weeklyChart", "weeklyLegend", main, list, weekStarts(12), m);
+  renderVolume($("ovVolume"), list, sportLabel(main), main);
+}
+
+// What each sport's activities are called in a sentence
+const SPORT_NOUNS = {
+  run: ["run", "runs"], bike: ["ride", "rides"], walk: ["walk", "walks"], hike: ["hike", "hikes"], swim: ["swim", "swims"],
+  strength: ["strength session", "strength sessions"], cardio: ["cardio session", "cardio sessions"],
+  disc_golf: ["round of disc golf", "rounds of disc golf"], yoga: ["yoga session", "yoga sessions"],
+  winter: ["day on snow", "days on snow"], other: ["other activity", "other activities"],
+};
+const plural = (n, [one, many]) => `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
+const sum = (as, f) => as.reduce((t, a) => t + (a[f] || 0), 0);
+const between = (list, from, to) => list.filter((a) => a.date >= from && a.date < to);
+const fmtKm = (v) => (v >= 100 ? Math.round(v).toLocaleString("en-GB") : v.toFixed(1));
+
+// Every run's personal best events, oldest first: [{m, s, a}] whenever a run beat the best so far over a distance.
+// A distance's first time doesn't count, as there was nothing to beat.
+function pbEvents() {
+  const best = {}, events = [];
+  data.activities.filter((a) => a.sport === "run" && a.best).slice().reverse().forEach((a) => {
+    Object.entries(a.best).forEach(([m, s]) => {
+      if (!(m in BEST_LABELS)) return;
+      if (best[m] != null && s < best[m]) events.push({ m, s, a });
+      if (best[m] == null || s < best[m]) best[m] = s;
+    });
+  });
+  return events;
+}
+const pbText = (e) => `${BEST_LABELS[e.m]} in ${fmtDuration(e.s)}`;
+const listText = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : xs[0]);
+
+// A few sentences on where the athlete stands, led by Garmin's training status: what it means, VO2 max,
+// personal bests, the year so far and the recent trend in training hours
+function renderStory() {
+  const parts = [], today = data.generated, ts = data.training_status;
+  if (ts) parts.push(`Garmin rates your training as <strong>${ts.label.toLowerCase()}</strong>${ts.since ? ` since ${fmtShort(ts.since)}` : ""}.`);
+  const v = data.vo2max;
+  if (v) {
+    const diff = v.ago_3m != null ? Math.round((v.now - v.ago_3m) * 10) / 10 : 0;
+    parts.push(`VO2 max is ${round(v.now, 1)}${Math.abs(diff) >= 0.5 ? `, ${diff > 0 ? "up" : "down"} ${Math.abs(diff).toFixed(1)} in three months` : ""}.`);
+  }
+  // Personal bests from the last four weeks, or else the latest one
+  const pbs = pbEvents(), recent = pbs.filter((e) => e.a.date > addDays(today, -28));
+  if (recent.length) {
+    // One per distance: the newest
+    const latest = Object.values(Object.fromEntries(recent.map((e) => [e.m, e])));
+    parts.push(`<strong>New personal best${latest.length > 1 ? "s" : ""}</strong> in the last four weeks: ${listText(latest.map((e) => `${pbText(e)} (${fmtShort(e.a.date)})`))}.`);
+  } else if (pbs.length) {
+    const e = pbs[pbs.length - 1];
+    parts.push(`Your latest personal best is ${pbText(e)}, on ${fmtShort(e.a.date)} ${e.a.date.slice(0, 4)}.`);
+  }
+  // The year so far: the three sports with the most hours
+  const year = data.activities.filter((a) => a.date.startsWith(today.slice(0, 4)));
+  const bySport = sportsByCount().map(([key]) => [key, year.filter((a) => a.sport === key)])
+    .filter(([, as]) => as.length).sort((a, b) => sum(b[1], "duration_s") - sum(a[1], "duration_s")).slice(0, 3);
+  if (bySport.length) {
+    parts.push(`So far this year: ${listText(bySport.map(([key, as]) => {
+      const km = sum(as, "km");
+      return `${plural(as.length, SPORT_NOUNS[key])} (${km > 0 ? `${fmtKm(km)} km` : fmtHours(sum(as, "duration_s"))})`;
+    }))}.`);
+  }
+  // Training hours per week, last 4 weeks against the 4 before
+  const now4 = sum(between(data.activities, addDays(today, -27), addDays(today, 1)), "duration_s") / 4;
+  const before4 = sum(between(data.activities, addDays(today, -55), addDays(today, -27)), "duration_s") / 4;
+  if (now4 && before4) {
+    const change = Math.round((now4 - before4) / before4 * 100);
+    parts.push(`Over the last four weeks you've trained ${fmtHours(now4)} a week${Math.abs(change) >= 5
+      ? `, ${change > 0 ? "up" : "down"} from ${fmtHours(before4)} the four weeks before` : ", about the same as the four weeks before"}.`);
+  }
+  $("story").innerHTML = parts.join(" ");
+}
+
+const mondayOf = (iso) => addDays(iso, -((new Date(iso + "T12:00:00").getDay() + 6) % 7));
+// Mondays of the `n` weeks up to the week of `end` (today by default)
+const weekStarts = (n, end = data.generated) => [...Array(n)].map((_, i) => addDays(mondayOf(end), -7 * (n - 1 - i)));
+
+function stackedBarOptions(tooltip) {
+  const o = baseOptions();
+  o.scales.x.stacked = o.scales.y.stacked = true;
+  o.plugins.tooltip.callbacks = tooltip;
+  return o;
+}
+// Bars rounded at the top, with a thin line of page color between stacked segments
+const barStyle = () => ({ borderRadius: 2, borderSkipped: "bottom", borderWidth: { top: 2 }, borderColor: css("--paper"), maxBarThickness: 34 });
+
+// The share of the last 4 weeks' running kilometres that Garmin rated low aerobic, as a sentence
+function lowShare(runs) {
+  const recent = runs.filter((a) => a.date > addDays(data.generated, -28));
+  const low = sum(recent.filter((a) => a.focus === "low"), "km"), known = sum(recent.filter((a) => a.focus), "km");
+  return known ? `Last 4 weeks: ${Math.round(low / known * 100)}% low aerobic.` : "";
+}
+
+// Volume per week in `canvas` (km or hours, by `m`); runs are split by Garmin's training effect, like the load focus
+function weeklyChart(canvas, legend, key, list, starts, m) {
+  const val = (as) => (m.byKm ? +sum(as, "km").toFixed(1) : +(sum(as, "duration_s") / 3600).toFixed(2));
+  const inWeek = (w) => list.filter((a) => mondayOf(a.date) === w);
+  const fmt = (v) => (m.byKm ? `${v} km` : fmtHours(v * 3600));
+  let sets;
+  if (key === "run") {
+    sets = FOCUS.map(([f, name, color]) => ({ label: name, data: starts.map((w) => val(inWeek(w).filter((a) => a.focus === f))), backgroundColor: css(color) }));
+    const unknown = starts.map((w) => val(inWeek(w).filter((a) => !a.focus)));
+    if (unknown.some(Boolean)) sets.push({ label: "Unknown", data: unknown, backgroundColor: css("--nohr") });
+  } else {
+    sets = [{ label: sportLabel(key), data: starts.map((w) => val(inWeek(w))), backgroundColor: sportColor(key) }];
+  }
+  // A single series needs no legend: the title names it
+  $(legend).innerHTML = sets.length > 1 ? sets.map((x) => `<span><i style="background:${x.backgroundColor}"></i>${x.label}</span>`).join("") : "";
+  $(canvas).setAttribute("aria-label", `${m.unit} of ${sportLabel(key).toLowerCase()} per week, last ${starts.length} weeks`);
+  draw(canvas, {
+    type: "bar",
+    data: { labels: starts.map((w) => fmtShort(w)), datasets: sets.map((x) => ({ ...x, ...barStyle() })) },
+    options: stackedBarOptions({
+      title: (items) => `Week of ${fmtShort(starts[items[0].dataIndex])}`,
+      label: (c) => (c.parsed.y ? ` ${c.dataset.label}: ${fmt(c.parsed.y)}` : null),
+      footer: (items) => {
+        const as = inWeek(starts[items[0].dataIndex]);
+        return as.length ? `${plural(as.length, SPORT_NOUNS[key])}, ${fmtHours(sum(as, "duration_s"))}` : "";
+      },
+    }),
+  });
+}
+
+// ---- Race goal: target, Garmin's prediction and how far apart they are; the result after race day
+
+const RACE_DISTANCES = { 5000: "5 km", 10000: "10 km", 21098: "Half marathon", 42195: "Marathon" };
+const raceDistance = (m) => RACE_DISTANCES[m] || `${+(m / 1000).toFixed(2)} km`;
+// "50:00" or "1:45:00" -> seconds
+function parseTime(text) {
+  const parts = text.trim().split(":");
+  if (parts.length < 2 || parts.length > 3 || parts.some((p) => !/^\d+$/.test(p))) return null;
+  return parts.map(Number).reduce((t, v) => t * 60 + v, 0) || null;
+}
+
+function renderRace() {
+  const r = data.race;
+  $("race").hidden = !r;
+  $("raceAdd").hidden = !!r;
+  if (!r) return;
+  const pace = (sec) => fmtPace(sec / r.metres * 1000);
+  const d = r.days_to_go;
+  $("raceWhen").textContent = [fmtDayYear(r.date), raceDistance(r.metres),
+    d > 1 ? `${d} days to go` : d === 1 ? "Tomorrow" : d === 0 ? "Today" : null].filter(Boolean).join(" · ");
+  $("raceName").textContent = r.name;
+  const items = [["Target", fmtDuration(r.target_s), pace(r.target_s)]];
+  if (r.result) {
+    // After race day: the time, over or under the target
+    const gap = r.result.s - r.target_s;
+    items.push(["Result", fmtDuration(r.result.s),
+      `<span class="${gap > 0 ? "over" : "under"}">${gap > 0 ? "+" : "−"}${fmtDuration(Math.abs(gap)) || "0:00"}</span> vs target`]);
+  } else if (r.predicted_s) {
+    const gap = r.predicted_s - r.target_s;
+    items.push(["Garmin predicts", fmtDuration(r.predicted_s), pace(r.predicted_s)],
+      ["Gap", gap > 0 ? fmtDuration(gap) : "On target", gap > 0 ? "to find" : ""]);
+  }
+  $("raceStats").innerHTML = statItems(items);
+
+  const h = r.history;
+  $("raceTrend").hidden = h.length < 2;
+  if (h.length < 2) return;
+  const fit = css("--fitness"), ink = css("--ink");
+  const o = baseOptions({
+    // Faster is higher, so the prediction climbs toward the target as you get fitter
+    y: { reverse: true, grid: { color: css("--rule") }, ticks: { color: css("--muted"), callback: (v) => fmtDuration(v) }, border: { display: false },
+      suggestedMin: Math.min(r.target_s, ...h.map((x) => x.s)) - 30, suggestedMax: Math.max(r.target_s, ...h.map((x) => x.s)) + 30 },
+  });
+  o.plugins.tooltip.callbacks = { label: (c) => ` ${c.dataset.label}: ${fmtDuration(c.parsed.y)}` };
+  draw("raceChart", {
+    type: "line",
+    data: {
+      labels: h.map((x) => fmtShort(x.date)),
+      datasets: [
+        { label: "Garmin predicts", data: h.map((x) => x.s), borderColor: fit, backgroundColor: fit, borderWidth: 2, tension: 0.3,
+          pointRadius: h.map((_, i) => (i === h.length - 1 ? 4 : 0)) },
+        { label: "Target", data: h.map(() => r.target_s), borderColor: ink, borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0 },
+      ],
+    },
+    options: o,
+  });
+}
+
+const raceDialog = $("raceDialog");
+function openRaceForm() {
+  const r = data.race;
+  $("raceInName").value = r?.name || "";
+  $("raceInDate").value = r?.date || "";
+  const preset = r && RACE_DISTANCES[r.metres] ? String(r.metres) : r ? "custom" : "10000";
+  $("raceInDist").value = preset;
+  $("raceInKm").value = preset === "custom" ? +(r.metres / 1000).toFixed(2) : "";
+  $("raceInKmWrap").hidden = preset !== "custom";
+  $("raceInTime").value = r ? fmtDuration(r.target_s) : "";
+  $("raceRemove").hidden = !r;
+  $("raceError").hidden = true;
+  raceDialog.showModal();
+}
+async function raceRequest(method, body) {
+  const res = await fetch("/api/race", { method, headers: { "Content-Type": "application/json" }, body: body && JSON.stringify(body) });
+  if (res.status === 404 || res.status === 405) throw new Error("The dashboard server is older than this page. Restart it, then try again.");
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Couldn't save the race goal.");
+  raceDialog.close();
+  lastJson = "";  // redraw even though only the goal changed
+  await load();
+}
+const raceFail = (e) => { $("raceError").textContent = e.message; $("raceError").hidden = false; };
+$("raceAdd").addEventListener("click", openRaceForm);
+$("raceEdit").addEventListener("click", openRaceForm);
+$("raceCancel").addEventListener("click", () => raceDialog.close());
+$("raceInDist").addEventListener("change", () => { $("raceInKmWrap").hidden = $("raceInDist").value !== "custom"; });
+$("raceRemove").addEventListener("click", () => raceRequest("DELETE").catch(raceFail));
+$("raceForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const dist = $("raceInDist").value, metres = dist === "custom" ? Number($("raceInKm").value) * 1000 : Number(dist);
+  const target = parseTime($("raceInTime").value);
+  if (!metres) return raceFail(new Error("Enter the distance in kilometres."));
+  if (!target) return raceFail(new Error("Enter the target time as minutes:seconds or hours:minutes:seconds."));
+  raceRequest("POST", { name: $("raceInName").value, date: $("raceInDate").value, metres, target_s: target }).catch(raceFail);
+});
 
 // Garmin's own colors per status
 const STATUS_COLORS = {
@@ -118,7 +407,6 @@ function renderTrainingStatus() {
   $("tsLabel").textContent = ts.label;
   $("tsLabel").style.setProperty("--status-color", statusColor(ts.code));
   $("tsSince").textContent = ts.since ? `since ${fmtDay(ts.since)}` : "";
-  $("tsAbout").textContent = ts.about;
 
   const facts = [];
   if (ts.acute_load != null) {
@@ -155,58 +443,42 @@ function fitnessReading(f) {
   if (f.ctl < 5 || fx.length < 29) return "";
   const now = Math.round(f.ctl), before = Math.round(fx[fx.length - 29].ctl);
   const change = Math.round((now - before) / before * 100);
-  if (change >= 3) return `Fitness is ${now}, up from ${before} four weeks ago (+${change}%). You're getting fitter.`;
-  if (change <= -3) return `Fitness is ${now}, down from ${before} four weeks ago (${change}%). Normal during a recovery week or taper; if it keeps falling, you're losing fitness.`;
-  return `Fitness is ${now}, about the same as four weeks ago (${before}). You're holding your fitness.`;
+  if (Math.abs(change) < 3) return `Fitness ${now}, about the same as four weeks ago.`;
+  return `Fitness ${now}, ${change > 0 ? "up" : "down"} from ${before} four weeks ago (${change > 0 ? "+" : ""}${change}%).`;
 }
-
-// Chart.js plugin: shades the form bands behind the line and names them in the right margin.
-const formBands = {
-  id: "formBands",
-  beforeDatasetsDraw(chart) {
-    const { ctx, chartArea: a, scales: { y } } = chart;
-    const zones = data.form_zones;
-    const clamp = (px) => Math.max(a.top, Math.min(a.bottom, px));
-    ctx.save();
-    zones.forEach((z, i) => {
-      const top = i === 0 ? a.top : clamp(y.getPixelForValue(zones[i - 1].min));
-      const bottom = z.min == null ? a.bottom : clamp(y.getPixelForValue(z.min));
-      if (bottom - top < 1) return;
-      ctx.fillStyle = alpha(css(FORM_COLORS[z.name]), 0.14);
-      ctx.fillRect(a.left, top, a.right - a.left, bottom - top);
-      if (bottom - top >= 14) {
-        ctx.fillStyle = css("--muted");
-        ctx.font = `500 11px ${css("--body")}`;
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.fillText(z.name, a.right + 8, (top + bottom) / 2);
-      }
-    });
-    ctx.restore();
-  },
-};
 
 function renderHero() {
   const f = data.form, t = data.today;
   $("state").textContent = f.pct != null ? `${f.state} (${f.pct > 0 ? "+" : ""}${Math.round(f.pct)}%)` : f.state;
   $("state").style.setProperty("--state-color", `var(${FORM_COLORS[f.state] || "--ink"})`);
-  $("advice").textContent = f.advice;
   $("fitnessReading").textContent = fitnessReading(f);
 
+  $("today").innerHTML = statItems(todayItems().slice(0, 4));
+}
+
+// Garmin's readiness and stress levels
+const readinessLevel = (v) => (v >= 95 ? "Prime" : v >= 75 ? "High" : v >= 50 ? "Moderate" : v >= 25 ? "Low" : "Poor");
+const stressLevel = (v) => (v > 75 ? "High" : v > 50 ? "Medium" : v > 25 ? "Low" : "Resting");
+
+// Last night and today: [label, value, note]; the first four are the overview's, the health page shows them all
+function todayItems() {
+  const t = data.today;
   let hrvNote = "";
   if (t.hrv_last_night != null && t.hrv_low != null && t.hrv_high != null) {
     hrvNote = t.hrv_last_night < t.hrv_low ? "Below your range" : t.hrv_last_night > t.hrv_high ? "Above your range" : "In your normal range";
   }
-  const items = [
-    ["Readiness", t.readiness != null ? round(t.readiness) : null, ""],
+  return [
+    ["Readiness", t.readiness != null ? round(t.readiness) : null, t.readiness != null ? readinessLevel(t.readiness) : ""],
     ["HRV last night", t.hrv_last_night != null ? `${round(t.hrv_last_night)}<span>ms</span>` : null, hrvNote],
     ["Sleep", fmtSleep(t.sleep_s), t.sleep_score != null ? `Score ${round(t.sleep_score)}` : ""],
     ["Resting HR", t.resting_hr != null ? `${round(t.resting_hr)}<span>bpm</span>` : null, t.resting_hr_7d != null ? `7-day avg: ${t.resting_hr_7d} bpm` : ""],
+    ["Body Battery peak", t.bb_high != null ? round(t.bb_high) : null, t.bb_low != null ? `Lowest ${round(t.bb_low)}` : ""],
+    ["Average stress", t.stress_avg != null ? round(t.stress_avg) : null, t.stress_avg != null ? stressLevel(t.stress_avg) : ""],
+    ["Steps today", t.steps != null ? Math.round(t.steps).toLocaleString("en-GB") : null, ""],
   ].filter((i) => i[1] != null);
-  $("today").innerHTML = items
-    .map(([label, val, note]) => `<div><dd>${val}</dd><dt>${label}${note ? `<span class="note">${note}</span>` : ""}</dt></div>`)
-    .join("");
 }
+const statItems = (items) => items
+  .map(([label, val, note]) => `<div><dd>${val}</dd><dt>${label}${note ? `<span class="note">${note}</span>` : ""}</dt></div>`).join("");
 
 // The newest activity at the top: name, when, the sport's stats, and its route on a map when it has GPS
 function renderLastActivity() {
@@ -387,100 +659,157 @@ function alpha(hex, a) {
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
-function renderCharts() {
+function renderFitnessCharts() {
   Chart.defaults.font.family = css("--body");
-  const easy = css("--easy"), fit = css("--fitness"), fat = css("--fatigue"), nohr = css("--nohr"), muted = css("--muted");
+  const fit = css("--fitness");
 
-  // Fitness and fatigue
-  const fx = data.fitness;
-  const fxLabels = fx.map((d) => fmtShort(d.date));
+  // Fitness and fatigue on one scale: the gap between them is form
+  const fx = data.fitness, fat = css("--fatigue");
+  const last = (color) => ({ pointRadius: fx.map((_, i) => (i === fx.length - 1 ? 4 : 0)), pointBackgroundColor: color });
+  const o = baseOptions();
+  o.plugins.tooltip.callbacks = {
+    label: (c) => ` ${c.dataset.label}: ${Math.round(c.parsed.y)}`,
+    footer: (items) => {
+      const p = fx[items[0].dataIndex].form_pct;
+      if (p == null) return "";
+      const zone = data.form_zones.find((z) => z.min == null || p > z.min);
+      return `Form: ${p > 0 ? "+" : ""}${Math.round(p)}% (${zone.name.toLowerCase()})`;
+    },
+  };
   draw("fitnessChart", {
     type: "line",
     data: {
-      labels: fxLabels,
+      labels: fx.map((d) => fmtShort(d.date)),
       datasets: [
         { label: "Fitness", data: fx.map((d) => d.ctl), borderColor: fit, backgroundColor: alpha(fit, 0.1), fill: "origin", borderWidth: 2.5,
-          tension: 0.3, pointRadius: fx.map((_, i) => (i === fx.length - 1 ? 4 : 0)), pointBackgroundColor: fit },
+          tension: 0.3, ...last(fit) },
+        { label: "Fatigue", data: fx.map((d) => d.atl), borderColor: fat, borderWidth: 1.5, tension: 0.3, ...last(fat) },
       ],
     },
-    options: baseOptions(),
-  });
-
-  // Form, against the bands
-  const pcts = fx.map((d) => d.form_pct).filter((v) => v != null);
-  const formOpts = baseOptions({
-    y: {
-      min: Math.floor(Math.min(-45, ...pcts) / 10) * 10, max: Math.ceil(Math.max(40, ...pcts) / 10) * 10,
-      grid: { display: false }, ticks: { color: muted, callback: (v) => `${v > 0 ? "+" : ""}${v}%` }, border: { display: false },
-    },
-  });
-  formOpts.layout = { padding: { right: 72 } };
-  formOpts.plugins.tooltip.callbacks = { label: (c) => ` Form: ${c.parsed.y > 0 ? "+" : ""}${Math.round(c.parsed.y)}%` };
-  draw("formChart", {
-    type: "line",
-    data: {
-      labels: fxLabels,
-      datasets: [{ label: "Form", data: fx.map((d) => d.form_pct), borderColor: css("--ink"), borderWidth: 2, tension: 0.3, spanGaps: true,
-        pointRadius: fx.map((_, i) => (i === fx.length - 1 ? 4 : 0)), pointBackgroundColor: css("--ink") }],
-    },
-    options: formOpts,
-    plugins: [formBands],
+    options: o,
   });
 
   renderVo2max();
+}
 
-  // Weekly running
-  const w = data.weeks;
-  const anyUnknown = w.some((x) => x.unknown_km > 0);
-  $("weeklySub").textContent = "Kilometres per week, split by Garmin's training effect for each run." +
-    (data.low_share_4w != null ? ` Last 4 weeks: ${data.low_share_4w}% low aerobic.` : "");
-  const sets = FOCUS.map(([key, label, color]) => ({ label, data: w.map((x) => x[`${key}_km`]), backgroundColor: css(color) }));
-  if (anyUnknown) sets.push({ label: "Unknown", data: w.map((x) => x.unknown_km), backgroundColor: nohr });
-  $("weeklyLegend").innerHTML = sets.map((s) => `<span><i style="background:${s.backgroundColor}"></i>${s.label}</span>`).join("");
-  const wopts = baseOptions();
-  wopts.scales.x.stacked = true;
-  wopts.scales.y.stacked = true;
-  wopts.plugins.tooltip.callbacks = {
-    label: (c) => ` ${c.dataset.label}: ${c.parsed.y} km`,
-    footer: (items) => { const x = w[items[0].dataIndex]; return `${x.runs} runs, ${x.hours} h`; },
+// ---- Health: recovery, sleep and the body's daily numbers, last 90 days
+
+// Average of a daily field over the days from `from` to `to` days ago (to excluded), skipping days without it
+function trendAvg(field, from, to) {
+  const lo = addDays(data.generated, -from), hi = addDays(data.generated, -to);
+  const vals = data.trends.filter((d) => d.date > lo && d.date <= hi && d[field] != null).map((d) => d[field]);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+function healthReadings() {
+  const t = data.today;
+  const hrv7 = trendAvg("hrv_last_night", 7, 0);
+  $("hrvReading").textContent = hrv7 == null ? "" : `Your HRV has averaged ${Math.round(hrv7)} ms over the last 7 nights` +
+    (t.hrv_low != null ? (hrv7 < t.hrv_low ? `, below your normal range of ${round(t.hrv_low)}–${round(t.hrv_high)}.`
+      : hrv7 > t.hrv_high ? `, above your normal range of ${round(t.hrv_low)}–${round(t.hrv_high)}.`
+      : `, inside your normal range of ${round(t.hrv_low)}–${round(t.hrv_high)}.`) : ".");
+  const vs = (now, before, unit, digits = 0) => {
+    if (before == null) return ".";
+    const d = now - before;
+    return Math.abs(d) < (digits ? 0.15 : 1) ? `, the same as the 30 days before.`
+      : `, ${Math.abs(d).toFixed(digits)} ${unit} ${d > 0 ? "higher" : "lower"} than the 30 days before.`;
   };
-  draw("weeklyChart", { type: "bar", data: { labels: w.map((x) => fmtShort(x.week)), datasets: sets.map((s) => ({ ...s, borderRadius: 2, maxBarThickness: 34 })) }, options: wopts });
+  const rhr7 = trendAvg("resting_hr", 7, 0), rhr30 = trendAvg("resting_hr", 37, 7);
+  $("rhrReading").textContent = rhr7 == null ? "" : `Resting heart rate has averaged ${Math.round(rhr7)} bpm this week` + vs(rhr7, rhr30, "bpm");
+  const sl7 = trendAvg("sleep_s", 7, 0), sl30 = trendAvg("sleep_s", 37, 7);
+  $("sleepReading").textContent = sl7 == null ? "" : `You've slept ${fmtHours(sl7)} a night this week` +
+    (sl30 != null ? `, against ${fmtHours(sl30)} over the 30 nights before.` : ".");
+  // Today's steps are still counting, so the averages start yesterday
+  const st7 = trendAvg("steps", 8, 1), st30 = trendAvg("steps", 38, 8);
+  $("stepsReading").textContent = st7 == null ? "" : `${Math.round(st7).toLocaleString("en-GB")} steps a day over the last 7 days` +
+    (st30 != null ? `, against ${Math.round(st30).toLocaleString("en-GB")} the 30 days before.` : ".");
 
-  // HRV with normal range
-  const tr = data.trends;
-  const labels = tr.map((d) => fmtShort(d.date));
-  draw("hrvChart", {
+}
+
+let healthDays = 90;
+try { healthDays = Number(localStorage.getItem("healthDays")) || 90; } catch {}
+$("healthRange").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-days]");
+  if (!b) return;
+  healthDays = Number(b.dataset.days);
+  try { localStorage.setItem("healthDays", healthDays); } catch {}
+  renderHealth();
+});
+
+function renderHealth() {
+  Chart.defaults.font.family = css("--body");
+  $("healthRange").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.days) === healthDays)));
+  $("healthToday").innerHTML = statItems(todayItems().filter(([label]) => label !== "Readiness"));
+  healthReadings();
+  const from = addDays(data.generated, -healthDays);
+  const tr = data.trends.filter((d) => d.date > from), labels = tr.map((d) => fmtShort(d.date));
+  const fit = css("--fitness"), muted = css("--muted"), rule = css("--rule"), dots = healthDays > 90 ? 0 : 2;
+  const has = (f) => tr.some((d) => d[f] != null);
+  // Each measure gets its own chart (one y-axis each); a chart with no data hides its section
+  const chart = (section, id, config) => {
+    $(section).hidden = !config;
+    if (config) draw(id, config);
+  };
+  const yAxis = (extra = {}) => ({ y: { grid: { color: rule }, ticks: { color: muted }, border: { display: false }, ...extra } });
+  const opts = (extra, label) => {
+    const o = baseOptions(yAxis(extra));
+    if (label) o.plugins.tooltip.callbacks = { label };
+    return o;
+  };
+  const line = (label, f, color) => ({ label, data: tr.map((d) => d[f]), borderColor: color, backgroundColor: color, borderWidth: 2,
+    pointRadius: 0, pointHoverRadius: 4, tension: 0.3, spanGaps: true });
+  const bars = (label, data, color) => ({ type: "bar", label, data, backgroundColor: color, borderRadius: 2, maxBarThickness: 14 });
+
+  chart("hrvSection", "hrvChart", has("hrv_last_night") && {
     type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "Range high", data: tr.map((d) => d.hrv_high), borderWidth: 0, pointRadius: 0, fill: "+1", backgroundColor: alpha(fit, 0.12), yAxisID: "y" },
-        { label: "Range low", data: tr.map((d) => d.hrv_low), borderWidth: 0, pointRadius: 0, fill: false, yAxisID: "y" },
-        { label: "HRV (ms)", data: tr.map((d) => d.hrv_last_night), borderColor: fit, backgroundColor: fit, borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true, yAxisID: "y" },
-        { label: "Resting HR (bpm)", data: tr.map((d) => d.resting_hr), borderColor: alpha(fat, 0.7), borderWidth: 1.25, borderDash: [4, 3], pointRadius: 0, tension: 0.25, spanGaps: true, yAxisID: "y2" },
-      ],
-    },
+    data: { labels, datasets: [
+      { label: "Range high", data: tr.map((d) => d.hrv_high), borderWidth: 0, pointRadius: 0, fill: "+1", backgroundColor: alpha(fit, 0.12) },
+      { label: "Range low", data: tr.map((d) => d.hrv_low), borderWidth: 0, pointRadius: 0, fill: false },
+      { ...line("HRV", "hrv_last_night", fit), pointRadius: dots },
+    ] },
     options: (() => {
-      const o = baseOptions({ y2: { position: "right", grid: { display: false }, ticks: { color: muted }, border: { display: false } } });
+      const o = opts({}, (c) => ` HRV: ${c.parsed.y} ms`);
       o.plugins.tooltip.filter = (i) => !i.dataset.label.startsWith("Range");
       return o;
     })(),
   });
-
-  // Sleep and readiness
-  draw("sleepChart", {
-    data: {
-      labels,
-      datasets: [
-        { type: "bar", label: "Sleep (h)", data: tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(1) : null)), backgroundColor: alpha(nohr, 0.75), borderRadius: 2, yAxisID: "y" },
-        { type: "line", label: "Readiness", data: tr.map((d) => d.readiness), borderColor: easy, borderWidth: 2, pointRadius: 0, tension: 0.3, spanGaps: true, yAxisID: "y2" },
-      ],
-    },
-    options: baseOptions({
-      y: { min: 0, grid: { color: css("--rule") }, ticks: { color: muted }, border: { display: false } },
-      y2: { position: "right", min: 0, max: 100, grid: { display: false }, ticks: { color: muted }, border: { display: false } },
-    }),
+  chart("rhrSection", "rhrChart", has("resting_hr") && {
+    type: "line", data: { labels, datasets: [line("Resting HR", "resting_hr", css("--fatigue"))] },
+    options: opts({ ticks: { color: muted, precision: 0 } }, (c) => ` Resting HR: ${c.parsed.y} bpm`),
   });
+  chart("sleepSection", "sleepChart", has("sleep_s") && {
+    data: { labels, datasets: [bars("Sleep", tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(2) : null)), alpha(css("--nohr"), 0.85))] },
+    options: (() => {
+      const o = opts({ min: 0 }, (c) => ` ${fmtHours(c.parsed.y * 3600)}`);
+      o.plugins.tooltip.callbacks.footer = (items) => { const sc = tr[items[0].dataIndex].sleep_score; return sc != null ? `Sleep score ${sc}` : ""; };
+      return o;
+    })(),
+  });
+  // Floating bars from the day's lowest to its highest Body Battery
+  chart("bbSection", "bbChart", has("bb_high") && {
+    data: { labels, datasets: [bars("Body Battery", tr.map((d) => (d.bb_high != null && d.bb_low != null ? [d.bb_low, d.bb_high] : null)), css("--easy"))] },
+    options: opts({ min: 0, max: 100 }, (c) => { const [lo, hi] = c.raw; return ` Body Battery: ${lo} to ${hi}`; }),
+  });
+  chart("stressSection", "stressChart", has("stress_avg") && {
+    data: { labels, datasets: [bars("Stress", tr.map((d) => d.stress_avg), css("--hard"))] },
+    options: opts({ min: 0, max: 100 }, (c) => ` Average stress: ${c.parsed.y} (${stressLevel(c.parsed.y).toLowerCase()})`),
+  });
+  // The 7-day average of the days with steps, counted over the whole history so the first days of the view have one
+  const all = data.trends, avg7 = all.map((d, i) => {
+    const week = all.slice(Math.max(0, i - 6), i + 1).filter((x) => x.steps != null);
+    return d.steps != null && week.length ? Math.round(week.reduce((t, x) => t + x.steps, 0) / week.length) : null;
+  }).slice(all.length - tr.length);
+  const steps = (v) => `${Math.round(v).toLocaleString("en-GB")} steps`;
+  chart("stepsSection", "stepsChart", has("steps") && {
+    data: { labels, datasets: [
+      bars("Steps", tr.map((d) => d.steps), alpha(fit, 0.55)),
+      { type: "line", label: "7-day average", data: avg7, borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true },
+    ] },
+    options: opts({ min: 0 }, (c) => ` ${c.dataset.label === "Steps" ? "" : "7-day average: "}${steps(c.parsed.y)}`),
+  });
+  // Best day in the period shown
+  const best = tr.filter((d) => d.steps != null).reduce((b, d) => (!b || d.steps > b.steps ? d : b), null);
+  if (best) $("stepsReading").textContent += ` Best day: ${steps(best.steps)} on ${fmtShort(best.date)}.`;
 }
 
 // One plain-language sentence on where VO2 max stands against 3 and 12 months ago.
@@ -625,89 +954,283 @@ function setSport(s) {
   renderActivities();
 }
 
+// The sport's columns for these rows, minus any that are empty for every row (e.g. sets when Garmin didn't record them)
+function tableParts(rows, key) {
+  const cols = (SPORT_COLUMNS[key] || SPORT_COLUMNS.other).map((k) => [k, ...COLUMNS[k]])
+    .filter(([k, , , cell]) => k === "date" || k === "name" || rows.some((a) => cell(a) !== ""));
+  if (key === "all") cols.find((c) => c[0] === "pace")?.splice(1, 1, "Pace / speed");
+  return {
+    head: `<tr>${cols.map(([, head, num]) => `<th${num ? ' class="num"' : ""}>${head}</th>`).join("")}</tr>`,
+    // The whole row opens the activity; the name is a button so it can be reached with the keyboard too
+    body: rows.map((a) => `<tr data-id="${a.id}">${cols.map(([k, , num, cell]) => k === "name"
+      ? `<td class="name"><button type="button" class="act-link">${cell(a)}</button></td>`
+      : `<td${num ? ' class="num"' : ""}>${cell(a)}</td>`).join("")}</tr>`).join(""),
+  };
+}
+
 function renderActivities() {
-  const acts = data.activities;
-  const counts = {};
-  acts.forEach((a) => { counts[a.sport] = (counts[a.sport] || 0) + 1; });
+  const acts = data.activities, counts = sportCounts();
   if (sport !== "all" && !counts[sport]) sport = "all";
-  // Most-used sports first; "Other" always last
-  const options = [["all", "All"], ...SPORTS.filter(([key]) => counts[key])
-    .sort((a, b) => (a[0] === "other") - (b[0] === "other") || counts[b[0]] - counts[a[0]])];
+  const options = [["all", "All"], ...sportsByCount(counts)];
   $("sportFilter").innerHTML = options.map(([key, label]) =>
     `<button type="button" data-sport="${key}" aria-pressed="${key === sport}">${label}<span>${key === "all" ? acts.length : counts[key]}</span></button>`).join("");
 
   const list = sport === "all" ? acts : acts.filter((a) => a.sport === sport);
-  const rows = list.slice(0, shown);
-  // The sport's columns, minus any that are empty for every row shown (e.g. sets when Garmin didn't record them)
-  const cols = (SPORT_COLUMNS[sport] || SPORT_COLUMNS.other).map((key) => [key, ...COLUMNS[key]])
-    .filter(([key, , , cell]) => key === "date" || key === "name" || rows.some((a) => cell(a) !== ""));
-  if (sport === "all") cols.find((c) => c[0] === "pace")?.splice(1, 1, "Pace / speed");
-  $("actHead").innerHTML = `<tr>${cols.map(([, head, num]) => `<th${num ? ' class="num"' : ""}>${head}</th>`).join("")}</tr>`;
-  // The whole row opens the activity; the name is a button so it can be reached with the keyboard too
-  $("actBody").innerHTML = rows.map((a) => `<tr data-id="${a.id}">${cols.map(([key, , num, cell]) => key === "name"
-    ? `<td class="name"><button type="button" class="act-link">${cell(a)}</button></td>`
-    : `<td${num ? ' class="num"' : ""}>${cell(a)}</td>`).join("")}</tr>`).join("");
+  const t = tableParts(list.slice(0, shown), sport);
+  $("actHead").innerHTML = t.head;
+  $("actBody").innerHTML = t.body;
   $("actMore").hidden = list.length <= shown;
   $("actMore").textContent = `Show more (${list.length - shown} left)`;
 
-  renderVolume(list);
+  renderVolume($("actVolume"), list, sport === "all" ? "All activities" : sportLabel(sport), sport === "all" ? null : sport);
 }
 
-// Strava-style totals for the selected sport: this week day by day, and this year
-function renderVolume(list) {
+// Strava-style totals for a list of activities in the `root` panel: this week day by day, and this year.
+// For one sport (`key`) with distances, also the longest one this week and this year.
+function renderVolume(root, list, label, key) {
+  const q = (cls) => root.querySelector(`.${cls}`);
   const today = data.generated;
   const monday = addDays(today, -((new Date(today + "T12:00:00").getDay() + 6) % 7));
   const year = today.slice(0, 4);
-  const sum = (as, f) => as.reduce((t, a) => t + (a[f] || 0), 0);
   // Distance where the sport has it (running, cycling…), otherwise time (strength, yoga…)
   const byKm = sum(list.filter((a) => a.date.startsWith(year)), "km") > 0;
   const value = (as) => (byKm ? sum(as, "km") : sum(as, "duration_s"));
   const big = (v) => (byKm ? `${v.toFixed(1)}<span>km</span>` : fmtHours(v).replace(/(\d+)([hm])/g, "$1<span>$2</span>"));
   const small = (v) => (byKm ? `${v.toFixed(1)} km` : fmtHours(v));
-  const between = (from, to) => list.filter((a) => a.date >= from && a.date < to);
+  const between = (from, to) => list.filter((a) => a.date >= from && a.date < to);  // this list only
   const count = (n) => `${n} ${n === 1 ? "activity" : "activities"}`;
 
-  const label = sport === "all" ? "All activities" : SPORTS.find(([key]) => key === sport)[1];
-  $("volSport").textContent = label;
+  q("vol-sport").textContent = label;
 
   const week = between(monday, addDays(monday, 7));
-  $("volWeek").innerHTML = big(value(week));
+  q("vol-week").innerHTML = big(value(week));
   const prev4 = value(between(addDays(monday, -28), monday)) / 4;
   const weekNote = [count(week.length)];
   if (byKm && week.length) weekNote.push(fmtHours(sum(week, "duration_s")));
   if (prev4 > 0) weekNote.push(`4-week avg ${small(prev4)}`);
-  $("volWeekNote").textContent = weekNote.join(" · ");
+  q("vol-week-note").textContent = weekNote.join(" · ");
 
   const days = [...Array(7)].map((_, i) => {
     const iso = addDays(monday, i);
     return { iso, v: value(list.filter((a) => a.date === iso)) };
   });
   const top = Math.max(...days.map((d) => d.v)) || 1;
-  $("volDays").innerHTML = days.map((d, i) => {
+  q("vol-days").innerHTML = days.map((d, i) => {
     const cls = d.iso === today ? "is-today" : d.iso > today ? "future" : "";
     const h = d.v ? Math.max(6, (d.v / top) * 100) : 0;
     return `<div class="${cls}" title="${fmtDay(d.iso)}: ${d.v ? small(d.v) : "rest"}"><div class="bar"><i style="height:${h}%"></i></div><span class="day">${"MTWTFSS"[i]}</span></div>`;
   }).join("");
-  $("volDays").setAttribute("aria-label", `${label} this week by day: ` + days.filter((d) => d.iso <= today).map((d) => `${fmtDay(d.iso)} ${d.v ? small(d.v) : "rest"}`).join(", "));
+  q("vol-days").setAttribute("aria-label", `${label} this week by day: ` + days.filter((d) => d.iso <= today).map((d) => `${fmtDay(d.iso)} ${d.v ? small(d.v) : "rest"}`).join(", "));
 
   const yr = list.filter((a) => a.date.startsWith(year));
-  $("volYear").innerHTML = big(value(yr));
+  q("vol-year").innerHTML = big(value(yr));
   const elev = sum(yr, "elev_m");
   const yearNote = [count(yr.length)];
   if (byKm) yearNote.push(fmtHours(sum(yr, "duration_s")));
   if (byKm && elev >= 1) yearNote.push(`${Math.round(elev).toLocaleString("en-GB")} m climbed`);
   if (data.activities_from > `${year}-01-01`) yearNote.push(`synced from ${fmtShort(data.activities_from)}`);
-  $("volYearNote").textContent = yearNote.join(" · ");
+  q("vol-year-note").textContent = yearNote.join(" · ");
+
+  const longest = (as) => {
+    const a = as.filter((x) => x.km > 0).reduce((b, x) => (!b || x.km > b.km ? x : b), null);
+    return key && byKm && a ? `Longest ${SPORT_NOUNS[key][0]}: ${a.km.toFixed(1)} km` : "";
+  };
+  q("vol-week-long").textContent = longest(week);
+  q("vol-year-long").textContent = longest(yr);
 }
+
+// ---- Sport pages: one sport's totals, how its volume and speed have developed, its personal bests and its activities
+
+const BEST_LABELS = { 400: "400 m", 1000: "1 km", 1609: "1 mile", 5000: "5 km", 10000: "10 km", 21098: "Half marathon", 42195: "Marathon" };
+let sportShown = PAGE, sportShownKey = null;
+
+// Distance for sports that record it, time for the rest
+function measureFor(list) {
+  const byKm = sum(list, "km") > 0;
+  return byKm
+    ? { byKm, of: (as) => sum(as, "km"), big: (v) => `${fmtKm(v)}<span>km</span>`, small: (v) => `${fmtKm(v)} km`, unit: "Kilometres" }
+    : { byKm, of: (as) => sum(as, "duration_s"), big: (v) => fmtHours(v).replace(/(\d+)([hm])/g, "$1<span>$2</span>"), small: fmtHours, unit: "Hours" };
+}
+
+function renderSport(key) {
+  Chart.defaults.font.family = css("--body");
+  const list = data.activities.filter((a) => a.sport === key);  // newest first
+  const label = sportLabel(key), today = data.generated, m = measureFor(list), nouns = SPORT_NOUNS[key];
+  if (sportShownKey !== key) { sportShown = PAGE; sportShownKey = key; }
+  $("sportTitle").textContent = label;
+  $("sportListName").textContent = nouns[1];
+
+  // Tiles: this week, the last 4 weeks (against the 4 before), this year and last year
+  const monday = mondayOf(today), tomorrow = addDays(today, 1);
+  const week = between(list, monday, tomorrow), four = between(list, addDays(today, -27), tomorrow);
+  const fourBefore = between(list, addDays(today, -55), addDays(today, -27)), year = list.filter((a) => a.date.startsWith(today.slice(0, 4)));
+  const change = m.of(fourBefore) ? Math.round((m.of(four) - m.of(fourBefore)) / m.of(fourBefore) * 100) : null;
+  const yearTile = (y, as) => [y === today.slice(0, 4) ? "This year" : y, m.big(m.of(as)),
+    plural(as.length, nouns) + (m.byKm && as.length ? ` · ${fmtHours(sum(as, "duration_s"))}` : "")];
+  // A sport you haven't done for a month (a ski trip, a summer sport) shows its latest outing and last year instead of zeros
+  const lastYear = String(Number(today.slice(0, 4)) - 1);
+  const tiles = four.length || fourBefore.length ? [
+    ["This week", m.big(m.of(week)), plural(week.length, nouns)],
+    ["Last 4 weeks", m.big(m.of(four)), change == null ? plural(four.length, nouns)
+      : `<span class="${change >= 0 ? "up" : "down"}">${change >= 0 ? "+" : "−"}${Math.abs(change)}%</span> vs the 4 weeks before`],
+    yearTile(today.slice(0, 4), year),
+    yearTile(lastYear, list.filter((a) => a.date.startsWith(lastYear))),
+  ] : [
+    ["Latest", `${fmtShort(list[0].date)}<span>${list[0].date.slice(0, 4)}</span>`, escapeHtml(list[0].name || "")],
+    yearTile(today.slice(0, 4), year),
+    yearTile(lastYear, list.filter((a) => a.date.startsWith(lastYear))),
+  ];
+  $("sportTiles").innerHTML = statItems(tiles);
+  $("sportTiles").style.setProperty("--cols", tiles.length);
+
+  renderSportWeekly(key, list, m);
+  renderYearOnYear(key, list, m);
+  renderMonthly(key, list, m);
+  renderRecords(key, list);
+
+  const t = tableParts(list.slice(0, sportShown), key);
+  $("sportHead").innerHTML = t.head;
+  $("sportBody").innerHTML = t.body;
+  $("sportMore").hidden = list.length <= sportShown;
+  $("sportMore").textContent = `Show more (${list.length - sportShown} left)`;
+}
+
+// Volume per week for the last 26 weeks (or the 26 up to the latest one, for a sport done in a season)
+function renderSportWeekly(key, list, m) {
+  const latest = list[0].date, current = latest >= weekStarts(26)[0];
+  $("sportWeeklyTitle").textContent = `${m.unit} per week`;
+  $("sportWeeklySub").textContent = !current ? `Up to ${fmtShort(latest)} ${latest.slice(0, 4)}.` : key === "run" ? lowShare(list) : "";
+  weeklyChart("sportWeeklyChart", "sportWeeklyLegend", key, list, weekStarts(26, current ? data.generated : latest), m);
+}
+
+// Running total through the year, this year against last year, on a shared January-to-December axis
+function renderYearOnYear(key, list, m) {
+  const today = data.generated, y = Number(today.slice(0, 4));
+  const thisYear = list.filter((a) => a.date.startsWith(String(y))), lastYear = list.filter((a) => a.date.startsWith(String(y - 1)));
+  $("sportYoySection").hidden = !lastYear.length;
+  if (!lastYear.length) return;
+  // Day by day through a 366-day year, so 29 February has a place; each year's total so far on each day
+  const days = [...Array(366)].map((_, i) => addDays("2000-01-01", i).slice(5));
+  const val = (a) => (m.byKm ? a.km : a.duration_s / 3600);
+  const running = (as, year, until) => {
+    const per = {};
+    as.forEach((a) => { per[a.date.slice(5)] = (per[a.date.slice(5)] || 0) + val(a); });
+    let t = 0;
+    return days.map((md) => {
+      if (until && `${year}-${md}` > until) return null;
+      t += per[md] || 0;
+      return +t.toFixed(2);
+    });
+  };
+  const now = running(thisYear, y, today), before = running(lastYear, y - 1);
+  const md = today.slice(5), idx = days.indexOf(md);
+  const fmt = (v) => (m.byKm ? `${fmtKm(v)} km` : fmtHours(v * 3600));
+  const thenTotal = before[idx], nowTotal = now[idx];
+  $("sportYoyReading").textContent = `${fmt(nowTotal)} so far, against ${fmt(thenTotal)} by this date last year (${fmt(before[365])} in all).`;
+  const color = sportColor(key), muted = css("--muted");
+  $("sportYoyLegend").innerHTML = `<span><i class="line" style="background:${color}"></i>${y}</span>` +
+    `<span><i class="line dashed" style="color:${muted}"></i>${y - 1}</span>`;
+  $("sportYoyChart").setAttribute("aria-label", `Running total of ${m.unit.toLowerCase()} through ${y}, against ${y - 1}`);
+  const o = baseOptions({ y: { min: 0, grid: { color: css("--rule") }, ticks: { color: muted }, border: { display: false } } });
+  // A tick at the start of each month
+  o.scales.x.ticks = { ...o.scales.x.ticks, autoSkip: false,
+    callback: (i) => (days[i].endsWith("-01") ? new Date(`2000-${days[i]}T12:00:00`).toLocaleDateString("en-GB", { month: "short" }) : null) };
+  o.plugins.tooltip.callbacks = {
+    title: (items) => new Date(`2000-${days[items[0].dataIndex]}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long" }),
+    label: (c) => ` ${c.dataset.label}: ${fmt(c.parsed.y)}`,
+  };
+  draw("sportYoyChart", {
+    type: "line",
+    data: {
+      labels: days,
+      datasets: [
+        { label: String(y), data: now, borderColor: color, backgroundColor: color, borderWidth: 2.5, pointRadius: now.map((_, i) => (i === idx ? 4 : 0)), tension: 0 },
+        { label: String(y - 1), data: before, borderColor: muted, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0 },
+      ],
+    },
+    options: o,
+  });
+}
+
+// Distance (or hours) per month, this year next to last year
+function renderMonthly(key, list, m) {
+  const y = Number(data.generated.slice(0, 4)), month = data.generated.slice(5, 7);
+  const perMonth = (year) => [...Array(12)].map((_, i) => {
+    const mo = `${year}-${String(i + 1).padStart(2, "0")}`;
+    if (year === y && mo.slice(5) > month) return null;  // months still to come
+    const as = list.filter((a) => a.date.startsWith(mo));
+    return m.byKm ? +sum(as, "km").toFixed(1) : +(sum(as, "duration_s") / 3600).toFixed(2);
+  });
+  const now = perMonth(y), before = perMonth(y - 1);
+  $("sportMonthSection").hidden = !now.some(Boolean) && !before.some(Boolean);
+  if ($("sportMonthSection").hidden) return;
+  const color = sportColor(key), grey = css("--nohr");
+  $("sportMonthTitle").textContent = `${m.unit} per month`;
+  $("sportMonthLegend").innerHTML = `<span><i style="background:${color}"></i>${y}</span><span><i style="background:${grey}"></i>${y - 1}</span>`;
+  $("sportMonthChart").setAttribute("aria-label", `${m.unit} per month, ${y} against ${y - 1}`);
+  const fmt = (v) => (m.byKm ? `${fmtKm(v)} km` : fmtHours(v * 3600));
+  const o = baseOptions();
+  o.plugins.tooltip.callbacks = { label: (c) => (c.parsed.y == null ? null : ` ${c.dataset.label}: ${fmt(c.parsed.y)}`) };
+  const bar = { borderRadius: 2, maxBarThickness: 26, categoryPercentage: 0.7, barPercentage: 0.9 };
+  draw("sportMonthChart", {
+    type: "bar",
+    data: {
+      labels: [...Array(12)].map((_, i) => new Date(2000, i, 15).toLocaleDateString("en-GB", { month: "short" })),
+      datasets: [
+        { label: String(y - 1), data: before, backgroundColor: grey, ...bar },
+        { label: String(y), data: now, backgroundColor: color, ...bar },
+      ],
+    },
+    options: o,
+  });
+}
+
+// The sport's bests: longest, fastest, highest; each opens its activity
+function renderRecords(key, list) {
+  const top = (as, f, pick = Math.max) => {
+    const vs = as.filter((a) => a[f] != null && a[f] > 0);
+    if (!vs.length) return null;
+    const best = pick(...vs.map((a) => a[f]));
+    return vs.find((a) => a[f] === best);
+  };
+  const recs = [];  // [label, value, activity, or a note when there's no activity]
+  const add = (label, a, value) => { if (a) recs.push([label, value(a), a]); };
+  if (key === "run") {
+    // The fastest time over each distance within any run, 400 m to marathon
+    const longest = Math.max(...list.map((a) => a.km)) * 1000;
+    Object.entries(BEST_LABELS).forEach(([mtr, name]) => {
+      const as = list.filter((a) => a.best?.[mtr]);
+      if (!as.length) {
+        recs.push([`Fastest ${name}`, "–", longest >= mtr ? "Coming with the next syncs" : "No run this long yet"]);
+        return;
+      }
+      const a = as.reduce((b, x) => (x.best[mtr] < b.best[mtr] ? x : b));
+      recs.push([`Fastest ${name}`, `${fmtDuration(a.best[mtr])}<small> · ${fmtPace(a.best[mtr] / mtr * 1000)}</small>`, a]);
+    });
+  }
+  add("Longest distance", top(list, "km"), (a) => `${a.km.toFixed(2)} km`);
+  add("Longest time", top(list, "duration_s"), (a) => fmtDuration(a.duration_s));
+  if (KMH_SPORTS.includes(key)) add("Top speed", top(list, "max_speed"), (a) => `${(a.max_speed * 3.6).toFixed(1)} km/h`);
+  if (key === "winter") add("Most descent", top(list, "descent_m"), (a) => `${Math.round(a.descent_m).toLocaleString("en-GB")} m`);
+
+  $("sportRecordsSection").hidden = !recs.length;
+  $("sportRecords").innerHTML = recs.map(([lbl, val, a]) => (typeof a === "string"
+    ? `<div class="empty-rec"><span class="rl">${lbl}</span><span class="rv">${val}</span><small>${a}</small></div>`
+    : `<button type="button" data-act="${a.id}"><span class="rl">${lbl}</span><span class="rv">${val}</span>
+    <small>${COLUMNS.date[2](a)} · ${escapeHtml(a.name || a.type.replace(/_/g, " "))}</small></button>`)).join("");
+}
+
+$("sportMore").addEventListener("click", () => { sportShown += PAGE; showPage(); });
 
 $("sportFilter").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-sport]");
   if (b) setSport(b.dataset.sport);
 });
 $("actMore").addEventListener("click", () => { shown += PAGE; renderActivities(); });
-$("actBody").addEventListener("click", (e) => {
-  const row = e.target.closest("tr[data-id]");
-  if (row) openActivity(Number(row.dataset.id));
+// Any activity row, or a personal best, opens the activity
+document.addEventListener("click", (e) => {
+  const el = e.target.closest(".act-table tbody tr[data-id], [data-act]");
+  if (el) openActivity(Number(el.dataset.id || el.dataset.act));
 });
 
 // ---- Activity popup: the list's summary straight away, then every stat, the route and the laps once they've loaded
@@ -908,7 +1431,7 @@ $("syncBtn").addEventListener("click", async () => {
 });
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (data) { renderCharts(); renderLastActivity(); }
+  if (data?.has_data) { renderNav(); showPage(); }
   if (modalDetail) modalMap.show(modalDetail.track, modalDetail.name || "activity", modalDetail.sport);
 });
 // Pick up background syncs: check every 5 minutes, and right away when the tab comes back into view.

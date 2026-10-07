@@ -5,12 +5,14 @@
 """
 import argparse
 import base64
+import json
 import logging
 import secrets
 import socket
 import threading
 import time
 from contextlib import asynccontextmanager
+from datetime import date
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -18,6 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import config
+import db
 import metrics
 import sync
 
@@ -97,6 +100,40 @@ def activity(activity_id: int):
         return JSONResponse({"error": "No such activity"}, status_code=404)
     data["details_error"] = error
     return data
+
+
+@app.post("/api/race")
+async def set_race(request: Request):
+    """Save the race goal: {name, date (YYYY-MM-DD), metres, target_s}."""
+    body = await request.json()
+    try:
+        goal = {
+            "name": str(body.get("name") or "").strip()[:80] or "Race",
+            "date": date.fromisoformat(body["date"]).isoformat(),
+            "metres": float(body["metres"]),
+            "target_s": int(body["target_s"]),
+        }
+        assert 100 <= goal["metres"] <= 1_000_000 and 0 < goal["target_s"] < 7 * 86400
+    except (KeyError, TypeError, ValueError, AssertionError):
+        return JSONResponse({"error": "Give a name, a date, a distance and a target time."}, status_code=400)
+    conn = db.connect(DB_PATH)
+    try:
+        db.set_meta(conn, "race_goal", json.dumps(goal))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "saved"}
+
+
+@app.delete("/api/race")
+def remove_race():
+    conn = db.connect(DB_PATH)
+    try:
+        conn.execute("DELETE FROM meta WHERE key = 'race_goal'")
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "removed"}
 
 
 @app.post("/api/sync")

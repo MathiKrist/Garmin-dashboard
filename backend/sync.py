@@ -17,6 +17,9 @@ log = logging.getLogger("sync")
 _lock = threading.Lock()
 ACTIVITY_PAGE = 100  # activities per request when fetching the full history
 TRACK_ACTIVITIES = 5  # GPS tracks are fetched for this many of the newest activities
+HEALTH_DAYS_PER_SYNC = 45  # the health backfill fetches this many days per sync, so one sync never runs for long
+EFFORT_RUNS_PER_SYNC = 40  # runs whose best efforts are worked out per sync (one request each)
+EFFORT_DISTANCES = (400, 1000, 1609, 5000, 10000, 21098, 42195)
 
 
 def _get(d, *path):
@@ -131,6 +134,48 @@ def fetch_laps(client, activity_id):
     } for l in splits.get("lapDTOs") or [] if isinstance(l, dict)]
 
 
+def best_efforts(samples, distances=EFFORT_DISTANCES):
+    """The fastest time over each distance within one activity, from (elapsed seconds, metres) samples.
+    The start of each window is interpolated between samples, so the span is exactly the distance."""
+    out = {}
+    for m in distances:
+        if not samples or samples[-1][1] - samples[0][1] < m:
+            continue
+        best, j = None, 0
+        for i, (t, d) in enumerate(samples):
+            if d - samples[0][1] < m:
+                continue
+            while samples[j + 1][1] <= d - m:
+                j += 1
+            (t0, d0), (t1, d1) = samples[j], samples[j + 1]
+            start = t0 + (t1 - t0) * ((d - m - d0) / (d1 - d0) if d1 > d0 else 0)
+            if best is None or t - start < best:
+                best = t - start
+        out[m] = round(best, 1)
+    return out
+
+
+def fetch_efforts(client, activity_id):
+    """A run's best efforts from its second-by-second data, or None if the request failed."""
+    details = _try(client.get_activity_details, activity_id, 100000, 1)
+    if details is None:
+        return None
+    keys = {m.get("key"): m.get("metricsIndex") for m in details.get("metricDescriptors") or []}
+    # Elapsed time, as Garmin's own fastest splits use: a stop in the middle of a 5 km counts against it
+    ti, di = keys.get("sumElapsedDuration", keys.get("sumDuration")), keys.get("sumDistance")
+    if ti is None or di is None:
+        return {}
+    samples, last = [], (-1, -1)
+    for row in details.get("activityDetailMetrics") or []:
+        vals = row.get("metrics") or []
+        t, d = (vals[ti], vals[di]) if len(vals) > max(ti, di) else (None, None)
+        if t is None or d is None or t < last[0] or d < last[1]:
+            continue  # gaps and the odd backwards step from GPS corrections
+        samples.append((t, d))
+        last = (t, d)
+    return best_efforts(samples)
+
+
 _shared_client = None  # logged in once and kept, for activities opened on the page
 
 
@@ -181,6 +226,16 @@ def fetch_vo2max_history(client, start, end):
         if g.get("calendarDate") and g.get("vo2MaxPreciseValue"):
             out.append({"date": g["calendarDate"], "vo2max": g["vo2MaxPreciseValue"]})
     return out
+
+
+PREDICTIONS = {"time5K": "pred_5k", "time10K": "pred_10k", "timeHalfMarathon": "pred_half", "timeMarathon": "pred_marathon"}
+
+
+def fetch_predictions(client, start, end):
+    """Garmin's race predictions (5 km to marathon) for each day from start to end (at most a year)."""
+    rows = _try(client.get_race_predictions, start.isoformat(), end.isoformat(), "daily") or []
+    return [{"date": r["calendarDate"], **{col: r.get(key) for key, col in PREDICTIONS.items()}}
+            for r in rows if isinstance(r, dict) and r.get("calendarDate")]
 
 
 def fetch_day(client, day):
@@ -274,6 +329,32 @@ def run_sync(db_path=None):
             day += timedelta(days=1)
             time.sleep(0.4)  # be gentle with Garmin's rate limits
 
+        # Health history: a year of daily data (HRV, sleep, Body Battery…), fetched once, backwards from the oldest day
+        # already synced. A chunk per sync, saving progress per day, so a rate limit just resumes on the next sync.
+        oldest = db.get_meta(conn, "health_backfill_from") or conn.execute(
+            "SELECT min(date) FROM daily WHERE resting_hr IS NOT NULL OR sleep_s IS NOT NULL").fetchone()[0]
+        day = date.fromisoformat(oldest) if oldest else day_start
+        target = today - timedelta(days=config.HEALTH_HISTORY_DAYS)
+        for _ in range(HEALTH_DAYS_PER_SYNC):
+            if day <= target:
+                break
+            day -= timedelta(days=1)
+            db.upsert_daily(conn, fetch_day(client, day))
+            db.set_meta(conn, "health_backfill_from", day.isoformat())
+            conn.commit()
+            time.sleep(0.4)
+
+        # Best efforts (400 m to marathon) for runs that don't have them yet, newest first, a batch per sync
+        todo = conn.execute(
+            "SELECT id FROM activities WHERE type LIKE '%running%' AND id NOT IN (SELECT activity_id FROM efforts) "
+            "ORDER BY start_local DESC LIMIT ?", (EFFORT_RUNS_PER_SYNC,)).fetchall()
+        for row in todo:
+            bests = fetch_efforts(client, row["id"])
+            if bests is not None:  # a failed request is retried next sync
+                db.set_efforts(conn, row["id"], bests)
+                conn.commit()
+            time.sleep(0.5)
+
         # Training status was added later: fill four weeks of history once, for the status strip.
         if not db.get_meta(conn, "training_status_backfilled"):
             day = today - timedelta(days=27)
@@ -283,6 +364,15 @@ def run_sync(db_path=None):
                 day += timedelta(days=1)
                 time.sleep(0.4)
             db.set_meta(conn, "training_status_backfilled", "1")
+
+        # Race predictions: the last year once (one request), then the days since the last sync
+        pred_start = day_start if db.get_meta(conn, "predictions_backfilled") else today - timedelta(days=364)
+        rows = fetch_predictions(client, pred_start, today)
+        for row in rows:
+            db.upsert_daily(conn, row)
+        if rows:
+            db.set_meta(conn, "predictions_backfilled", "1")
+        conn.commit()
 
         # VO2 max history for its chart: one request covers years, so fetch it once.
         if not db.get_meta(conn, "vo2max_backfilled"):

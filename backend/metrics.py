@@ -185,11 +185,47 @@ def _vo2max(days, today):
     }
 
 
+# Garmin's predicted distances: metres -> daily column
+PREDICTED = {5000: "pred_5k", 10000: "pred_10k", 21097.5: "pred_half", 42195: "pred_marathon"}
+
+
+def predicted_time(day, metres):
+    """Garmin's prediction for the distance on one day; other distances are scaled from the nearest one (Riegel)."""
+    known = [(m, day.get(col)) for m, col in PREDICTED.items() if day.get(col)]
+    if not known:
+        return None
+    m, t = min(known, key=lambda k: abs(math.log(metres / k[0])))
+    return round(t * (metres / m) ** 1.06)
+
+
+def _race(goal, days, acts, today):
+    """The race goal for the overview: target, Garmin's prediction and its last six months, and the result once run.
+    Shown until a week after race day."""
+    race_day = date.fromisoformat(goal["date"])
+    if today > race_day + timedelta(days=7):
+        return None
+    m = goal["metres"]
+    since = (today - timedelta(days=182)).isoformat()
+    history = [{"date": d["date"], "s": predicted_time(d, m)} for d in days if d["date"] >= since]
+    history = [h for h in history if h["s"]]
+    # The result: the run on race day closest to the distance, timed over the distance where it's known
+    result = None
+    runs = [a for a in acts if a["date"] == goal["date"] and is_run(a["type"]) and (a["distance_m"] or 0) >= m * 0.95]
+    if runs:
+        a = min(runs, key=lambda r: abs(r["distance_m"] - m))
+        best = (a.get("efforts") or {}).get(int(m))
+        result = {"s": round(best or a["duration_s"] * m / a["distance_m"]), "id": a["id"]}
+    return {**goal, "days_to_go": (race_day - today).days, "predicted_s": history[-1]["s"] if history else None,
+            "history": history, "result": result}
+
+
 ACTIVITY_SELECT = (
     "id, start_local, date, type, name, distance_m, duration_s, avg_hr, max_hr, avg_speed, elev_gain, "
     "training_load, aerobic_te, anaerobic_te, te_label, "
     "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps, "
-    "json_extract(raw, '$.locationName') AS location, json_extract(raw, '$.elevationLoss') AS elev_loss"
+    "json_extract(raw, '$.locationName') AS location, json_extract(raw, '$.elevationLoss') AS elev_loss, "
+    "json_extract(raw, '$.maxSpeed') AS max_speed, "
+    + ", ".join(f"json_extract(raw, '$.fastestSplit_{m}') AS best_{m}" for m in (1000, 1609, 5000, 10000, 21098, 42195))
 )
 
 
@@ -209,7 +245,10 @@ def _summary(a):
         "name": a["name"], "km": round((a["distance_m"] or 0) / 1000, 2), "duration_s": a["duration_s"],
         "speed": a["avg_speed"], "elev_m": a["elev_gain"], "descent_m": a["elev_loss"], "avg_hr": a["avg_hr"], "load": a["load"],
         "sets": a["sets"], "reps": a["reps"], "location": a["location"],
-        "focus": a["focus"], "te_label": a["te_label"],
+        "focus": a["focus"], "te_label": a["te_label"], "max_speed": a["max_speed"],
+        # Fastest time over set distances within the activity ({metres: seconds}), for the personal bests:
+        # worked out from the run's own data where synced (400 m included), otherwise Garmin's fastest splits
+        "best": a.get("efforts") or {m: a[f"best_{m}"] for m in BEST_EFFORTS if a.get(f"best_{m}")} or None,
     }
 
 
@@ -272,7 +311,9 @@ def build_dashboard(db_path=None):
         acts = [dict(r) for r in conn.execute(
             f"SELECT {ACTIVITY_SELECT} FROM activities WHERE date IS NOT NULL AND date != '' ORDER BY start_local")]
         track = db.get_track(conn, acts[-1]["id"]) if acts else None
+        efforts = db.all_efforts(conn)
         days = [dict(r) for r in conn.execute("SELECT * FROM daily ORDER BY date")]
+        goal = db.get_meta(conn, "race_goal")
         meta = {
             "last_sync_at": db.get_meta(conn, "last_sync_at"),
             "last_error": db.get_meta(conn, "last_error") or None,
@@ -289,6 +330,7 @@ def build_dashboard(db_path=None):
     # Load per activity and per day
     load_by_day = {}
     for a in acts:
+        a["efforts"] = efforts.get(a["id"])
         _add_load(a, rest_hr)
         load_by_day[a["date"]] = load_by_day.get(a["date"], 0) + a["load"]
 
@@ -312,32 +354,10 @@ def build_dashboard(db_path=None):
     state, advice = _form_state(now["form_pct"])
     ratio = round(now["atl"] / now["ctl"], 2) if now["ctl"] >= 5 else None
 
-    # Weekly running volume, split by Garmin's load focus
-    monday = today - timedelta(days=today.weekday())
-    weeks = []
-    for i in range(11, -1, -1):
-        start = monday - timedelta(weeks=i)
-        end = start + timedelta(days=7)
-        runs = [a for a in acts if is_run(a["type"]) and start.isoformat() <= a["date"] < end.isoformat()]
-        km = lambda rs: round(sum((r["distance_m"] or 0) for r in rs) / 1000, 1)
-        weeks.append({
-            "week": start.isoformat(),
-            "low_km": km([r for r in runs if r["focus"] == "low"]),
-            "high_km": km([r for r in runs if r["focus"] == "high"]),
-            "anaerobic_km": km([r for r in runs if r["focus"] == "anaerobic"]),
-            "unknown_km": km([r for r in runs if r["focus"] is None]),
-            "runs": len(runs),
-            "hours": round(sum((r["duration_s"] or 0) for r in runs) / 3600, 1),
-        })
-    last4 = weeks[-4:]
-    low4 = sum(w["low_km"] for w in last4)
-    known4 = low4 + sum(w["high_km"] + w["anaerobic_km"] for w in last4)
-    low_share = round(low4 / known4 * 100) if known4 else None
-
-    # Recovery trends (last 60 days)
-    cutoff = (today - timedelta(days=59)).isoformat()
-    trends = [{k: d.get(k) for k in ("date", "hrv_last_night", "hrv_low", "hrv_high",
-                                       "resting_hr", "sleep_s", "sleep_score", "readiness")}
+    # Health trends for the health page (the last year; the page shows 90 days or all of it)
+    cutoff = (today - timedelta(days=364)).isoformat()
+    trends = [{k: d.get(k) for k in ("date", "hrv_last_night", "hrv_low", "hrv_high", "resting_hr", "sleep_s",
+                                       "sleep_score", "readiness", "bb_high", "bb_low", "stress_avg", "steps")}
               for d in days if d["date"] >= cutoff]
 
     # Today: newest value of each field from the last two days
@@ -352,7 +372,7 @@ def build_dashboard(db_path=None):
 
     today_vals = {f: latest(f) for f in (
         "readiness", "hrv_last_night", "hrv_weekly_avg", "hrv_low", "hrv_high",
-        "hrv_status", "sleep_s", "sleep_score", "resting_hr", "bb_high", "bb_low", "stress_avg")}
+        "hrv_status", "sleep_s", "sleep_score", "resting_hr", "bb_high", "bb_low", "stress_avg", "steps")}
     week_rhr = [d["resting_hr"] for d in days if d.get("resting_hr") and d["date"] > (today - timedelta(days=7)).isoformat()]
     today_vals["resting_hr_7d"] = round(sum(week_rhr) / len(week_rhr)) if week_rhr else None
 
@@ -371,9 +391,8 @@ def build_dashboard(db_path=None):
         "training_status": _training_status(days, today),
         "load_focus": _load_focus(days, today),
         "vo2max": _vo2max(days, today),
-        "low_share_4w": low_share,
+        "race": _race(json.loads(goal), days, acts, today) if goal else None,
         "fitness": fitness[-120:],
-        "weeks": weeks,
         "trends": trends,
         "activities": recent_acts,
         # The newest activity, with its GPS track when it has one (for the map at the top)

@@ -49,6 +49,16 @@
   --z3: #2E9E4F;
   --z4: #F08A24;
   --z5: #D63A2E;
+  /* One fixed color per sport, for the menu and the sport pages (the dataviz reference palette, in its validated
+     order); sports without one use --nohr */
+  --sp-run: #2A78D6;
+  --sp-bike: #EB6834;
+  --sp-walk: #1BAF7A;
+  --sp-hike: #EDA100;
+  --sp-disc_golf: #E87BA4;
+  --sp-winter: #008300;
+  --sp-strength: #4A3AA7;
+  --sp-swim: #E34948;
   --body: "Barlow", "Segoe UI", system-ui, sans-serif;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   color-scheme: light dark;
@@ -86,6 +96,14 @@
     --z3: #4CC46C;
     --z4: #F59A40;
     --z5: #EF5A4B;
+    --sp-run: #3987E5;
+    --sp-bike: #D95926;
+    --sp-walk: #199E70;
+    --sp-hike: #C98500;
+    --sp-disc_golf: #D55181;
+    --sp-winter: #008300;
+    --sp-strength: #9085E9;
+    --sp-swim: #E66767;
   }
 }
 * { box-sizing: border-box; }
@@ -98,15 +116,99 @@ body {
   font-variant-numeric: tabular-nums;
   padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
 }
-.wrap { max-width: 1600px; margin: 0 auto; padding: 0 clamp(1.25rem, 3vw, 2.5rem) 4rem; }
-
-header.top {
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 1.25rem 0 0.75rem; border-bottom: 1px solid var(--rule);
+/* A menu down the left, the selected page beside it; on narrow screens the menu sits on top and scrolls sideways */
+.app {
+  display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0 clamp(1.5rem, 3vw, 3rem);
+  max-width: 1680px; margin: 0 auto; padding: 0 clamp(1.25rem, 3vw, 2.5rem);
 }
+.content { min-width: 0; padding-bottom: 4rem; }
+.side {
+  position: sticky; top: 0; align-self: start; height: 100dvh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1.75rem; padding: 1.5rem 1.25rem 1.5rem 0; border-right: 1px solid var(--rule);
+}
+.side-top { display: flex; flex-direction: column; gap: 0.9rem; }
 .brand { font: 600 1.35rem/1 var(--display); letter-spacing: 0.01em; }
-.brand small { font: 400 0.9rem var(--body); color: var(--muted); margin-left: 0.6rem; }
-.sync { display: flex; align-items: center; gap: 0.9rem; color: var(--muted); font-size: 0.9rem; }
+.brand small { display: block; font: 400 0.85rem var(--body); color: var(--muted); margin-top: 0.3rem; }
+.sync { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; color: var(--muted); font-size: 0.85rem; }
+.nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.1rem; }
+.nav a {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+  padding: 0.45rem 0.7rem; border-radius: 6px; color: var(--ink); text-decoration: none; font-weight: 500;
+}
+.nav a .count { color: var(--muted); font-size: 0.82rem; font-weight: 400; }
+.nav a:hover { background: var(--panel); }
+.nav a[aria-current="page"] { background: var(--ink); color: var(--paper); }
+.nav a[aria-current="page"] .count { color: inherit; opacity: 0.75; }
+.nav a .swatch { width: 0.55rem; height: 0.55rem; border-radius: 2px; flex: none; align-self: center; margin-right: 0.15rem; }
+.nav a .label { flex: 1; display: flex; align-items: center; gap: 0.5rem; }
+.nav-label { margin: 1.25rem 0 0.4rem 0.7rem; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; }
+
+/* Page titles, each with a sentence or two on where things stand */
+.page-head { padding: 2rem 0 1.25rem; border-bottom: 1px solid var(--rule); }
+.page-head h1 { font: 700 clamp(2.4rem, 6vw, 3.4rem)/1 var(--display); margin: 0; text-wrap: balance; }
+.story { margin: 0.75rem 0 0; max-width: 70ch; font-size: 1.08rem; }
+.story:empty { display: none; }
+.page-head-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+.range-switch { display: flex; gap: 0.4rem; }
+.range-switch button { border-color: var(--rule); padding: 0.35rem 0.9rem; }
+.range-switch button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+/* Race goal: what, when and how far off, with Garmin's prediction moving toward the target */
+.race { display: grid; gap: 1.25rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
+@media (min-width: 1000px) { .race { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; } }
+.race .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.race-title { display: flex; align-items: baseline; gap: 1rem; }
+.race h2 { font: 700 clamp(1.9rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; }
+.race-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1.1rem 0 0; }
+.race-stats dd { margin: 0; font: 600 2rem/1 var(--display); white-space: nowrap; }
+.race-stats dt { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
+.race-stats .note { display: block; color: var(--ink); font-size: 0.85rem; }
+.race-stats .over { color: var(--fatigue); }
+.race-stats .under { color: var(--easy); }
+.race-trend .chart { height: 190px; }
+button.link-btn { all: unset; cursor: pointer; color: var(--fitness); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+button.link-btn:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
+.page-head > button.link-btn { margin-top: 0.75rem; }
+.race-dialog {
+  width: min(420px, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid var(--rule); border-radius: 10px;
+  background: var(--paper); color: var(--ink); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+.race-dialog::backdrop { background: rgba(10, 16, 14, 0.65); }
+.race-dialog form { display: grid; gap: 0.9rem; }
+.race-dialog h2 { margin: 0; font: 700 1.8rem/1 var(--display); }
+.race-dialog label { display: grid; gap: 0.3rem; color: var(--muted); font-size: 0.9rem; }
+.race-dialog input, .race-dialog select {
+  font: 400 1rem var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 0.5rem 0.65rem;
+}
+.form-error { margin: 0; color: var(--fatigue); }
+.form-actions { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.4rem; }
+.form-actions .link-btn { margin-left: auto; color: var(--fatigue); }
+button.primary { background: var(--ink); color: var(--paper); }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.more-link { color: var(--fitness); font-weight: 500; text-underline-offset: 3px; }
+
+/* A sport's headline totals */
+.tiles { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); margin: 0; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); gap: 1.25rem 0; }
+.tiles div { padding: 0 1.25rem; border-left: 1px solid var(--rule); min-width: 0; }
+.tiles div:first-child { border-left: 0; padding-left: 0; }
+.tiles dd { margin: 0; font: 600 2.4rem/1 var(--display); }
+.tiles dd span { font: 500 1rem var(--body); color: var(--muted); margin-left: 0.15rem; }
+.tiles dt { color: var(--muted); font-size: 0.9rem; margin-top: 0.35rem; }
+.tiles .note { display: block; color: var(--ink); font-size: 0.85rem; }
+.tiles .up { color: var(--easy); }
+.tiles .down { color: var(--fatigue); }
+
+/* Personal bests: label, value and date, each opening its activity */
+.records { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 0 2.5rem; }
+.records .empty-rec { opacity: 0.6; }
+.records button, .records .empty-rec {
+  all: unset; box-sizing: border-box; cursor: pointer; width: 100%;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.1rem 1rem; padding: 0.6rem 0.25rem; border-bottom: 1px solid var(--rule);
+}
+.records button:hover:not(.empty-rec) { background: var(--panel); }
+.records button:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
+.records .rl { color: var(--muted); }
+.records .rv { font-weight: 600; text-align: right; }
+.records small { grid-column: 1 / -1; color: var(--muted); font-size: 0.82rem; }
 button {
   font: 500 0.95rem var(--body); color: var(--ink); background: transparent;
   border: 1px solid var(--ink); border-radius: 999px; padding: 0.4rem 1rem; cursor: pointer;
@@ -201,7 +303,7 @@ button:disabled { opacity: 0.55; cursor: progress; }
   margin: 0; gap: 1.25rem 0;
 }
 .today div { padding: 0 1.25rem; border-left: 1px solid var(--rule); }
-.today div:first-child { border-left: 0; padding-left: 0; }
+.today div:nth-child(4n+1) { border-left: 0; padding-left: 0; }
 .today dd { margin: 0; font: 600 2.4rem/1 var(--display); }
 .today dd span { font: 500 1rem var(--body); color: var(--muted); margin-left: 0.15rem; }
 .today dt { color: var(--muted); font-size: 0.9rem; margin-top: 0.35rem; }
@@ -210,6 +312,7 @@ button:disabled { opacity: 0.55; cursor: progress; }
 /* Chart sections */
 /* minmax(0, …) lets columns shrink below the width a chart was drawn at, so charts redraw on resize */
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3rem 2.5rem; padding-top: 2.5rem; }
+.today { grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); }
 section h2 { font: 600 1.6rem/1.1 var(--display); margin: 0 0 0.3rem; }
 section p.sub { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; max-width: 60ch; }
 .chart { position: relative; height: 260px; width: 100%; min-width: 0; }
@@ -217,9 +320,10 @@ section p.sub { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; max-w
 .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.75rem; font-size: 0.88rem; color: var(--muted); }
 .legend i { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -0.1rem; }
 .legend i.line { height: 3px; border-radius: 0; vertical-align: 0.2rem; }
+.legend i.dashed { height: 0; border-top: 3px dashed; background: none !important; }
 
 /* Activities */
-.activities { padding-top: 3rem; }
+.activities { padding-top: 1.75rem; }
 .scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 640px; }
 th, td { text-align: left; padding: 0.6rem 0.75rem 0.6rem 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
@@ -239,13 +343,14 @@ td.name { white-space: normal; }
 .sports button[aria-pressed="true"] span { color: inherit; opacity: 0.75; }
 .sports button:hover:not([aria-pressed="true"]) span { color: inherit; }
 .act-layout { display: grid; gap: 2.5rem; }
+.act-layout > .scroll { min-width: 0; align-self: start; }
 @media (min-width: 1000px) { .act-layout { grid-template-columns: minmax(0, 1fr) 300px; } }
 .act-list { min-width: 0; }
-#actBody tr { cursor: pointer; }
-#actBody tr:hover td { background: var(--panel); }
+.act-table tbody tr { cursor: pointer; }
+.act-table tbody tr:hover td { background: var(--panel); }
 /* The activity name opens the popup; looks like plain text until hovered */
 button.act-link { all: unset; cursor: pointer; font-weight: 500; }
-button.act-link:hover, #actBody tr:hover button.act-link { text-decoration: underline; text-underline-offset: 3px; }
+button.act-link:hover, .act-table tr:hover button.act-link { text-decoration: underline; text-underline-offset: 3px; }
 button.act-link:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; border-radius: 2px; }
 
 /* Activity popup */
@@ -314,164 +419,332 @@ button.more { margin-top: 1rem; }
 .vol-days .day { display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--muted); }
 .vol-days .is-today .day { color: var(--ink); font-weight: 600; }
 .vol-days .future .bar { border-bottom-style: dashed; }
+.vol-long { margin-top: 0.75rem; color: var(--ink); }
+.vol-long:empty { display: none; }
 
 .empty { padding: 4rem 0; max-width: 56ch; }
 .empty h1 { font: 700 3rem/1 var(--display); margin: 0 0 0.75rem; }
 
 @media (max-width: 900px) {
-  .grid { grid-template-columns: minmax(0, 1fr); }
-  .today { grid-template-columns: repeat(2, 1fr); }
-  .today div:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; height: auto; overflow: visible; min-width: 0; border-right: 0; border-bottom: 1px solid var(--rule); padding: 1rem 0 0.75rem; gap: 0.75rem; }
+  .side-top { flex-direction: row; align-items: center; justify-content: space-between; }
+  .brand small { display: inline; margin: 0 0 0 0.6rem; }
+  .sync { flex-direction: row; align-items: center; }
   .sync span { display: none; }
+  /* The menu becomes one row that scrolls sideways */
+  .nav { display: flex; gap: 0.25rem; overflow-x: auto; scrollbar-width: none; }
+  .nav ul { display: flex; gap: 0.25rem; }
+  .nav a { white-space: nowrap; }
+  .nav-label { display: none; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .today, .tiles { grid-template-columns: repeat(2, 1fr); }
+  .today div:nth-child(odd), .tiles div:nth-child(odd) { border-left: 0; padding-left: 0; }
 }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand">Training<small id="demo" hidden>Demo data</small></div>
-    <div class="sync">
-      <span id="synced"></span>
-      <button id="syncBtn" type="button">Sync now</button>
+<div class="app">
+  <aside class="side">
+    <div class="side-top">
+      <div class="brand">Training<small id="demo" hidden>Demo data</small></div>
+      <div class="sync">
+        <span id="synced"></span>
+        <button id="syncBtn" type="button">Sync now</button>
+      </div>
     </div>
-  </header>
+    <nav class="nav" id="nav" aria-label="Pages" hidden>
+      <ul>
+        <li><a href="#overview" data-page="overview">Overview</a></li>
+        <li><a href="#health" data-page="health">Health</a></li>
+        <li><a href="#activities" data-page="activities">Activities<span class="count" id="navActCount"></span></a></li>
+      </ul>
+      <p class="nav-label" id="navSportsLabel">Sports</p>
+      <ul id="navSports"></ul>
+    </nav>
+  </aside>
+
+  <div class="content">
   <div id="notice" class="notice" role="status" hidden></div>
 
   <main id="main" hidden>
-    <section class="hero" aria-label="Last night and today">
-      <dl class="today" id="today"></dl>
-    </section>
-
-    <div class="overview">
-      <section class="tstatus" id="tstatus" hidden>
-        <div id="tsMain" aria-labelledby="tsLabel">
-        <p class="eyebrow">Garmin training status</p>
-        <div class="tstatus-row">
-          <h2 id="tsLabel"></h2>
-          <span class="since" id="tsSince"></span>
-        </div>
-        <p class="about" id="tsAbout"></p>
-        <p class="facts" id="tsFacts"></p>
-        <div class="weeks" id="tsWeeks" role="img"></div>
-        <div class="status-legend" id="tsLegend"></div>
-        </div>
-
-        <aside class="focus" id="focus" aria-labelledby="focusTitle" hidden>
-          <p class="eyebrow">Garmin load focus · last 4 weeks</p>
-          <h3 id="focusTitle"></h3>
-          <p class="about" id="focusAdvice"></p>
-          <div class="frows" id="focusRows"></div>
-          <div class="status-legend"><span><i class="range-key"></i>Optimal range</span></div>
-        </aside>
-      </section>
-
-      <section class="last" id="lastAct" aria-labelledby="lastName" hidden>
-        <header>
-          <p class="eyebrow" id="lastWhen"></p>
-          <h2 id="lastName"></h2>
-          <p class="last-effect" id="lastEffect"></p>
-        </header>
-        <dl class="last-stats" id="lastStats"></dl>
-        <div class="last-map" id="lastMap" role="img" hidden></div>
-      </section>
-    </div>
-
-    <div class="grid">
-      <section>
-        <h2>Fitness</h2>
-        <p class="reading" id="fitnessReading"></p>
-        <p class="sub">Your daily training load averaged over the last 6 weeks: what your body is used to. A line that rises over weeks and months means you're getting fitter.</p>
-        <div class="chart"><canvas id="fitnessChart" aria-label="Fitness over the last 120 days" role="img"></canvas></div>
-      </section>
-
-      <section>
-        <h2>Form</h2>
-        <p class="form-now">Today: <span class="state" id="state"></span>
-          <span class="advice" id="advice"></span></p>
-        <p class="sub">Form compares your last 7 days of training (fatigue) with your fitness. Below zero you've trained more than you're used to and are carrying fatigue, which is how fitness grows; above zero you're fresh. The bands show what each level means.</p>
-        <div class="chart"><canvas id="formChart" aria-label="Form over the last 120 days, against the form bands" role="img"></canvas></div>
-      </section>
-
-      <section class="wide" id="vo2Section" hidden>
-        <h2>VO2 max</h2>
-        <p class="reading" id="vo2Reading"></p>
-        <p class="sub">Garmin's estimate of how much oxygen your body can use at full effort, updated after runs with heart rate. It moves slowly: look at the trend over months, not single weeks.</p>
-        <div class="chart"><canvas id="vo2Chart" aria-label="VO2 max per week, last 12 months" role="img"></canvas></div>
-      </section>
-
-      <section>
-        <h2>Weekly running</h2>
-        <p class="sub" id="weeklySub"></p>
-        <div class="chart"><canvas id="weeklyChart" aria-label="Running kilometres per week, split by training effect" role="img"></canvas></div>
-        <div class="legend" id="weeklyLegend"></div>
-      </section>
-
-      <section>
-        <h2>Heart rate variability</h2>
-        <p class="sub">Nightly HRV against your normal range. Several nights below it usually means you're carrying fatigue or stress.</p>
-        <div class="chart"><canvas id="hrvChart" aria-label="Nightly HRV and resting heart rate, last 60 days" role="img"></canvas></div>
-        <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>HRV</span><span><i style="background:var(--fitness);opacity:.15"></i>Normal range</span><span><i class="line" style="background:var(--fatigue)"></i>Resting HR</span></div>
-      </section>
-
-      <section class="wide">
-        <h2>Sleep and readiness</h2>
-        <p class="sub">Hours slept each night, with Garmin's training readiness score for the morning after.</p>
-        <div class="chart"><canvas id="sleepChart" aria-label="Sleep hours and training readiness, last 60 days" role="img"></canvas></div>
-        <div class="legend"><span><i style="background:var(--nohr)"></i>Sleep</span><span><i class="line" style="background:var(--easy)"></i>Readiness</span></div>
-      </section>
-    </div>
-
-    <section class="activities">
-      <h2>Recent activities</h2>
-      <div class="sports" id="sportFilter" role="group" aria-label="Filter by sport"></div>
-      <div class="act-layout">
-        <div class="act-list">
-          <div class="scroll"><table>
-            <thead id="actHead"></thead>
-            <tbody id="actBody"></tbody>
-          </table></div>
-          <button type="button" class="more" id="actMore" hidden>Show more</button>
-        </div>
-        <aside class="volume" aria-label="Activity totals">
-          <p class="eyebrow" id="volSport"></p>
-          <div class="vol-block">
-            <h3>This week</h3>
-            <p class="vol-big" id="volWeek"></p>
-            <p class="vol-note" id="volWeekNote"></p>
-            <div class="vol-days" id="volDays" role="img"></div>
-          </div>
-          <div class="vol-block">
-            <h3>This year</h3>
-            <p class="vol-big" id="volYear"></p>
-            <p class="vol-note" id="volYearNote"></p>
-          </div>
-        </aside>
-      </div>
-    </section>
-  </main>
-
-  <dialog class="act-modal" id="actModal" aria-labelledby="modalName">
-    <div class="modal-box">
-      <header class="modal-head">
-        <div>
-          <p class="eyebrow" id="modalWhen"></p>
-          <h2 id="modalName"></h2>
-          <p class="last-effect" id="modalEffect"></p>
-        </div>
-        <button type="button" class="close" id="modalClose" aria-label="Close">&times;</button>
+    <!-- Overview: the athlete's story, with the big picture of fitness and training -->
+    <div class="page" id="page-overview" data-title="Overview">
+      <header class="page-head">
+        <h1>Overview</h1>
+        <p class="story" id="story"></p>
+        <button type="button" class="link-btn" id="raceAdd" hidden>+ Race goal</button>
       </header>
-      <dl class="last-stats" id="modalStats"></dl>
-      <div class="last-map modal-map" id="modalMap" role="img" hidden></div>
-      <p class="modal-status" id="modalStatus" role="status" hidden></p>
-      <div class="modal-details" id="modalDetails"></div>
+
+      <section class="race" id="race" aria-labelledby="raceName" hidden>
+        <div>
+          <p class="eyebrow" id="raceWhen"></p>
+          <div class="race-title"><h2 id="raceName"></h2><button type="button" class="link-btn" id="raceEdit">Edit</button></div>
+          <dl class="race-stats" id="raceStats"></dl>
+        </div>
+        <div class="race-trend" id="raceTrend">
+          <div class="chart"><canvas id="raceChart" aria-label="Garmin's predicted time for the race against the target, last 6 months" role="img"></canvas></div>
+          <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Garmin predicts</span><span><i class="line dashed" style="color:var(--ink)"></i>Target</span></div>
+        </div>
+      </section>
+
+      <section class="hero" aria-label="Last night and today">
+        <dl class="today" id="today"></dl>
+      </section>
+
+      <div class="overview">
+        <section class="tstatus" id="tstatus" hidden>
+          <div id="tsMain" aria-labelledby="tsLabel">
+          <p class="eyebrow">Garmin training status</p>
+          <div class="tstatus-row">
+            <h2 id="tsLabel"></h2>
+            <span class="since" id="tsSince"></span>
+          </div>
+          <p class="facts" id="tsFacts"></p>
+          <div class="weeks" id="tsWeeks" role="img"></div>
+          <div class="status-legend" id="tsLegend"></div>
+          </div>
+
+          <aside class="focus" id="focus" aria-labelledby="focusTitle" hidden>
+            <p class="eyebrow">Garmin load focus · last 4 weeks</p>
+            <h3 id="focusTitle"></h3>
+            <p class="about" id="focusAdvice"></p>
+            <div class="frows" id="focusRows"></div>
+            <div class="status-legend"><span><i class="range-key"></i>Optimal range</span></div>
+          </aside>
+        </section>
+
+        <section class="last" id="lastAct" aria-labelledby="lastName" hidden>
+          <header>
+            <p class="eyebrow" id="lastWhen"></p>
+            <h2 id="lastName"></h2>
+            <p class="last-effect" id="lastEffect"></p>
+          </header>
+          <dl class="last-stats" id="lastStats"></dl>
+          <div class="last-map" id="lastMap" role="img" hidden></div>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section>
+          <h2>Fitness and form</h2>
+          <p class="form-now">Form today: <span class="state" id="state"></span></p>
+          <p class="reading" id="fitnessReading"></p>
+          <div class="chart"><canvas id="fitnessChart" aria-label="Fitness and fatigue over the last 120 days" role="img"></canvas></div>
+          <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Fitness</span><span><i class="line" style="background:var(--fatigue)"></i>Fatigue</span></div>
+        </section>
+
+        <section id="weeklySection">
+          <h2 id="weeklyTitle"></h2>
+          <p class="reading" id="weeklySub"></p>
+          <div class="chart"><canvas id="weeklyChart" role="img"></canvas></div>
+          <div class="legend" id="weeklyLegend"></div>
+        </section>
+
+        <section class="wide" id="vo2Section" hidden>
+          <h2>VO2 max</h2>
+          <p class="reading" id="vo2Reading"></p>
+          <div class="chart"><canvas id="vo2Chart" aria-label="VO2 max per week, last 12 months" role="img"></canvas></div>
+        </section>
+
+        <section class="wide">
+          <div class="section-head">
+            <h2>Latest activities</h2>
+            <a class="more-link" href="#activities">All activities</a>
+          </div>
+          <div class="act-layout">
+            <div class="scroll"><table class="act-table">
+              <thead id="recentHead"></thead>
+              <tbody id="recentBody"></tbody>
+            </table></div>
+            <aside class="volume" id="ovVolume" aria-label="Totals for your main sport">
+              <p class="eyebrow vol-sport"></p>
+              <div class="vol-block">
+                <h3>This week</h3>
+                <p class="vol-big vol-week"></p>
+                <p class="vol-note vol-week-note"></p>
+                <div class="vol-days" role="img"></div>
+                <p class="vol-note vol-long vol-week-long"></p>
+              </div>
+              <div class="vol-block">
+                <h3>This year</h3>
+                <p class="vol-big vol-year"></p>
+                <p class="vol-note vol-year-note"></p>
+                <p class="vol-note vol-long vol-year-long"></p>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </div>
     </div>
-  </dialog>
+
+    <!-- Health: recovery, sleep and the body's daily numbers -->
+    <div class="page" id="page-health" data-title="Health" hidden>
+      <header class="page-head page-head-row">
+        <h1>Health</h1>
+        <div class="range-switch" id="healthRange" role="group" aria-label="Period">
+          <button type="button" data-days="90">90 days</button>
+          <button type="button" data-days="365">1 year</button>
+        </div>
+      </header>
+      <section class="hero" aria-label="Last night and today">
+        <dl class="today" id="healthToday"></dl>
+      </section>
+      <div class="grid">
+        <section id="hrvSection">
+          <h2>Heart rate variability</h2>
+          <p class="reading" id="hrvReading"></p>
+          <div class="chart"><canvas id="hrvChart" aria-label="Nightly HRV against the normal range, last 90 days" role="img"></canvas></div>
+          <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>HRV</span><span><i style="background:var(--fitness);opacity:.15"></i>Normal range</span></div>
+        </section>
+        <section id="rhrSection">
+          <h2>Resting heart rate</h2>
+          <p class="reading" id="rhrReading"></p>
+          <div class="chart"><canvas id="rhrChart" aria-label="Resting heart rate per day, last 90 days" role="img"></canvas></div>
+        </section>
+        <section id="sleepSection">
+          <h2>Sleep</h2>
+          <p class="reading" id="sleepReading"></p>
+          <div class="chart"><canvas id="sleepChart" aria-label="Hours of sleep per night, last 90 days" role="img"></canvas></div>
+        </section>
+        <section id="bbSection">
+          <h2>Body Battery</h2>
+          <div class="chart"><canvas id="bbChart" aria-label="Daily Body Battery range, last 90 days" role="img"></canvas></div>
+        </section>
+        <section id="stressSection">
+          <h2>Stress</h2>
+          <div class="chart"><canvas id="stressChart" aria-label="Average stress per day, last 90 days" role="img"></canvas></div>
+        </section>
+        <section class="wide" id="stepsSection">
+          <h2>Steps</h2>
+          <p class="reading" id="stepsReading"></p>
+          <div class="chart"><canvas id="stepsChart" aria-label="Steps per day" role="img"></canvas></div>
+          <div class="legend"><span><i style="background:var(--fitness)"></i>Steps</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Activities: everything, filterable by sport -->
+    <div class="page" id="page-activities" data-title="Activities" hidden>
+      <header class="page-head"><h1>Activities</h1></header>
+      <section class="activities">
+        <div class="sports" id="sportFilter" role="group" aria-label="Filter by sport"></div>
+        <div class="act-layout">
+          <div class="act-list">
+            <div class="scroll"><table class="act-table">
+              <thead id="actHead"></thead>
+              <tbody id="actBody"></tbody>
+            </table></div>
+            <button type="button" class="more" id="actMore" hidden>Show more</button>
+          </div>
+          <aside class="volume" id="actVolume" aria-label="Activity totals">
+            <p class="eyebrow vol-sport"></p>
+            <div class="vol-block">
+              <h3>This week</h3>
+              <p class="vol-big vol-week"></p>
+              <p class="vol-note vol-week-note"></p>
+              <div class="vol-days" role="img"></div>
+                <p class="vol-note vol-long vol-week-long"></p>
+            </div>
+            <div class="vol-block">
+              <h3>This year</h3>
+              <p class="vol-big vol-year"></p>
+              <p class="vol-note vol-year-note"></p>
+                <p class="vol-note vol-long vol-year-long"></p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
+
+    <!-- One sport: its totals, how volume and speed have developed, its records and its activities -->
+    <div class="page" id="page-sport" hidden>
+      <header class="page-head">
+        <h1 id="sportTitle"></h1>
+      </header>
+      <dl class="tiles" id="sportTiles"></dl>
+      <div class="grid">
+        <section class="wide">
+          <h2 id="sportWeeklyTitle"></h2>
+          <p class="reading" id="sportWeeklySub"></p>
+          <div class="chart"><canvas id="sportWeeklyChart" role="img"></canvas></div>
+          <div class="legend" id="sportWeeklyLegend"></div>
+        </section>
+        <section class="wide" id="sportYoySection">
+          <h2>This year against last year</h2>
+          <p class="reading" id="sportYoyReading"></p>
+          <div class="chart"><canvas id="sportYoyChart" role="img"></canvas></div>
+          <div class="legend" id="sportYoyLegend"></div>
+        </section>
+        <section class="wide" id="sportMonthSection">
+          <h2 id="sportMonthTitle"></h2>
+          <div class="chart"><canvas id="sportMonthChart" role="img"></canvas></div>
+          <div class="legend" id="sportMonthLegend"></div>
+        </section>
+        <section class="wide" id="sportRecordsSection">
+          <h2>Personal bests</h2>
+          <div class="records" id="sportRecords"></div>
+        </section>
+        <section class="wide">
+          <h2>All <span id="sportListName"></span></h2>
+          <div class="scroll"><table class="act-table">
+            <thead id="sportHead"></thead>
+            <tbody id="sportBody"></tbody>
+          </table></div>
+          <button type="button" class="more" id="sportMore" hidden>Show more</button>
+        </section>
+      </div>
+    </div>
+  </main>
 
   <div id="empty" class="empty" hidden>
     <h1>No training data yet</h1>
     <p id="emptyText">The first sync pulls up to six months of activities from Garmin and can take a few minutes. This page updates when it's done.</p>
   </div>
+  </div>
 </div>
+
+<dialog class="race-dialog" id="raceDialog" aria-labelledby="raceDialogTitle">
+  <form id="raceForm">
+    <h2 id="raceDialogTitle">Race goal</h2>
+    <label>Race <input id="raceInName" maxlength="80" placeholder="Odense 10K" required></label>
+    <label>Date <input id="raceInDate" type="date" required></label>
+    <label>Distance
+      <select id="raceInDist">
+        <option value="5000">5 km</option>
+        <option value="10000">10 km</option>
+        <option value="21098">Half marathon</option>
+        <option value="42195">Marathon</option>
+        <option value="custom">Other</option>
+      </select>
+    </label>
+    <label id="raceInKmWrap" hidden>Kilometres <input id="raceInKm" type="number" min="0.1" max="1000" step="0.01"></label>
+    <label>Target time <input id="raceInTime" placeholder="50:00 or 1:45:00" required></label>
+    <p class="form-error" id="raceError" role="alert" hidden></p>
+    <div class="form-actions">
+      <button type="submit" class="primary">Save</button>
+      <button type="button" id="raceCancel">Cancel</button>
+      <button type="button" class="link-btn" id="raceRemove">Remove goal</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="act-modal" id="actModal" aria-labelledby="modalName">
+  <div class="modal-box">
+    <header class="modal-head">
+      <div>
+        <p class="eyebrow" id="modalWhen"></p>
+        <h2 id="modalName"></h2>
+        <p class="last-effect" id="modalEffect"></p>
+      </div>
+      <button type="button" class="close" id="modalClose" aria-label="Close">&times;</button>
+    </header>
+    <dl class="last-stats" id="modalStats"></dl>
+    <div class="last-map modal-map" id="modalMap" role="img" hidden></div>
+    <p class="modal-status" id="modalStatus" role="status" hidden></p>
+    <div class="modal-details" id="modalDetails"></div>
+  </div>
+</dialog>
 <script src="/static/vendor/chart.umd.js"></script>
 <script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/app.js"></script>

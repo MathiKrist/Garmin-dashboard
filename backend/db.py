@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS tracks (activity_id INTEGER PRIMARY KEY, points TEXT)
 -- Laps per activity as JSON [{km, duration_s, speed, ...}, ...]; fetched when the activity is first opened
 CREATE TABLE IF NOT EXISTS laps (activity_id INTEGER PRIMARY KEY, laps TEXT);
 
+-- A run's fastest time over set distances as JSON {"400": seconds, "1000": seconds, ...}, worked out from its
+-- second-by-second data; "{}" when that couldn't be read
+CREATE TABLE IF NOT EXISTS efforts (activity_id INTEGER PRIMARY KEY, bests TEXT);
+
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
@@ -77,6 +81,7 @@ DAILY_COLS = [
     "stress_avg", "steps", "readiness", "training_status", "training_status_since",
     "acute_load", "acute_load_min", "acute_load_max", "acwr_status", "vo2max",
     "load_low", "load_low_min", "load_low_max", "load_high", "load_high_min", "load_high_max", "load_anaerobic", "load_anaerobic_min", "load_anaerobic_max", "load_focus",
+    "pred_5k", "pred_10k", "pred_half", "pred_marathon",
 ]
 # Columns added after the first release; connect() adds them to older databases.
 DAILY_ADDED = {
@@ -84,6 +89,8 @@ DAILY_ADDED = {
     "acute_load_min": "REAL", "acute_load_max": "REAL", "acwr_status": "TEXT", "vo2max": "REAL",
     **{c: "REAL" for c in ("load_low", "load_low_min", "load_low_max", "load_high", "load_high_min", "load_high_max", "load_anaerobic", "load_anaerobic_min", "load_anaerobic_max")},
     "load_focus": "TEXT",
+    # Garmin's race predictor: predicted seconds for each distance
+    **{c: "REAL" for c in ("pred_5k", "pred_10k", "pred_half", "pred_marathon")},
 }
 
 
@@ -144,6 +151,16 @@ def set_laps(conn, activity_id, laps):
 def get_laps(conn, activity_id):
     row = conn.execute("SELECT laps FROM laps WHERE activity_id = ?", (activity_id,)).fetchone()
     return json.loads(row["laps"]) if row else None
+
+
+def set_efforts(conn, activity_id, bests):
+    conn.execute("INSERT OR REPLACE INTO efforts (activity_id, bests) VALUES (?, ?)", (activity_id, json.dumps(bests)))
+
+
+def all_efforts(conn):
+    """Every run's best efforts: {activity_id: {metres: seconds}}."""
+    return {r["activity_id"]: {int(m): s for m, s in json.loads(r["bests"]).items()}
+            for r in conn.execute("SELECT activity_id, bests FROM efforts")}
 
 
 def set_meta(conn, key, value):
