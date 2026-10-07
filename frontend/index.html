@@ -21,6 +21,7 @@
   --fitness: #2C4F86;
   --fatigue: #C24A5A;
   --nohr: #A9B2AC;
+  --route: #FF6A00;  /* the last activity's glowing route line */
   /* Garmin's load focus colors */
   --low-aerobic: #3FA9DE;
   --high-aerobic: #F08A24;
@@ -50,6 +51,7 @@
     --fitness: #7FA3DB;
     --fatigue: #E07383;
     --nohr: #55615B;
+    --route: #FF7A1A;
     --low-aerobic: #5BBDEB;
     --high-aerobic: #F59A40;
     --anaerobic: #B373E3;
@@ -152,6 +154,8 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .last-map .leaflet-bar a:hover { background: var(--paper); }
 .last-map .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent); color: var(--muted); }
 .last-map .leaflet-control-attribution a { color: inherit; }
+/* Soft orange bloom around the route; stacked under the wide halo lines drawn in app.js */
+.last-map .route-glow { filter: drop-shadow(0 0 4px var(--route)) drop-shadow(0 0 10px var(--route)); }
 
 /* Today: sleep and recovery */
 .hero { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }

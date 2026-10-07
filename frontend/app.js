@@ -255,17 +255,69 @@ function renderMap(track) {
     tiles.options.style = style;
     tiles.redraw();
   }
+  stopReplay?.();
   route?.remove();
-  const line = css("--hard"), paper = css("--paper");
-  const dot = (p, color) => L.circleMarker(p, { radius: 5.5, color: paper, weight: 2.5, fillColor: color, fillOpacity: 1 });
-  route = L.featureGroup([
-    L.polyline(track, { color: paper, weight: 8, opacity: 0.85, lineJoin: "round", lineCap: "round" }),  // casing
-    L.polyline(track, { color: line, weight: 4, lineJoin: "round", lineCap: "round" }),
-    dot(track[track.length - 1], css("--fatigue")),
-    dot(track[0], css("--easy")),
-  ]).addTo(map);
+  const line = css("--route"), paper = css("--paper");
+  const dot = (p, color, extra) => L.circleMarker(p, { radius: 5.5, color: paper, weight: 2.5, fillColor: color, fillOpacity: 1, ...extra });
+  const stroke = (weight, opacity, extra) => L.polyline(track, { color: line, weight, opacity, lineJoin: "round", lineCap: "round", interactive: false, ...extra });
+  const lines = [
+    stroke(14, 0.12),  // glow: two wide faint halos fading out from the line
+    stroke(8, 0.25),
+    stroke(3.5, 1, { className: "route-glow" }),
+    stroke(1.2, 0.9, { color: "#FFE0B0" }),  // hot pale centre, like a lit filament
+  ];
+  // Distance covered at each GPS point, so the replay's runner moves at an even speed
+  const along = [0];
+  for (let i = 1; i < track.length; i++) along.push(along[i - 1] + metres(track[i - 1], track[i]));
+  const finish = dot(track[track.length - 1], css("--fatigue"));
+  route = L.featureGroup([...lines, finish, dot(track[0], css("--easy"))]).addTo(map);
   fitRoute();
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const runner = dot(track[0], "#FFFFFF", { radius: 6, color: line, className: "route-glow" });
+    stopReplay = replayRoute({ track, along, lines, finish, runner });
+  }
   el.setAttribute("aria-label", `Map of the route: ${data.last_activity.name || "last activity"}`);
+}
+
+// Metres between two [lat, lon] points (flat-earth approximation, plenty for points a few metres apart)
+function metres([lat1, lon1], [lat2, lon2]) {
+  const rad = Math.PI / 180;
+  return Math.hypot((lon2 - lon1) * rad * Math.cos((lat1 + lat2) / 2 * rad), (lat2 - lat1) * rad) * 6371e3;
+}
+// The [lat, lon] reached after `m` metres along the track; `along` holds the distance at each point
+function pointAt(track, along, m, from = 0) {
+  let i = from;
+  while (i < track.length - 2 && along[i + 1] < m) i++;
+  const f = (m - along[i]) / (along[i + 1] - along[i] || 1);
+  return [track[i][0] + (track[i + 1][0] - track[i][0]) * f, track[i][1] + (track[i + 1][1] - track[i][1]) * f];
+}
+
+// Draws the route from start to finish once, with a glowing dot running at its head; returns a function that stops it and shows the whole route
+let stopReplay = null;
+const REPLAY_MS = 3500;
+function replayRoute({ track, along, lines, finish, runner }) {
+  const total = along[along.length - 1], paths = lines.map((l) => l.getElement());
+  runner.addTo(map);
+  finish.getElement().style.opacity = 0;
+  let frame, i = 0;
+  const t0 = performance.now();
+  const step = (now) => {
+    const f = Math.min(1, (now - t0) / REPLAY_MS), d = f * total;
+    // The path's length is read every frame, since a zoom mid-replay redraws it at a new size
+    paths.forEach((p) => { const len = p.getTotalLength(); p.style.strokeDasharray = len; p.style.strokeDashoffset = len * (1 - f); });
+    while (i < track.length - 2 && along[i + 1] < d) i++;
+    runner.setLatLng(pointAt(track, along, d, i));
+    if (f < 1) frame = requestAnimationFrame(step); else stop();
+  };
+  const stop = () => {
+    cancelAnimationFrame(frame);
+    runner.remove();
+    paths.forEach((p) => { p.style.strokeDasharray = p.style.strokeDashoffset = ""; });
+    finish.getElement().style.opacity = "";
+    stopReplay = null;
+  };
+  frame = requestAnimationFrame(step);
+  return stop;
 }
 
 function baseOptions(extra = {}) {
