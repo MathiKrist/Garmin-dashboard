@@ -121,9 +121,11 @@ def fetch_laps(client, activity_id):
         "km": round((l.get("distance") or 0) / 1000, 3),
         "duration_s": l.get("movingDuration") or l.get("duration"),
         "speed": l.get("averageMovingSpeed") or l.get("averageSpeed"),
+        "max_speed": l.get("maxSpeed"),
         "avg_hr": l.get("averageHR"),
         "max_hr": l.get("maxHR"),
         "elev_gain": l.get("elevationGain"),
+        "elev_loss": l.get("elevationLoss"),
         "cadence": l.get("averageRunCadence") or l.get("averageBikeCadence"),
         "power": l.get("averagePower"),
     } for l in splits.get("lapDTOs") or [] if isinstance(l, dict)]
@@ -143,7 +145,9 @@ def fetch_details(db_path, activity_id):
         if not row:
             return None
         need_track = bool(row["gps"]) and db.get_track(conn, activity_id) is None
-        need_laps = db.get_laps(conn, activity_id) is None
+        laps = db.get_laps(conn, activity_id)
+        # Laps stored before max speed and descent were added are fetched again to get them
+        need_laps = laps is None or (laps and "max_speed" not in laps[0])
         if not (need_track or need_laps):
             return None
         _shared_client = _shared_client or _client()

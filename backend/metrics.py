@@ -189,7 +189,7 @@ ACTIVITY_SELECT = (
     "id, start_local, date, type, name, distance_m, duration_s, avg_hr, max_hr, avg_speed, elev_gain, "
     "training_load, aerobic_te, anaerobic_te, te_label, "
     "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps, "
-    "json_extract(raw, '$.locationName') AS location"
+    "json_extract(raw, '$.locationName') AS location, json_extract(raw, '$.elevationLoss') AS elev_loss"
 )
 
 
@@ -207,7 +207,7 @@ def _summary(a):
     return {
         "id": a["id"], "date": a["date"], "start": a["start_local"], "type": a["type"], "sport": sport_of(a["type"]),
         "name": a["name"], "km": round((a["distance_m"] or 0) / 1000, 2), "duration_s": a["duration_s"],
-        "speed": a["avg_speed"], "elev_m": a["elev_gain"], "avg_hr": a["avg_hr"], "load": a["load"],
+        "speed": a["avg_speed"], "elev_m": a["elev_gain"], "descent_m": a["elev_loss"], "avg_hr": a["avg_hr"], "load": a["load"],
         "sets": a["sets"], "reps": a["reps"], "location": a["location"],
         "focus": a["focus"], "te_label": a["te_label"],
     }
@@ -215,13 +215,14 @@ def _summary(a):
 
 # The popup's extra stats: our key -> Garmin's field in the activity summary
 DETAIL_FIELDS = {
-    "calories": "calories", "elapsed_s": "elapsedDuration", "max_speed": "maxSpeed", "gap_speed": "avgGradeAdjustedSpeed",
+    "calories": "calories", "bmr_calories": "bmrCalories", "elapsed_s": "elapsedDuration", "max_speed": "maxSpeed", "gap_speed": "avgGradeAdjustedSpeed",
     "cadence": "averageRunningCadenceInStepsPerMinute", "max_cadence": "maxRunningCadenceInStepsPerMinute",
     "bike_cadence": "averageBikingCadenceInRevPerMinute", "max_bike_cadence": "maxBikingCadenceInRevPerMinute",
     "steps": "steps", "stride_cm": "avgStrideLength", "gct_ms": "avgGroundContactTime", "gct_balance": "avgGroundContactBalance",
     "vert_osc_cm": "avgVerticalOscillation", "vert_ratio": "avgVerticalRatio",
     "power": "avgPower", "max_power": "maxPower", "norm_power": "normPower",
     "elev_loss": "elevationLoss", "min_elev": "minElevation", "max_elev": "maxElevation",
+    "avg_elev": "avgElevation", "max_vert_speed": "maxVerticalSpeed",
     "resp": "avgRespirationRate", "min_resp": "minRespirationRate", "max_resp": "maxRespirationRate",
     "aerobic_msg": "aerobicTrainingEffectMessage", "anaerobic_msg": "anaerobicTrainingEffectMessage",
     "vo2max": "vO2MaxValue", "body_battery": "differenceBodyBattery", "water_ml": "waterEstimated",

@@ -21,7 +21,15 @@
   --fitness: #2C4F86;
   --fatigue: #C24A5A;
   --nohr: #A9B2AC;
-  --route: #FF6A00;  /* the last activity's glowing route line */
+  --route: #FF6A00;  /* the glowing route line on the maps */
+  /* Sports with their own route color and map (ROUTE_STYLES in app.js); swim and disc golf sit on satellite
+     photos in both themes, so they always take the bright color */
+  --route-winter: #0A8FE8;
+  --route-swim: #3FE0FF;
+  --route-disc: #FF5CC4;
+  --satellite-brightness: 0.78;  /* dims satellite photos so the route stands out */
+  --hillshade-blend: multiply;
+  --hillshade-opacity: 0.7;
   /* Garmin's load focus colors */
   --low-aerobic: #3FA9DE;
   --high-aerobic: #F08A24;
@@ -58,6 +66,10 @@
     --fatigue: #E07383;
     --nohr: #55615B;
     --route: #FF7A1A;
+    --route-winter: #46C8FF;
+    --satellite-brightness: 0.58;
+    --hillshade-blend: screen;
+    --hillshade-opacity: 0.55;
     --low-aerobic: #5BBDEB;
     --high-aerobic: #F59A40;
     --anaerobic: #B373E3;
@@ -165,8 +177,11 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .last-map .leaflet-bar a:hover { background: var(--paper); }
 .last-map .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent); color: var(--muted); }
 .last-map .leaflet-control-attribution a { color: inherit; }
-/* Soft orange bloom around the route; stacked under the wide halo lines drawn in app.js */
+/* Soft bloom in the route's color (set on the map by app.js); stacked under the wide halo lines drawn in app.js */
 .last-map .route-glow { filter: drop-shadow(0 0 4px var(--route)) drop-shadow(0 0 10px var(--route)); }
+.last-map .tiles-satellite { filter: brightness(var(--satellite-brightness)); }
+/* Terrain shading blended into the grey map: darkens the shadows in light mode, lights the slopes in dark mode */
+.last-map .tiles-hillshade { mix-blend-mode: var(--hillshade-blend); opacity: var(--hillshade-opacity); }
 
 /* Today: sleep and recovery */
 .hero { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
@@ -239,11 +254,13 @@ button.act-link:focus-visible { outline: 2px solid var(--fitness); outline-offse
   border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); color: var(--ink);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
 }
-.act-modal::backdrop { background: rgba(10, 16, 14, 0.55); backdrop-filter: blur(3px); }
+/* No backdrop blur: it's redone for every frame the route replay or a scroll draws, which made the popup stutter */
+.act-modal::backdrop { background: rgba(10, 16, 14, 0.65); }
 .act-modal[open] { animation: modal-in 180ms ease-out; }
 @keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
 @media (prefers-reduced-motion: reduce) { .act-modal[open] { animation: none; } }
-body:has(.act-modal[open]) { overflow: hidden; }
+/* A class set from JS rather than body:has(), which the browser rechecks on every change inside the page */
+body.modal-open { overflow: hidden; }
 /* The box scrolls rather than the dialog, so its scrollbar isn't mistaken for a click outside */
 .modal-box {
   display: flex; flex-direction: column; gap: 1.5rem; padding: 0 clamp(1.25rem, 3vw, 2.25rem) 2rem;
