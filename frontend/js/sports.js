@@ -3,6 +3,7 @@
 import { data } from "./state.js";
 import { $, css, fmtDay, fmtDayYear, fmtShort, fmtDuration, fmtPace, plural, sum, between, fmtKm, mondayOf, statusLabel, addDays, fmtHours, escapeHtml } from "./util.js";
 import { stackedBarOptions, barStyle, partialColors, draw } from "./charts.js";
+import { openWeek } from "./modal.js";
 
 export function sportCounts() {
   const counts = {};
@@ -62,11 +63,13 @@ export function weeklyChart(canvas, legend, key, list, starts, m) {
   // A single series needs no legend: the title names it
   $(legend).innerHTML = sets.length > 1 ? sets.map((x) => `<span><i style="background:${x.color}"></i>${x.label}</span>`).join("") : "";
   $(canvas).setAttribute("aria-label", `${m.unit} of ${sportLabel(key).toLowerCase()} per week, last ${starts.length} weeks`);
+  // A week with activities opens them in the popup
+  const weekAt = (els) => (els.length && inWeek(starts[els[0].index]).length ? els[0].index : -1);
   draw(canvas, {
     type: "bar",
     data: { labels: starts.map((w) => fmtShort(w)),
       datasets: sets.map(({ color, ...x }) => ({ ...x, backgroundColor: partialColors(color, partial), ...barStyle() })) },
-    options: stackedBarOptions({
+    options: { ...stackedBarOptions({
       title: (items) => `Week of ${fmtShort(starts[items[0].dataIndex])}${partial[items[0].dataIndex] ? " (so far)" : ""}`,
       label: (c) => (c.parsed.y ? ` ${c.dataset.label}: ${fmt(c.parsed.y)}` : null),
       footer: (items) => {
@@ -74,6 +77,11 @@ export function weeklyChart(canvas, legend, key, list, starts, m) {
         return as.length ? `${plural(as.length, SPORT_NOUNS[key])}, ${fmtHours(sum(as, "duration_s"))}` : "";
       },
     }),
+    onHover: (e, els) => { e.native.target.style.cursor = weekAt(els) >= 0 ? "pointer" : ""; },
+    onClick: (e, els) => {
+      const i = weekAt(els);
+      if (i >= 0) openWeek({ key, title: `Week of ${fmtShort(starts[i])}`, partial: partial[i], rows: inWeek(starts[i]) });
+    } },
   });
 }
 

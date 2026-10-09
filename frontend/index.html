@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/static/styles.css">
+<script src="/static/js/theme.js"></script>
 </head>
 <body>
 <div class="app">
@@ -29,6 +30,11 @@
       <p class="nav-label" id="navSportsLabel">Sports</p>
       <ul id="navSports"></ul>
     </nav>
+    <div class="range-switch theme-switch" id="themeSwitch" role="group" aria-label="Theme">
+      <button type="button" data-theme="auto" title="Dark from 20:00 to 07:00, otherwise like the system">Auto</button>
+      <button type="button" data-theme="light">Light</button>
+      <button type="button" data-theme="dark">Dark</button>
+    </div>
   </aside>
 
   <div class="content">
@@ -297,6 +303,7 @@
   <div class="modal-box">
     <header class="modal-head">
       <div>
+        <button type="button" class="link-btn modal-back" id="modalBack" hidden></button>
         <p class="eyebrow" id="modalWhen"></p>
         <h2 id="modalName"></h2>
         <p class="last-effect" id="modalEffect"></p>

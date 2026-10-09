@@ -8,6 +8,8 @@ Built with FastAPI, SQLite and Chart.js. No cloud, no accounts beyond your own G
 
 A menu on the left (a sideways-scrolling row on phones) picks the page; the address keeps it (`#overview`, `#health`, `#activities`, `#sport/run`), so a page can be bookmarked.
 
+The page is dark at night (20:00 to 07:00) and otherwise follows the system's light or dark setting. The **Auto / Light / Dark** switch at the bottom of the menu fixes it to one, remembered per device (`frontend/js/theme.js`).
+
 ### Overview
 
 The athlete's story and overall progression.
@@ -19,7 +21,7 @@ The athlete's story and overall progression.
 - **Load focus**: Garmin's last-four-weeks load in low aerobic, high aerobic and anaerobic against the optimal range for each, with what to train next. Training status and load focus sit in the left column under the top row.
 - **Last activity**: in the right column next to them: your newest activity's name, when and where, Garmin's training effect, and the same stats as its sport's table columns, minus ascent and load. If it was recorded with GPS, its route is drawn as a glowing line, replayed once from start to finish when the page loads (skipped with reduced motion), on Esri's grey basemap (light or dark to match the page; the map tiles need internet). Most sports get an orange line; a few get their own color and map (`ROUTE_STYLES` in `frontend/js/map.js`): winter sports are ice blue on the grey map with Esri's terrain hillshade blended in, open-water swims are aqua and disc golf is magenta, both on dimmed Esri satellite imagery. The activity popup's map uses the same styles. Routes are fetched from Garmin during the sync for the 5 newest activities and stored in the `tracks` table.
 - **Fitness and form**: one chart with fitness (42-day exponentially weighted training load, CTL) and fatigue (the same over 7 days, ATL) on one scale; form is the gap between them, as a % of fitness, named by band (Overloaded, Building, Balanced, Fresh, Rested) for today and in the tooltip, with the change in fitness over the last four weeks. The gap is shaded blue where fitness is ahead (positive form) and red where fatigue is. A switch shows the last 120 days or the whole year (remembered per device).
-- **Weekly running** (your main sport, the one you do most): kilometres per week for the last 12 weeks, split by Garmin's training effect for each run, with the low aerobic share of the last 4 weeks. Other main sports show their kilometres or hours per week.
+- **Weekly running** (your main sport, the one you do most): kilometres per week for the last 12 weeks, split by Garmin's training effect for each run, with the low aerobic share of the last 4 weeks. Other main sports show their kilometres or hours per week. Clicking a week's bar opens that week's activities: total distance, time, count and load, and the list, each opening its activity (with a link back to the week).
 - **VO2 max**: Garmin's VO2 max estimate per week as a smooth line, up to `VO2MAX_BACKFILL_DAYS` back (fetched once in a single request), compared with three and twelve months ago.
 - **Training calendar**: the last 53 weeks, a square per day (Monday at the top), shaded by the day's training load in four steps (the quartiles of the days you trained); rest days are grey. Hovering shows what you did, and clicking opens the day's biggest activity. Above it: training days, days a week and the longest streak.
 - **Latest activities**: the 15 newest, linking to the full list, with the **This week / This year** panel for your main sport next to them.
@@ -39,7 +41,7 @@ The athlete's story and overall progression.
 Every sport you've done at least 3 times gets a page in the menu, most-used first, with its own color (`--sp-*` in `frontend/styles.css`). One-offs, Other and disc golf (Garmin keeps no scores, so there's little to follow) get no page; their activities are in the activities list and its sport filter like everything else.
 
 - **Totals**: this week, the last 4 weeks (with the change against the 4 before), this year and last year. Distance for sports that record it, time for the rest. A sport you haven't done for four weeks (a ski trip, a summer sport) shows its latest outing, this year and last year instead of zeros.
-- **Per week**: kilometres or hours per week for the last 26 weeks (or the 26 weeks up to the latest one). Running is split by Garmin's training effect, with the low aerobic share of the last 4 weeks.
+- **Per week**: kilometres or hours per week for the last 26 weeks (or the 26 weeks up to the latest one). Running is split by Garmin's training effect, with the low aerobic share of the last 4 weeks. Clicking a week opens its activities, as on the overview.
 - **This year against last year**: the running total of kilometres (or hours) through the year, this year as a solid line and last year dashed, with both totals on today's date. Shown when there's anything from last year.
 - **Per month**: kilometres (or hours) per month, this year's bars next to last year's.
 - **Personal bests**: for running, the fastest 400 m, 1 km, mile, 5 km, 10 km, half marathon and marathon within any run (distances you haven't run yet are listed as such); for every sport, the longest distance and time; for cycling and winter sports, top speed; for winter sports, most descent. Each opens its activity.
@@ -59,8 +61,9 @@ Training load comes from Garmin when available; otherwise it falls back to Banis
 
 ```
 .
-├── Start dashboard.bat   # Double-click launcher: starts the server and opens the page (the desktop shortcut points here)
-├── Open dashboard.bat    # Only opens the page, for a server running on another device (DASHBOARD_URL)
+├── Dashboard app.bat     # Opens the dashboard in its own window (the desktop app); starts a server here if none runs
+├── Start dashboard.bat   # Double-click launcher: starts the server and opens the page in the browser
+├── Open dashboard.bat    # Only opens the page in the browser, for a server running on another device (DASHBOARD_URL)
 ├── README.md
 ├── requirements.txt
 ├── .env.example          # Copy to .env and adjust
@@ -72,12 +75,15 @@ Training load comes from Garmin when available; otherwise it falls back to Banis
 │   ├── config.py         # Reads settings from .env
 │   ├── login.py          # One-time Garmin login, stores a token
 │   └── demo.py           # Seeds fake data for --demo mode
+├── desktop/
+│   └── main.py           # The desktop app: a window onto the server (pywebview)
 ├── frontend/             # The page the browser loads (served at /static); no build step
 │   ├── index.html        # The page's markup
 │   ├── login.html        # The login page, when DASHBOARD_PASSWORD is set
 │   ├── styles.css
 │   ├── js/               # ES modules, loaded from main.js
 │   │   ├── main.js       # Loads the data, keeps it fresh, routes between pages
+│   │   ├── theme.js      # Light or dark (a plain script, run before the page draws)
 │   │   ├── state.js      # The dashboard data, shared by every module
 │   │   ├── util.js       # Formatting and small helpers
 │   │   ├── charts.js     # Chart.js setup
@@ -89,7 +95,7 @@ Training load comes from Garmin when available; otherwise it falls back to Banis
 │   │   ├── activities.js # Activities page
 │   │   ├── calendar.js   # Training calendar (overview)
 │   │   ├── sport.js      # A page per sport
-│   │   └── modal.js      # Activity popup
+│   │   └── modal.js      # Activity popup (and a week's activities)
 │   └── vendor/
 │       ├── chart.umd.js  # Chart.js, bundled so it works offline
 │       ├── fonts/        # Barlow and Barlow Condensed (SIL Open Font License), same reason
@@ -142,6 +148,12 @@ To sync without the server:
 python backend/sync.py
 ```
 
+### Desktop app
+
+`Dashboard app.bat` opens the dashboard in its own window instead of a browser tab, with no console. It's a client: it connects to `DASHBOARD_URL` from `.env`, or this machine when that's empty. If it's this machine and no server is running, the app starts one itself (with the background sync) and stops it when the window closes; meanwhile phones on the wifi can connect as usual. With the server running elsewhere (set `DASHBOARD_URL`), the app is only a window onto it, and if nothing answers it says so, with a **Try again** button. `Dashboard app.bat --demo` starts the local server on demo data.
+
+The window keeps its login and remembered switches between runs (in `data/webview`). Logs from a server it started go to `data/desktop.log`. It uses Edge WebView2 through pywebview, which comes with Windows 11. To give it a desktop shortcut, make one for `Dashboard app.bat` as described below and pick `assets/dashboard.ico`.
+
 ### Windows shortcut
 
 `Start dashboard.bat` in the project folder starts the dashboard with a double-click and opens it in the browser. It uses the Python in `.venv`. The desktop shortcut points at this file and takes its icon from `assets/dashboard.ico`, so keep both where they are or update the shortcut.
@@ -161,7 +173,7 @@ python backend/sync.py
 | `SYNC_INTERVAL_MINUTES` | 60 | Background sync interval (minimum 5) |
 | `HOST` | 0.0.0.0 | `0.0.0.0` = reachable on LAN, `127.0.0.1` = this machine only |
 | `PORT` | 8000 | Server port |
-| `DASHBOARD_URL` | empty | Where `Open dashboard.bat` opens the dashboard, when the server runs on another device (e.g. `http://192.168.1.20:8000`); empty means this machine |
+| `DASHBOARD_URL` | empty | Where the desktop app and `Open dashboard.bat` open the dashboard, when the server runs on another device (e.g. `http://192.168.1.20:8000`); empty means this machine |
 | `DASHBOARD_PASSWORD` | empty | If set, the dashboard opens with a login page asking for it. Recommended with `HOST=0.0.0.0` |
 | `DASHBOARD_USERNAME` | empty | If set, the login page asks for this username too; empty means password only |
 | `TOKEN_DIR` | ~/.garminconnect | Where the Garmin login token is stored |
@@ -181,6 +193,7 @@ python backend/sync.py
 - **"Too many requests" / 429**: Garmin is rate-limiting. Wait a while and sync again; the sync resumes from the last successful date.
 - **Logged out on every device**: changing `DASHBOARD_PASSWORD` or `DASHBOARD_USERNAME` logs everyone out; log in again with the new details.
 - **Can't open it from a phone**: check that `HOST=0.0.0.0`, both devices are on the same network, and the Windows firewall allows Python.
+- **Desktop app says "Can't reach the dashboard"**: the server at `DASHBOARD_URL` isn't running, the address is wrong, or the firewall on the server blocks it. If a window it started on this machine misbehaves, look in `data/desktop.log`.
 - **Start over**: stop the server and delete `data/athlete.db`. The next sync backfills again.
 
 ## Notes

@@ -1,9 +1,9 @@
 // Activity popup: the list's summary straight away, then every stat, the route and the laps once they've loaded
 
 import { data } from "./state.js";
-import { $, fmtDuration, fmtPace, statusLabel } from "./util.js";
+import { $, fmtDuration, fmtPace, statusLabel, sum, fmtHours } from "./util.js";
 import { routeMap } from "./map.js";
-import { headlineStats, KMH_SPORTS, fmtSpeed, effectCell, COLUMNS } from "./sports.js";
+import { headlineStats, KMH_SPORTS, fmtSpeed, effectCell, COLUMNS, measureFor, tableParts, sportLabel } from "./sports.js";
 
 export const modalMap = routeMap($("modalMap"));
 
@@ -17,9 +17,54 @@ const modal = $("actModal");
 
 let modalAct = null, modalDetail = null;
 
+// The week shown in the popup ({ key, title, partial, rows }), and the one an activity opened from it goes back to
+let modalWeek = null, backTo = null;
+
+function showModal() {
+  if (!modal.open) {
+    modal.showModal();
+    document.body.classList.add("modal-open");
+  }
+  modal.querySelector(".modal-box").scrollTop = 0;
+}
+
+// A week's activities from a weekly chart's bar: its totals and the list, each opening the activity
+export function openWeek(week) {
+  modalWeek = week;
+  backTo = modalAct = modalDetail = null;
+  modalMap.stop();
+  const { key, title, partial, rows } = week;
+  const list = rows.slice().sort((a, b) => (a.start || a.date).localeCompare(b.start || b.date));
+  const { byKm, of, small } = measureFor(list);
+  const stat = (label, v) => `<div><dd>${v.replace(/\s(\S*[a-z]\S*)$/i, "<span>$1</span>")}</dd><dt>${label}</dt></div>`;
+  $("modalBack").hidden = true;
+  $("modalWhen").textContent = sportLabel(key) + (partial ? " · so far" : "");
+  $("modalName").textContent = title;
+  $("modalEffect").hidden = true;
+  $("modalStats").innerHTML = [
+    byKm ? stat("Distance", small(of(list))) : "",
+    stat("Time", fmtHours(sum(list, "duration_s"))),
+    stat(list.length === 1 ? "Activity" : "Activities", String(list.length)),
+    sum(list, "load") ? stat("Load", String(Math.round(sum(list, "load")))) : "",
+  ].join("");
+  const t = tableParts(list, key);
+  $("modalDetails").innerHTML = `<section class="dgroup wide"><div class="scroll"><table class="act-table">
+    <thead>${t.head}</thead><tbody>${t.body}</tbody></table></div></section>`;
+  $("modalMap").hidden = true;
+  showModalStatus("");
+  showModal();
+}
+
+$("modalBack").addEventListener("click", () => { if (backTo) openWeek(backTo); });
+
 export async function openActivity(id) {
   const a = data.activities.find((x) => x.id === id);
   if (!a) return;
+  // Opened from a week's list: a link back to it
+  if (modalWeek) backTo = modalWeek;
+  modalWeek = null;
+  $("modalBack").hidden = !backTo;
+  if (backTo) $("modalBack").textContent = `← ${backTo.title}`;
   modalAct = a;
   modalDetail = null;
   $("modalWhen").textContent = [COLUMNS.date[2](a) + (a.start ? `, ${a.start.slice(11, 16)}` : ""), a.location].filter(Boolean).join(" · ");
@@ -30,11 +75,7 @@ export async function openActivity(id) {
   $("modalDetails").innerHTML = "";
   $("modalMap").hidden = true;
   showModalStatus("Loading details…");
-  if (!modal.open) {
-    modal.showModal();
-    document.body.classList.add("modal-open");
-  }
-  modal.querySelector(".modal-box").scrollTop = 0;
+  showModal();
   try {
     const res = await fetch(`/api/activity/${id}`);
     if (!res.ok) throw new Error(res.status);
@@ -63,7 +104,7 @@ export function closeModal() {
 
 modal.addEventListener("close", () => {
   modalMap.stop();
-  modalAct = modalDetail = null;
+  modalAct = modalDetail = modalWeek = backTo = null;
   document.body.classList.remove("modal-open");
 });
 

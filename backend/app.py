@@ -63,7 +63,7 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
 
 SESSION_COOKIE = "training_session"
 SESSION_DAYS = 365
-OPEN_PATHS = {"/login", "/static/styles.css"}  # reachable before logging in, with the fonts
+OPEN_PATHS = {"/login", "/static/styles.css", "/static/js/theme.js"}  # reachable before logging in, with the fonts
 OPEN_PREFIX = "/static/vendor/fonts/"
 
 
