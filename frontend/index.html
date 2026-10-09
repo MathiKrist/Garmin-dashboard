@@ -120,6 +120,13 @@
           <div class="chart"><canvas id="vo2Chart" aria-label="VO2 max per week, last 12 months" role="img"></canvas></div>
         </section>
 
+        <section class="wide" id="calSection" hidden>
+          <h2>Training calendar</h2>
+          <p class="reading" id="calReading"></p>
+          <div class="cal-scroll"><div class="cal" id="cal" role="img"></div></div>
+          <div class="legend cal-legend" id="calLegend"></div>
+        </section>
+
         <section class="wide">
           <div class="section-head">
             <h2>Latest activities</h2>
@@ -215,6 +222,12 @@
           <p class="reading" id="sportWeeklySub"></p>
           <div class="chart"><canvas id="sportWeeklyChart" role="img"></canvas></div>
           <div class="legend" id="sportWeeklyLegend"></div>
+        </section>
+        <section class="wide" id="effSection" hidden>
+          <h2>Aerobic efficiency</h2>
+          <p class="reading" id="effReading"></p>
+          <div class="chart"><canvas id="effChart" role="img"></canvas></div>
+          <div class="legend"><span><i style="background:var(--nohr);border-radius:50%"></i>Easy run (grade-adjusted pace where Garmin has it)</span><span><i class="line" style="background:var(--fitness)"></i>6-week median</span></div>
         </section>
         <section class="wide" id="sportYoySection">
           <h2>This year against last year</h2>
