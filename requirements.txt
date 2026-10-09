@@ -4,3 +4,4 @@ garminconnect==0.3.17
 fastapi==0.142.2
 uvicorn==0.54.0
 python-dotenv==1.2.4
+pywebview==6.2.1
