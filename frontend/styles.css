@@ -308,6 +308,22 @@ section p.sub { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; max-w
 .legend i.line { height: 3px; border-radius: 0; vertical-align: 0.2rem; }
 .legend i.dashed { height: 0; border-top: 3px dashed; background: none !important; }
 
+/* Training calendar: a column per week, Monday at the top, the month above its first week */
+.cal-scroll { overflow-x: auto; }
+.cal { display: flex; gap: 6px; min-width: 620px; }
+.cal-labels, .cal-grid { display: grid; grid-template-rows: 1.1rem repeat(7, 1fr); gap: 3px; }
+.cal-grid { flex: 1; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.cal-label, .cal-month { color: var(--muted); font-size: 0.72rem; line-height: 1; white-space: nowrap; }
+.cal-label { align-self: center; }
+.cal-day { display: block; aspect-ratio: 1; border-radius: 2px; background: color-mix(in srgb, var(--rule) 75%, transparent); }
+.cal-day.on { cursor: pointer; }
+.cal-day.on:hover { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cal-day.future { background: none; }
+.cal-legend { align-items: center; gap: 0.3rem; }
+.cal-legend i { margin: 0; }
+.cal-legend span:last-child { margin-left: 0.3rem; }
+.cal-legend span:first-child { margin-right: 0.3rem; }
+
 /* Activities */
 .activities { padding-top: 1.75rem; }
 .scroll { overflow-x: auto; }

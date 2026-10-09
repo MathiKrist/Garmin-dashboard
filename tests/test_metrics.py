@@ -89,6 +89,31 @@ class Sports(unittest.TestCase):
         self.assertEqual(sync.parse_activity({})["type"], "other")
 
 
+class Efficiency(unittest.TestCase):
+    def make_run(self, days_ago, pace_s, hr, km=8, gap=None):
+        d = (date.today() - timedelta(days=days_ago)).isoformat()
+        return {"id": days_ago, "date": d, "type": "running", "avg_hr": hr, "distance_m": km * 1000,
+                "avg_speed": 1000 / pace_s, "gap_speed": gap and 1000 / gap}
+
+    def test_band_and_trend(self):
+        mid = config.AEROBIC_THRESHOLD - 15
+        acts = [self.make_run(100 - i, 330 - i * 0.1, mid) for i in range(0, 100, 3)]
+        acts += [self.make_run(5, 250, config.AEROBIC_THRESHOLD + 5),  # too hard
+                 self.make_run(6, 300, mid, km=2)]  # too short
+        e = metrics._efficiency(acts, date.today())
+        self.assertEqual(len(e["runs"]), 34)
+        self.assertLess(e["now"], e["ago_3m"])  # faster now
+        self.assertEqual(len(e["trend"]), 53)
+
+    def test_grade_adjusted_pace_wins(self):
+        mid = config.AEROBIC_THRESHOLD - 15
+        e = metrics._efficiency([self.make_run(i, 360, mid, gap=330) for i in (1, 2, 3)], date.today())
+        self.assertEqual(e["now"], 330)
+
+    def test_needs_a_few_runs(self):
+        self.assertIsNone(metrics._efficiency([self.make_run(1, 330, config.AEROBIC_THRESHOLD - 15)], date.today()))
+
+
 class Vo2max(unittest.TestCase):
     def test_weekly_values_carry_forward(self):
         today = date.today()

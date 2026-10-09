@@ -7,6 +7,7 @@ import { routeMap } from "./map.js";
 import { sportsByCount, sportLabel, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, FOCUS, headlineStats, effectCell, COLUMNS, tableParts, renderVolume, measureFor } from "./sports.js";
 import { renderRace } from "./race.js";
 import { todayItems } from "./health.js";
+import { renderCalendar } from "./calendar.js";
 
 export function renderOverview() {
   renderStory();
@@ -15,6 +16,7 @@ export function renderOverview() {
   renderTrainingStatus();
   renderLastActivity();
   renderFitnessCharts();
+  renderCalendar();
   const t = tableParts(data.activities.slice(0, 15), "all");
   $("recentHead").innerHTML = t.head;
   $("recentBody").innerHTML = t.body;

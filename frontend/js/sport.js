@@ -4,6 +4,7 @@ import { data } from "./state.js";
 import { $, css, fmtShort, fmtDuration, fmtPace, plural, sum, between, fmtKm, mondayOf, statItems, addDays, fmtHours, escapeHtml } from "./util.js";
 import { partialColors, baseOptions, draw } from "./charts.js";
 import { sportLabel, sportColor, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, PAGE, KMH_SPORTS, COLUMNS, DEFAULT_SORT, sortRows, nextSort, tableParts, measureFor } from "./sports.js";
+import { renderEfficiency } from "./efficiency.js";
 
 let sportShown = PAGE, sportShownKey = null, sportSort = DEFAULT_SORT;
 
@@ -39,6 +40,7 @@ export function renderSport(key) {
   $("sportTiles").style.setProperty("--cols", tiles.length);
 
   renderSportWeekly(key, list, m);
+  renderEfficiency(key);
   renderYearOnYear(key, list, m);
   renderMonthly(key, list, m);
   renderRecords(key, list);
