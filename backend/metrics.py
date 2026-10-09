@@ -9,38 +9,48 @@ import db
 
 CTL_DAYS = 42  # fitness: long-term average load
 ATL_DAYS = 7   # fatigue: short-term average load
+RECENT_DAYS = 7  # Garmin's daily numbers are shown up to this old (marked with their date when not from today)
 
 
 def is_run(activity_type):
     return "running" in (activity_type or "")
 
 
-# Garmin type key -> sport group for the activity filter. First match wins; keys are matched as substrings.
+# Sport groups for the activity filter and the sport pages: (key, label, Garmin type keys). First match wins; type keys
+# are matched as substrings. The page gets the keys and labels from here.
 SPORTS = [
-    ("run", ("running",)),
-    ("bike", ("cycling", "biking", "virtual_ride", "bmx")),
-    ("swim", ("swimming",)),
-    ("walk", ("walking",)),
-    ("hike", ("hiking", "mountaineering")),
-    ("strength", ("strength",)),
-    ("disc_golf", ("disc_golf",)),
-    ("yoga", ("yoga", "pilates", "breathwork", "meditation")),
-    ("cardio", ("cardio", "hiit", "elliptical", "stair", "rowing", "fitness_equipment", "floor_climbing", "jump_rope", "boxing")),
-    ("winter", ("ski", "snowboard", "snowshoe", "skating")),
+    ("run", "Running", ("running",)),
+    ("bike", "Cycling", ("cycling", "biking", "virtual_ride", "bmx")),
+    ("swim", "Swimming", ("swimming",)),
+    ("walk", "Walking", ("walking",)),
+    ("hike", "Hiking", ("hiking", "mountaineering")),
+    ("strength", "Strength", ("strength",)),
+    ("disc_golf", "Disc golf", ("disc_golf",)),
+    ("yoga", "Yoga", ("yoga", "pilates", "breathwork", "meditation")),
+    ("cardio", "Gym & cardio", ("cardio", "hiit", "elliptical", "stair", "rowing", "fitness_equipment", "floor_climbing", "jump_rope", "boxing")),
+    ("winter", "Winter sports", ("ski", "snowboard", "snowshoe", "skating")),
 ]
+SPORT_LABELS = [[key, label] for key, label, _ in SPORTS] + [["other", "Other"]]
 
 
 def sport_of(activity_type):
     t = activity_type or ""
-    return next((sport for sport, keys in SPORTS if any(k in t for k in keys)), "other")
+    return next((sport for sport, _, keys in SPORTS if any(k in t for k in keys)), "other")
 
 
-# Garmin's primary training effect label -> its load focus group.
-FOCUS = {
-    "RECOVERY": "low", "AEROBIC_BASE": "low",
-    "TEMPO": "high", "LACTATE_THRESHOLD": "high", "VO2MAX": "high",
-    "ANAEROBIC_CAPACITY": "anaerobic", "SPRINT": "anaerobic",
+# Garmin's primary training effect label -> (name, load focus group)
+EFFECTS = {
+    "RECOVERY": ("Recovery", "low"), "AEROBIC_BASE": ("Base", "low"),
+    "TEMPO": ("Tempo", "high"), "LACTATE_THRESHOLD": ("Threshold", "high"), "VO2MAX": ("VO2 max", "high"),
+    "ANAEROBIC_CAPACITY": ("Anaerobic", "anaerobic"), "SPRINT": ("Sprint", "anaerobic"),
 }
+FOCUS = {label: group for label, (_, group) in EFFECTS.items()}
+
+# The distances for personal bests and race goals: metres -> label. Best efforts are worked out for all of them;
+# Garmin keeps its own fastest splits for all but 400 m, and predicts race times for 5 km to marathon.
+DISTANCES = {400: "400 m", 1000: "1 km", 1609: "1 mile", 5000: "5 km", 10000: "10 km", 21098: "Half marathon", 42195: "Marathon"}
+# Garmin's fastest splits: metres -> label
+BEST_EFFORTS = {m: label for m, label in DISTANCES.items() if m != 400}
 
 
 def run_focus(a, threshold):
@@ -119,7 +129,7 @@ def _load_focus_text(phrase):
 
 
 def _load_focus(days, today):
-    recent = [d for d in days if d.get("load_low") is not None and d["date"] >= (today - timedelta(days=2)).isoformat()]
+    recent = [d for d in days if d.get("load_low") is not None and d["date"] >= (today - timedelta(days=RECENT_DAYS)).isoformat()]
     if not recent:
         return None
     cur = recent[-1]
@@ -138,7 +148,7 @@ def _training_status(days, today):
         d = (today - timedelta(days=i)).isoformat()
         history.append({"date": d, "status": (by_date.get(d) or {}).get("training_status")})
 
-    recent = [d for d in days if d.get("training_status") and d["date"] >= (today - timedelta(days=2)).isoformat()]
+    recent = [d for d in days if d.get("training_status") and d["date"] >= (today - timedelta(days=RECENT_DAYS)).isoformat()]
     if not recent:
         return None
     cur = recent[-1]
@@ -186,7 +196,7 @@ def _vo2max(days, today):
 
 
 # Garmin's predicted distances: metres -> daily column
-PREDICTED = {5000: "pred_5k", 10000: "pred_10k", 21097.5: "pred_half", 42195: "pred_marathon"}
+PREDICTED = {5000: "pred_5k", 10000: "pred_10k", 21098: "pred_half", 42195: "pred_marathon"}
 
 
 def predicted_time(day, metres):
@@ -225,7 +235,7 @@ ACTIVITY_SELECT = (
     "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps, "
     "json_extract(raw, '$.locationName') AS location, json_extract(raw, '$.elevationLoss') AS elev_loss, "
     "json_extract(raw, '$.maxSpeed') AS max_speed, "
-    + ", ".join(f"json_extract(raw, '$.fastestSplit_{m}') AS best_{m}" for m in (1000, 1609, 5000, 10000, 21098, 42195))
+    + ", ".join(f"json_extract(raw, '$.fastestSplit_{m}') AS best_{m}" for m in BEST_EFFORTS)
 )
 
 
@@ -270,8 +280,6 @@ DETAIL_FIELDS = {
     "stroke_m": "avgStrokeDistance", "swim_cadence": "averageSwimCadenceInStrokesPerMinute",
     "min_temp": "minTemperature", "max_temp": "maxTemperature",
 }
-# Garmin's fastest splits: metres -> label
-BEST_EFFORTS = {1000: "1 km", 1609: "1 mile", 5000: "5 km", 10000: "10 km", 21098: "Half marathon", 42195: "Marathon"}
 
 
 def build_activity(db_path, activity_id):
@@ -360,19 +368,18 @@ def build_dashboard(db_path=None):
                                        "sleep_score", "readiness", "bb_high", "bb_low", "stress_avg", "steps")}
               for d in days if d["date"] >= cutoff]
 
-    # Today: newest value of each field from the last two days
-    recent = [d for d in days if d["date"] >= (today - timedelta(days=1)).isoformat()]
+    # Today: newest value of each field from the last week, with the day it's from (the page marks older ones)
+    recent = [d for d in days if d["date"] >= (today - timedelta(days=RECENT_DAYS)).isoformat()]
     recent.sort(key=lambda d: d["date"], reverse=True)
 
     def latest(field):
-        for d in recent:
-            if d.get(field) is not None:
-                return d[field]
-        return None
+        return next(((d[field], d["date"]) for d in recent if d.get(field) is not None), (None, None))
 
-    today_vals = {f: latest(f) for f in (
-        "readiness", "hrv_last_night", "hrv_weekly_avg", "hrv_low", "hrv_high",
-        "hrv_status", "sleep_s", "sleep_score", "resting_hr", "bb_high", "bb_low", "stress_avg", "steps")}
+    today_vals, today_dates = {}, {}
+    for f in ("readiness", "hrv_last_night", "hrv_weekly_avg", "hrv_low", "hrv_high", "hrv_status",
+              "sleep_s", "sleep_score", "resting_hr", "bb_high", "bb_low", "stress_avg", "steps"):
+        today_vals[f], today_dates[f] = latest(f)
+    today_vals["dates"] = today_dates
     week_rhr = [d["resting_hr"] for d in days if d.get("resting_hr") and d["date"] > (today - timedelta(days=7)).isoformat()]
     today_vals["resting_hr_7d"] = round(sum(week_rhr) / len(week_rhr)) if week_rhr else None
 
@@ -398,4 +405,9 @@ def build_dashboard(db_path=None):
         # The newest activity, with its GPS track when it has one (for the map at the top)
         "last_activity": {**recent_acts[0], "track": track or None} if acts else None,
         "activities_from": acts[0]["date"] if acts else None,  # the first synced activity, for "this year" totals
+        # Names the page shows, from the tables above
+        "sports": SPORT_LABELS,
+        "effects": EFFECTS,
+        "distances": DISTANCES,
+        "race_distances": list(PREDICTED),
     }

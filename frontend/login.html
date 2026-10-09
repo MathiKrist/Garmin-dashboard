@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Log in · Training</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="login-page">
+<!-- Served by app.py, which shows the username field when DASHBOARD_USERNAME is set and adds the error after a wrong try -->
+<main class="login">
+  <form method="post" action="/login">
+    <header>
+      <p class="eyebrow">Training dashboard</p>
+      <h1>Log in</h1>
+    </header>
+    <label id="userField" hidden>Username <input id="username" autocomplete="username" autocapitalize="none"></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required autofocus></label>
+    <p class="form-error" id="loginError" hidden></p>
+    <button type="submit" class="primary">Log in</button>
+  </form>
+</main>
+</body>
+</html>
