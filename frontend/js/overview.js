@@ -157,13 +157,14 @@ export function fitnessReading(f) {
   const fx = data.fitness;
   if (f.ctl < 5 || fx.length < 29) return "";
   const now = Math.round(f.ctl), before = Math.round(fx[fx.length - 29].ctl);
+  if (!before) return `Fitness ${now}, up from 0 four weeks ago.`;
   const change = Math.round((now - before) / before * 100);
   if (Math.abs(change) < 3) return `Fitness ${now}, about the same as four weeks ago.`;
   return `Fitness ${now}, ${change > 0 ? "up" : "down"} from ${before} four weeks ago (${change > 0 ? "+" : ""}${change}%).`;
 }
 
 export function renderHero() {
-  const f = data.form, t = data.today;
+  const f = data.form;
   $("state").textContent = f.pct != null ? `${f.state} (${f.pct > 0 ? "+" : ""}${Math.round(f.pct)}%)` : f.state;
   $("state").style.setProperty("--state-color", `var(${FORM_COLORS[f.state] || "--ink"})`);
   $("fitnessReading").textContent = fitnessReading(f);

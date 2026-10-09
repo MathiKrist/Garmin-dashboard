@@ -16,13 +16,28 @@ PLAN = {
     6: ("long", (16, 24), (145, 156), (320, 350)),
 }
 
+# Other sports, so every page has something: weekday -> (Garmin type, name, chance, km range, speed m/s range,
+# avg HR range, load per hour, training effect label)
+OTHER = {
+    0: ("lap_swimming", "Pool swim", 0.6, (1.5, 2.5), (0.75, 0.9), (125, 140), 45, "AEROBIC_BASE"),
+    5: ("road_biking", "Saturday ride", 0.7, (30, 60), (7.2, 8.6), (128, 145), 70, "AEROBIC_BASE"),
+    6: ("walking", "Evening walk", 0.5, (3, 6), (1.3, 1.55), (95, 110), 10, None),
+}
+# How much faster than the run's average pace its best stretch over each distance is (shorter is faster)
+EFFORT_PACE = {400: 0.86, 1000: 0.9, 1609: 0.92, 5000: 0.96, 10000: 0.98, 21098: 1.0, 42195: 1.0}
 
-def seed(db_path, days=180):
+
+def seed(db_path, days=420):
+    """Made-up data up to today, built once a day. 420 days, so this year can be set against last year."""
     conn = db.connect(db_path)
     if db.get_meta(conn, "demo_date") == date.today().isoformat():
         conn.close()
         return
-    conn.executescript("DELETE FROM activities; DELETE FROM daily; DELETE FROM tracks; DELETE FROM laps; DELETE FROM meta;")
+    goal = db.get_meta(conn, "race_goal")  # a race goal set in demo mode outlives the daily rebuild
+    conn.executescript("DELETE FROM activities; DELETE FROM daily; DELETE FROM tracks; DELETE FROM laps; "
+                       "DELETE FROM efforts; DELETE FROM meta;")
+    if goal:
+        db.set_meta(conn, "race_goal", goal)
     rng = random.Random(7)
     today = date.today()
     fatigue = 0.0
@@ -53,6 +68,22 @@ def seed(db_path, days=180):
                 "te_label": {"intervals": rng.choice(["VO2MAX", "ANAEROBIC_CAPACITY"]), "tempo": rng.choice(["TEMPO", "LACTATE_THRESHOLD"]),
                              "easy": "AEROBIC_BASE", "long": "AEROBIC_BASE"}[kind], "raw": None,
             })
+            # Best efforts within the run, a bit faster than its average pace over shorter stretches
+            db.set_efforts(conn, int(d.strftime("%Y%m%d")) * 10 + 1, {
+                m: round(m / 1000 * pace * f * rng.uniform(0.98, 1.02), 1) for m, f in EFFORT_PACE.items() if m <= km * 1000})
+        other = OTHER.get(d.weekday())
+        if other and i > 0 and rng.random() < other[2]:
+            typ, name, _, km_r, speed_r, hr_r, per_hour, te = other
+            km, speed, hr = rng.uniform(*km_r) * build, rng.uniform(*speed_r), rng.uniform(*hr_r)
+            dur = km * 1000 / speed
+            db.upsert_activity(conn, {
+                "id": int(d.strftime("%Y%m%d")) * 10 + 3, "start_local": f"{d.isoformat()} {rng.choice(['10', '12', '15'])}:15:00",
+                "date": d.isoformat(), "type": typ, "name": name, "distance_m": km * 1000, "duration_s": dur,
+                "avg_hr": round(hr), "max_hr": round(hr + rng.uniform(10, 25)), "avg_speed": speed,
+                "elev_gain": 0 if typ == "lap_swimming" else rng.uniform(10, 40) * km / 5, "training_load": round(per_hour * dur / 3600),
+                "aerobic_te": round(rng.uniform(1.5, 3.2), 1), "anaerobic_te": round(rng.uniform(0, 0.8), 1), "te_label": te, "raw": None,
+            })
+            load += per_hour * dur / 3600
         if d.weekday() == 3 and i > 0:
             db.upsert_activity(conn, {
                 "id": int(d.strftime("%Y%m%d")) * 10 + 2,
@@ -68,6 +99,8 @@ def seed(db_path, days=180):
         if new_status != status:
             status, since = new_status, d.isoformat()
         hrv = 64 - fatigue * 0.12 + rng.gauss(0, 5)
+        vo2 = 50 + (1 - i / days) * 2
+        pred_5k = 1250 - (vo2 - 50) * 35 + rng.gauss(0, 4)
         db.upsert_daily(conn, {
             "date": d.isoformat(), "resting_hr": round(48 + fatigue * 0.04 + rng.gauss(0, 1.5)),
             "hrv_last_night": round(hrv), "hrv_weekly_avg": round(64 - fatigue * 0.1), "hrv_low": 54, "hrv_high": 72,
@@ -78,15 +111,19 @@ def seed(db_path, days=180):
             "readiness": max(5, min(100, round(85 - fatigue * 0.5 + rng.gauss(0, 8)))),
             "training_status": status, "training_status_since": since,
             "acute_load": round(sum(loads[-7:])), "acute_load_min": 300, "acute_load_max": 560,
-            "acwr_status": "LOW" if sum(loads[-7:]) < 300 else "OPTIMAL", "vo2max": round(50 + (1 - i / days) * 2, 1),
+            "acwr_status": "LOW" if sum(loads[-7:]) < 300 else "OPTIMAL", "vo2max": round(vo2, 1),
+            # Garmin's race predictor, following VO2 max
+            "pred_5k": round(pred_5k), "pred_10k": round(pred_5k * 2.08), "pred_half": round(pred_5k * 4.62),
+            "pred_marathon": round(pred_5k * 9.8),
             "load_low": 760, "load_low_min": 300, "load_low_max": 820, "load_high": 690, "load_high_min": 640,
             "load_high_max": 1160, "load_anaerobic": 40, "load_anaerobic_min": 170, "load_anaerobic_max": 510,
             "load_focus": "ANAEROBIC_SHORTAGE",
         })
-    # A GPS loop for the newest run, so the last activity panel has a map
-    last_run = conn.execute("SELECT id, distance_m FROM activities WHERE type = 'running' ORDER BY start_local DESC LIMIT 1").fetchone()
-    if last_run:
-        db.set_track(conn, last_run["id"], demo_track(rng, last_run["distance_m"] / 1000))
+    # A GPS loop for the newest outdoor activity, so the last activity panel has a map when that's the newest
+    last = conn.execute("SELECT id, distance_m FROM activities WHERE type IN ('running', 'road_biking', 'walking') "
+                        "ORDER BY start_local DESC LIMIT 1").fetchone()
+    if last:
+        db.set_track(conn, last["id"], demo_track(rng, last["distance_m"] / 1000))
     now = datetime.now().isoformat(timespec="seconds")
     db.set_meta(conn, "last_sync_at", now)
     db.set_meta(conn, "demo_date", today.isoformat())
@@ -108,7 +145,7 @@ def demo_track(rng, km, lat=55.3959, lon=10.3883, points=240):
 
 
 def fill_details(db_path, activity_id):
-    """A made-up route and per-km laps for a demo run, the first time it's opened."""
+    """A made-up route and laps (per km, per 5 km on the bike) for a demo activity, the first time it's opened."""
     conn = db.connect(db_path)
     try:
         a = conn.execute("SELECT * FROM activities WHERE id = ?", (activity_id,)).fetchone()
@@ -117,17 +154,17 @@ def fill_details(db_path, activity_id):
         rng = random.Random(activity_id)
         km = (a["distance_m"] or 0) / 1000
         laps = []
-        if a["type"] == "running" and km > 0:
+        if a["type"] in ("running", "road_biking", "walking") and km > 0:
             if db.get_track(conn, activity_id) is None:
                 db.set_track(conn, activity_id, demo_track(rng, km))
-            pace = a["duration_s"] / km
+            pace, step = a["duration_s"] / km, 5.0 if a["type"] == "road_biking" else 1.0
             left = km
             while left > 0.05:
-                lap_km = min(1.0, left)
+                lap_km = min(step, left)
                 lap_pace = pace * rng.uniform(0.95, 1.05)
                 laps.append({"km": round(lap_km, 2), "duration_s": lap_km * lap_pace, "speed": 1000 / lap_pace,
                              "avg_hr": round(a["avg_hr"] + rng.uniform(-6, 6)), "elev_gain": round(rng.uniform(0, 12)),
-                             "cadence": round(rng.uniform(164, 178))})
+                             "cadence": round(rng.uniform(164, 178)) if a["type"] == "running" else None})
                 left -= lap_km
         db.set_laps(conn, activity_id, laps)
         conn.commit()

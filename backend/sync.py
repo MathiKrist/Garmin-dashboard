@@ -292,7 +292,8 @@ def run_sync(db_path=None):
         client = _client()
 
         # Once a day, look further back, so activities edited or deleted on Garmin since are changed here too
-        recheck = last is not None and db.get_meta(conn, "activities_rechecked") != today.isoformat()
+        # (the first sync looks further back anyway, and counts as today's)
+        recheck = db.get_meta(conn, "activities_rechecked") != today.isoformat()
         if recheck:
             act_start = min(act_start, today - timedelta(days=RECHECK_DAYS))
         activities = client.get_activities_by_date(act_start.isoformat(), today.isoformat())
@@ -349,16 +350,6 @@ def run_sync(db_path=None):
             if points is not None:  # a failed request is retried next sync
                 db.set_track(conn, row["id"], points)
                 conn.commit()
-
-        # Training status was added later: fill four weeks of history once, for the status strip.
-        if not db.get_meta(conn, "training_status_backfilled"):
-            day = today - timedelta(days=27)
-            while day < day_start:
-                db.upsert_daily(conn, {"date": day.isoformat(), **fetch_training_status(client, day)})
-                conn.commit()
-                day += timedelta(days=1)
-                time.sleep(0.4)
-            db.set_meta(conn, "training_status_backfilled", "1")
 
         # Best efforts (400 m to marathon) for runs that don't have them yet, newest first, a batch per sync
         todo = conn.execute(

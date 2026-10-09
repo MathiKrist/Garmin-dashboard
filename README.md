@@ -2,7 +2,7 @@
 
 A personal, self-hosted training dashboard. It pulls activities and daily recovery data from Garmin Connect into a local SQLite database and serves a single-page dashboard on your home network, so any device on the wifi can open it.
 
-Built with FastAPI, SQLite and Chart.js. No cloud, no accounts beyond your own Garmin login.
+Built with FastAPI, SQLite and Chart.js. No cloud, no accounts beyond your own Garmin login. Everything the page needs is bundled, so it works without internet, apart from the map tiles.
 
 ## What it shows
 
@@ -89,7 +89,9 @@ Training load comes from Garmin when available; otherwise it falls back to Banis
 │   │   └── modal.js      # Activity popup
 │   └── vendor/
 │       ├── chart.umd.js  # Chart.js, bundled so it works offline
+│       ├── fonts/        # Barlow and Barlow Condensed (SIL Open Font License), same reason
 │       └── leaflet/      # Leaflet, for the last activity's map
+├── tests/                # python -m unittest discover tests
 ├── assets/
 │   └── dashboard.ico     # Icon for the desktop shortcut
 └── data/                 # athlete.db (and demo.db) live here; not in git
@@ -99,13 +101,16 @@ Run everything from the project folder; paths in `.env` (like `DB_PATH`) are rel
 
 ## Setup
 
-Requires Python 3.10+.
+Requires Python 3.10+. From the project folder, on Windows:
 
 ```bash
-pip install fastapi uvicorn garminconnect python-dotenv
-copy .env.example .env        # Windows (use cp on Linux/macOS)
-python backend/login.py       # once; stores a token in TOKEN_DIR
+python -m venv .venv                          # a Python just for the dashboard (Start dashboard.bat uses it)
+.venv\Scripts\pip install -r requirements.txt
+copy .env.example .env                        # then adjust .env
+.venv\Scripts\python backend/login.py         # once; stores a token in TOKEN_DIR
 ```
+
+On Linux/macOS it's `.venv/bin/pip`, `.venv/bin/python` and `cp` instead. `requirements.txt` pins versions the dashboard is known to work with; if a sync starts failing after Garmin changes something, `pip install -U garminconnect` is the first thing to try.
 
 Your Garmin password never goes in `.env`. `backend/login.py` stores a token, and the sync reuses it.
 
@@ -155,6 +160,14 @@ python backend/sync.py
 | `DASHBOARD_USERNAME` | empty | If set, the login page asks for this username too; empty means password only |
 | `TOKEN_DIR` | ~/.garminconnect | Where the Garmin login token is stored |
 | `DB_PATH` | data/athlete.db | SQLite database, relative to the project folder |
+
+## Tests
+
+```bash
+.venv\Scripts\python -m unittest discover tests
+```
+
+`tests/test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, sports, VO2 max); `tests/test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and what's kept when Garmin rate-limits).
 
 ## Troubleshooting
 

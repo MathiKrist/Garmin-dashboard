@@ -73,14 +73,8 @@ def trimp(duration_s, avg_hr, rest_hr, max_hr):
     return duration_s / 60 * hrr * 0.64 * math.exp(1.92 * hrr)
 
 
-# Form as % of fitness: (name, lower bound, advice). The page names today's band, and the chart's tooltip each day's.
-FORM_ZONES = [
-    ("Rested", 25, "Very little recent fatigue. Fine before a race or after a hard block, but fitness starts to slip if it lasts."),
-    ("Fresh", 5, "Recovered and ready. A good day for a hard session or a race."),
-    ("Balanced", -10, "Training roughly matches what you're used to. Normal sessions are fine."),
-    ("Building", -30, "You're carrying fatigue from training more than usual. That's how fitness grows; keep the easy days easy."),
-    ("Overloaded", None, "Fatigue is high compared to your fitness. An easy day or rest would help."),
-]
+# Form as % of fitness: (name, lower bound). The page names today's band, and the chart's tooltip each day's.
+FORM_ZONES = [("Rested", 25), ("Fresh", 5), ("Balanced", -10), ("Building", -30), ("Overloaded", None)]
 
 
 def _form_pct(ctl, atl):
@@ -89,25 +83,12 @@ def _form_pct(ctl, atl):
 
 def _form_state(pct):
     if pct is None:
-        return "Warming up", "Not enough training history yet. Form gets meaningful after a few weeks of data."
-    for name, low, advice in FORM_ZONES:
-        if low is None or pct > low:
-            return name, advice
+        return "Warming up"  # not enough training history yet for form to mean much
+    return next(name for name, low in FORM_ZONES if low is None or pct > low)
 
 
-# Garmin's training statuses, with a plain-language summary of what Garmin means by each.
-TRAINING_STATUS = {
-    "PEAKING": ("Peaking", "You're in ideal race shape. Recent lighter load has let your body recover and absorb the training."),
-    "PRODUCTIVE": ("Productive", "Your fitness is improving and your load is in a good range. Keep it up, with recovery in the plan."),
-    "MAINTAINING": ("Maintaining", "Your load is enough to hold your fitness. To improve, add variety or more load."),
-    "RECOVERY": ("Recovery", "A lighter load is letting your body recover. Good after a hard block or before a race."),
-    "UNPRODUCTIVE": ("Unproductive", "Your load is fine but fitness is dropping. You may be struggling to recover: check sleep, stress and easy days."),
-    "STRAINED": ("Strained", "Your HRV suggests you're not recovering well, which is holding back your training. Prioritise rest."),
-    "OVERREACHING": ("Overreaching", "Your load is very high and becoming counterproductive. Your body needs rest."),
-    "DETRAINING": ("Detraining", "You've trained much less than usual for a week or more, and fitness is starting to slip."),
-    "PAUSED": ("Paused", "Training status is paused, for example during illness or a training break."),
-    "NO_STATUS": ("No status", "Garmin needs a week or two of activities with VO2 max estimates to work out a status."),
-}
+# Garmin's training statuses -> the name the page shows (others are shown as Garmin names them)
+TRAINING_STATUS = {"NO_STATUS": "No status"}
 
 
 # Garmin's load focus zones: phrase prefix -> (key, name, what to add when short of it)
@@ -156,9 +137,8 @@ def _training_status(days, today):
         return None
     cur = recent[-1]
     code = cur["training_status"]
-    label, about = TRAINING_STATUS.get(code, (code.replace("_", " ").capitalize(), ""))
     return {
-        "code": code, "label": label, "about": about, "as_of": cur["date"],
+        "code": code, "label": TRAINING_STATUS.get(code) or code.replace("_", " ").capitalize(), "as_of": cur["date"],
         "since": cur.get("training_status_since"),
         "acute_load": cur.get("acute_load"), "acute_min": cur.get("acute_load_min"),
         "acute_max": cur.get("acute_load_max"), "acwr_status": cur.get("acwr_status"),
@@ -190,7 +170,7 @@ def _vo2max(days, today):
 
     year_ago = (today - timedelta(days=365)).isoformat()
     return {
-        "now": points[-1][1], "updated": points[-1][0],
+        "now": points[-1][1],
         "peak": max(v for d, v in points if d >= year_ago) if points[-1][0] >= year_ago else points[-1][1],
         "ago_3m": as_of(today - timedelta(days=91)), "ago_12m": as_of(today - timedelta(days=365)),
         "weeks": weeks[-53:],  # the chart shows the last year
@@ -345,7 +325,6 @@ def build_dashboard(db_path=None):
         conn.close()
 
     today = date.today()
-    threshold = config.AEROBIC_THRESHOLD
     rests = [d["resting_hr"] for d in days if d.get("resting_hr")]
     rest_hr = median(rests) if rests else 55
 
@@ -369,18 +348,14 @@ def build_dashboard(db_path=None):
             load = load_by_day.get(d.isoformat(), 0)
             ctl += (load - ctl) * k_ctl
             atl += (load - atl) * k_atl
-            fitness.append({"date": d.isoformat(), "load": round(load, 1),
-                            "ctl": round(ctl, 1), "atl": round(atl, 1), "tsb": round(ctl - atl, 1),
-                            "form_pct": _form_pct(ctl, atl)})
+            fitness.append({"date": d.isoformat(), "ctl": round(ctl, 1), "atl": round(atl, 1), "form_pct": _form_pct(ctl, atl)})
             d += timedelta(days=1)
-    now = fitness[-1] if fitness else {"ctl": 0, "atl": 0, "tsb": 0, "form_pct": None}
-    state, advice = _form_state(now["form_pct"])
-    ratio = round(now["atl"] / now["ctl"], 2) if now["ctl"] >= 5 else None
+    now = fitness[-1] if fitness else {"ctl": 0, "form_pct": None}
 
     # Health trends for the health page (the last year; the page shows 90 days or all of it)
     cutoff = (today - timedelta(days=364)).isoformat()
     trends = [{k: d.get(k) for k in ("date", "hrv_last_night", "hrv_low", "hrv_high", "resting_hr", "sleep_s",
-                                       "sleep_score", "readiness", "bb_high", "bb_low", "stress_avg", "steps")}
+                                       "sleep_score", "bb_high", "bb_low", "stress_avg", "steps")}
               for d in days if d["date"] >= cutoff]
 
     # Today: newest value of each field from the last week, with the day it's from (the page marks older ones)
@@ -391,8 +366,8 @@ def build_dashboard(db_path=None):
         return next(((d[field], d["date"]) for d in recent if d.get(field) is not None), (None, None))
 
     today_vals, today_dates = {}, {}
-    for f in ("readiness", "hrv_last_night", "hrv_weekly_avg", "hrv_low", "hrv_high", "hrv_status",
-              "sleep_s", "sleep_score", "resting_hr", "bb_high", "bb_low", "stress_avg", "steps"):
+    for f in ("readiness", "hrv_last_night", "hrv_low", "hrv_high", "sleep_s", "sleep_score", "resting_hr",
+              "bb_high", "bb_low", "stress_avg", "steps"):
         today_vals[f], today_dates[f] = latest(f)
     today_vals["dates"] = today_dates
     week_rhr = [d["resting_hr"] for d in days if d.get("resting_hr") and d["date"] > (today - timedelta(days=7)).isoformat()]
@@ -403,12 +378,10 @@ def build_dashboard(db_path=None):
 
     return {
         "generated": today.isoformat(),
-        "threshold": threshold,
         "meta": meta,
         "has_data": bool(acts or days),
-        "form": {"state": state, "advice": advice, "ctl": now["ctl"], "atl": now["atl"],
-                 "tsb": now["tsb"], "pct": now["form_pct"], "ratio": ratio},
-        "form_zones": [{"name": n, "min": low} for n, low, _ in FORM_ZONES],
+        "form": {"state": _form_state(now["form_pct"]), "ctl": now["ctl"], "pct": now["form_pct"]},
+        "form_zones": [{"name": n, "min": low} for n, low in FORM_ZONES],
         "today": today_vals,
         "training_status": _training_status(days, today),
         "load_focus": _load_focus(days, today),

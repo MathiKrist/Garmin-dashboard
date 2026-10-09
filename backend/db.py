@@ -54,7 +54,11 @@ CREATE TABLE IF NOT EXISTS daily (
     load_anaerobic     REAL,
     load_anaerobic_min REAL,
     load_anaerobic_max REAL,
-    load_focus         TEXT
+    load_focus         TEXT,
+    pred_5k        REAL,  -- Garmin's race predictor: predicted seconds for each distance
+    pred_10k       REAL,
+    pred_half      REAL,
+    pred_marathon  REAL
 );
 
 -- GPS track per activity as JSON [[lat, lon], ...]; "[]" when the activity has none
@@ -83,15 +87,6 @@ DAILY_COLS = [
     "load_low", "load_low_min", "load_low_max", "load_high", "load_high_min", "load_high_max", "load_anaerobic", "load_anaerobic_min", "load_anaerobic_max", "load_focus",
     "pred_5k", "pred_10k", "pred_half", "pred_marathon",
 ]
-# Columns added after the first release; connect() adds them to older databases.
-DAILY_ADDED = {
-    "training_status": "TEXT", "training_status_since": "TEXT", "acute_load": "REAL",
-    "acute_load_min": "REAL", "acute_load_max": "REAL", "acwr_status": "TEXT", "vo2max": "REAL",
-    **{c: "REAL" for c in ("load_low", "load_low_min", "load_low_max", "load_high", "load_high_min", "load_high_max", "load_anaerobic", "load_anaerobic_min", "load_anaerobic_max")},
-    "load_focus": "TEXT",
-    # Garmin's race predictor: predicted seconds for each distance
-    **{c: "REAL" for c in ("pred_5k", "pred_10k", "pred_half", "pred_marathon")},
-}
 
 
 def connect(db_path):
@@ -102,14 +97,6 @@ def connect(db_path):
     conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
-    have = {r["name"] for r in conn.execute("PRAGMA table_info(daily)")}
-    for col, typ in DAILY_ADDED.items():
-        if col not in have:
-            conn.execute(f"ALTER TABLE daily ADD COLUMN {col} {typ}")
-    if "te_label" not in {r["name"] for r in conn.execute("PRAGMA table_info(activities)")}:
-        conn.execute("ALTER TABLE activities ADD COLUMN te_label TEXT")
-        conn.execute("UPDATE activities SET te_label = json_extract(raw, '$.trainingEffectLabel') WHERE raw IS NOT NULL")
-        conn.commit()
     return conn
 
 
