@@ -3,15 +3,15 @@
 import { data } from "./state.js";
 import { $, css, fmtShort, fmtDuration, fmtPace, plural, sum, between, fmtKm, mondayOf, statItems, addDays, fmtHours, escapeHtml } from "./util.js";
 import { partialColors, baseOptions, draw } from "./charts.js";
-import { sportLabel, sportColor, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, PAGE, KMH_SPORTS, COLUMNS, tableParts, measureFor } from "./sports.js";
+import { sportLabel, sportColor, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, PAGE, KMH_SPORTS, COLUMNS, DEFAULT_SORT, sortRows, nextSort, tableParts, measureFor } from "./sports.js";
 
-let sportShown = PAGE, sportShownKey = null;
+let sportShown = PAGE, sportShownKey = null, sportSort = DEFAULT_SORT;
 
 export function renderSport(key) {
   Chart.defaults.font.family = css("--body");
   const list = data.activities.filter((a) => a.sport === key);  // newest first
   const label = sportLabel(key), today = data.generated, m = measureFor(list), nouns = SPORT_NOUNS[key];
-  if (sportShownKey !== key) { sportShown = PAGE; sportShownKey = key; }
+  if (sportShownKey !== key) { sportShown = PAGE; sportShownKey = key; sportSort = DEFAULT_SORT; }
   $("sportTitle").textContent = label;
   $("sportListName").textContent = nouns[1];
 
@@ -43,7 +43,7 @@ export function renderSport(key) {
   renderMonthly(key, list, m);
   renderRecords(key, list);
 
-  const t = tableParts(list.slice(0, sportShown), key);
+  const t = tableParts(sortRows(list, sportSort).slice(0, sportShown), key, sportSort);
   $("sportHead").innerHTML = t.head;
   $("sportBody").innerHTML = t.body;
   $("sportMore").hidden = list.length <= sportShown;
@@ -177,3 +177,10 @@ export function renderRecords(key, list) {
 }
 
 $("sportMore").addEventListener("click", () => { sportShown += PAGE; renderSport(sportShownKey); });
+
+$("sportHead").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-sort]");
+  if (!b) return;
+  sportSort = nextSort(sportSort, b.dataset.sort);
+  renderSport(sportShownKey);
+});

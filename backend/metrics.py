@@ -62,6 +62,9 @@ def run_focus(a, threshold):
     return None
 
 
+TRIMP_SCALE_MIN = 10  # activities with both Garmin's load and heart rate needed to put TRIMP on Garmin's scale
+
+
 def trimp(duration_s, avg_hr, rest_hr, max_hr):
     """Banister TRIMP, used only when Garmin has no training load."""
     if not duration_s or not avg_hr or max_hr <= rest_hr:
@@ -70,7 +73,7 @@ def trimp(duration_s, avg_hr, rest_hr, max_hr):
     return duration_s / 60 * hrr * 0.64 * math.exp(1.92 * hrr)
 
 
-# Form as % of fitness: (name, lower bound, advice). The chart draws these as bands.
+# Form as % of fitness: (name, lower bound, advice). The page names today's band, and the chart's tooltip each day's.
 FORM_ZONES = [
     ("Rested", 25, "Very little recent fatigue. Fine before a race or after a hard block, but fitness starts to slip if it lasts."),
     ("Fresh", 5, "Recovered and ready. A good day for a hard session or a race."),
@@ -109,9 +112,9 @@ TRAINING_STATUS = {
 
 # Garmin's load focus zones: phrase prefix -> (key, name, what to add when short of it)
 LOAD_ZONES = {
-    "AEROBIC_LOW": ("low", "low aerobic", "easy runs and long runs at a conversational pace"),
-    "AEROBIC_HIGH": ("high", "high aerobic", "tempo runs, threshold intervals or VO2 max intervals"),
-    "ANAEROBIC": ("anaerobic", "anaerobic", "short, very hard intervals of 30 seconds to 2 minutes, or strides and sprints"),
+    "AEROBIC_LOW": ("low", "low aerobic", "easy and long sessions at a conversational pace"),
+    "AEROBIC_HIGH": ("high", "high aerobic", "tempo, threshold or VO2 max intervals"),
+    "ANAEROBIC": ("anaerobic", "anaerobic", "short, very hard intervals of 30 seconds to 2 minutes, or sprints"),
 }
 
 
@@ -154,13 +157,12 @@ def _training_status(days, today):
     cur = recent[-1]
     code = cur["training_status"]
     label, about = TRAINING_STATUS.get(code, (code.replace("_", " ").capitalize(), ""))
-    vo2 = next((d["vo2max"] for d in reversed(days) if d.get("vo2max")), None)
     return {
         "code": code, "label": label, "about": about, "as_of": cur["date"],
         "since": cur.get("training_status_since"),
         "acute_load": cur.get("acute_load"), "acute_min": cur.get("acute_load_min"),
         "acute_max": cur.get("acute_load_max"), "acwr_status": cur.get("acwr_status"),
-        "vo2max": vo2, "history": history,
+        "history": history,
     }
 
 
@@ -224,7 +226,8 @@ def _race(goal, days, acts, today):
     if runs:
         a = min(runs, key=lambda r: abs(r["distance_m"] - m))
         best = (a.get("efforts") or {}).get(int(m))
-        result = {"s": round(best or a["duration_s"] * m / a["distance_m"]), "id": a["id"]}
+        # Elapsed time, as a race is timed: stops count
+        result = {"s": round(best or (a["elapsed_s"] or a["duration_s"]) * m / a["distance_m"]), "id": a["id"]}
     return {**goal, "days_to_go": (race_day - today).days, "predicted_s": history[-1]["s"] if history else None,
             "history": history, "result": result}
 
@@ -234,16 +237,24 @@ ACTIVITY_SELECT = (
     "training_load, aerobic_te, anaerobic_te, te_label, "
     "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps, "
     "json_extract(raw, '$.locationName') AS location, json_extract(raw, '$.elevationLoss') AS elev_loss, "
-    "json_extract(raw, '$.maxSpeed') AS max_speed, "
+    "json_extract(raw, '$.maxSpeed') AS max_speed, json_extract(raw, '$.elapsedDuration') AS elapsed_s, "
     + ", ".join(f"json_extract(raw, '$.fastestSplit_{m}') AS best_{m}" for m in BEST_EFFORTS)
 )
 
 
-def _add_load(a, rest_hr):
-    """Garmin's training load, or TRIMP when Garmin has none; plus the run's load focus."""
+def trimp_scale(acts, rest_hr):
+    """TRIMP and Garmin's training load are on different scales. Over the activities that have both, this is how many
+    Garmin load points one TRIMP point is worth, so activities without Garmin's load count the same in fitness."""
+    ratios = [a["training_load"] / t for a in acts if (a["training_load"] or 0) > 0
+              for t in [trimp(a["duration_s"], a["avg_hr"], rest_hr, config.MAX_HR)] if t > 0]
+    return median(ratios) if len(ratios) >= TRIMP_SCALE_MIN else 1.0
+
+
+def _add_load(a, rest_hr, scale):
+    """Garmin's training load, or TRIMP (on Garmin's scale) when Garmin has none; plus the run's load focus."""
     load = a["training_load"]
     if load is None:
-        load = trimp(a["duration_s"], a["avg_hr"], rest_hr, config.MAX_HR)
+        load = trimp(a["duration_s"], a["avg_hr"], rest_hr, config.MAX_HR) * scale
     a["load"] = round(load or 0, 1)
     a["focus"] = run_focus(a, config.AEROBIC_THRESHOLD) if is_run(a["type"]) else None
 
@@ -290,13 +301,16 @@ def build_activity(db_path, activity_id):
         if not row:
             return None
         rests = [r[0] for r in conn.execute("SELECT resting_hr FROM daily WHERE resting_hr IS NOT NULL")]
+        both = [dict(r) for r in conn.execute(
+            "SELECT duration_s, avg_hr, training_load FROM activities WHERE training_load > 0 AND avg_hr > 0")]
         track = db.get_track(conn, activity_id)
         laps = db.get_laps(conn, activity_id)
     finally:
         conn.close()
     a = dict(row)
     raw = json.loads(a.pop("raw") or "null") or {}
-    _add_load(a, median(rests) if rests else 55)
+    rest_hr = median(rests) if rests else 55
+    _add_load(a, rest_hr, trimp_scale(both, rest_hr))
     stats = {key: raw.get(field) for key, field in DETAIL_FIELDS.items()}
     stats.update(max_hr=a["max_hr"], aerobic_te=a["aerobic_te"], anaerobic_te=a["anaerobic_te"])
     hr_zones = [raw.get(f"hrTimeInZone_{i}") for i in range(1, 6)]
@@ -337,9 +351,10 @@ def build_dashboard(db_path=None):
 
     # Load per activity and per day
     load_by_day = {}
+    scale = trimp_scale(acts, rest_hr)
     for a in acts:
         a["efforts"] = efforts.get(a["id"])
-        _add_load(a, rest_hr)
+        _add_load(a, rest_hr, scale)
         load_by_day[a["date"]] = load_by_day.get(a["date"], 0) + a["load"]
 
     # Fitness / fatigue / form
@@ -399,7 +414,7 @@ def build_dashboard(db_path=None):
         "load_focus": _load_focus(days, today),
         "vo2max": _vo2max(days, today),
         "race": _race(json.loads(goal), days, acts, today) if goal else None,
-        "fitness": fitness[-120:],
+        "fitness": fitness[-365:],  # the chart shows 120 days or the whole year
         "trends": trends,
         "activities": recent_acts,
         # The newest activity, with its GPS track when it has one (for the map at the top)

@@ -20,6 +20,7 @@ ACTIVITY_PAGE = 100  # activities per request when fetching the full history
 TRACK_ACTIVITIES = 5  # GPS tracks are fetched for this many of the newest activities
 HEALTH_DAYS_PER_SYNC = 45  # the health backfill fetches this many days per sync, so one sync never runs for long
 EFFORT_RUNS_PER_SYNC = 40  # runs whose best efforts are worked out per sync (one request each)
+RECHECK_DAYS = 30  # once a day, activities this far back are fetched again, to pick up edits and deletions on Garmin
 EFFORT_DISTANCES = tuple(metrics.DISTANCES)
 
 
@@ -274,7 +275,10 @@ def fetch_day(client, day):
 
 
 def run_sync(db_path=None):
-    """Sync new data. Returns a short status string."""
+    """Sync new data. Returns a short status string.
+
+    The steps run in order of importance, cheapest first: new activities, today's numbers, then the one-off backfills.
+    If Garmin rate-limits a step, the ones after it wait for the next sync; every backfill saves its own progress."""
     if not _lock.acquire(blocking=False):
         return "already running"
     conn = db.connect(db_path or config.DB_PATH)
@@ -287,84 +291,23 @@ def run_sync(db_path=None):
 
         client = _client()
 
+        # Once a day, look further back, so activities edited or deleted on Garmin since are changed here too
+        recheck = last is not None and db.get_meta(conn, "activities_rechecked") != today.isoformat()
+        if recheck:
+            act_start = min(act_start, today - timedelta(days=RECHECK_DAYS))
         activities = client.get_activities_by_date(act_start.isoformat(), today.isoformat())
         for a in activities:
             db.upsert_activity(conn, parse_activity(a))
-        conn.commit()
         log.info("Synced %d activities since %s", len(activities), act_start)
-
-        # GPS tracks for the newest activities, for the map in the last activity panel
-        missing = conn.execute(
-            "SELECT id FROM (SELECT id, raw FROM activities ORDER BY start_local DESC LIMIT ?) "
-            "WHERE json_extract(raw, '$.hasPolyline') = 1 AND id NOT IN (SELECT activity_id FROM tracks)",
-            (TRACK_ACTIVITIES,)).fetchall()
-        for row in missing:
-            points = fetch_track(client, row["id"])
-            if points is not None:  # a failed request is retried next sync
-                db.set_track(conn, row["id"], points)
-                conn.commit()
-
-        # Full activity history: page back through everything on Garmin once, newest first.
-        # The offset is saved per page, so a rate limit just resumes from there on the next sync.
-        if not db.get_meta(conn, "activity_history_done"):
-            offset = int(db.get_meta(conn, "activity_history_offset") or 0)
-            while True:
-                page = client.get_activities(offset, ACTIVITY_PAGE)
-                page = page if isinstance(page, list) else []
-                for a in page:
-                    db.upsert_activity(conn, parse_activity(a))
-                offset += len(page)
-                db.set_meta(conn, "activity_history_offset", str(offset))
-                conn.commit()
-                if len(page) < ACTIVITY_PAGE:
-                    break
-                time.sleep(1)
-            db.set_meta(conn, "activity_history_done", "1")
-            conn.commit()
-            log.info("Activity history complete: %d activities", offset)
-
-        day = day_start
-        while day <= today:
-            db.upsert_daily(conn, fetch_day(client, day))
-            conn.commit()
-            day += timedelta(days=1)
-            time.sleep(0.4)  # be gentle with Garmin's rate limits
-
-        # Health history: a year of daily data (HRV, sleep, Body Battery…), fetched once, backwards from the oldest day
-        # already synced. A chunk per sync, saving progress per day, so a rate limit just resumes on the next sync.
-        oldest = db.get_meta(conn, "health_backfill_from") or conn.execute(
-            "SELECT min(date) FROM daily WHERE resting_hr IS NOT NULL OR sleep_s IS NOT NULL").fetchone()[0]
-        day = date.fromisoformat(oldest) if oldest else day_start
-        target = today - timedelta(days=config.HEALTH_HISTORY_DAYS)
-        for _ in range(HEALTH_DAYS_PER_SYNC):
-            if day <= target:
-                break
-            day -= timedelta(days=1)
-            db.upsert_daily(conn, fetch_day(client, day))
-            db.set_meta(conn, "health_backfill_from", day.isoformat())
-            conn.commit()
-            time.sleep(0.4)
-
-        # Best efforts (400 m to marathon) for runs that don't have them yet, newest first, a batch per sync
-        todo = conn.execute(
-            "SELECT id FROM activities WHERE type LIKE '%running%' AND id NOT IN (SELECT activity_id FROM efforts) "
-            "ORDER BY start_local DESC LIMIT ?", (EFFORT_RUNS_PER_SYNC,)).fetchall()
-        for row in todo:
-            bests = fetch_efforts(client, row["id"])
-            if bests is not None:  # a failed request is retried next sync
-                db.set_efforts(conn, row["id"], bests)
-                conn.commit()
-            time.sleep(0.5)
-
-        # Training status was added later: fill four weeks of history once, for the status strip.
-        if not db.get_meta(conn, "training_status_backfilled"):
-            day = today - timedelta(days=27)
-            while day < day_start:
-                db.upsert_daily(conn, {"date": day.isoformat(), **fetch_training_status(client, day)})
-                conn.commit()
-                day += timedelta(days=1)
-                time.sleep(0.4)
-            db.set_meta(conn, "training_status_backfilled", "1")
+        if recheck and activities:  # an empty answer may be a failed request, so nothing is deleted on it
+            seen = {a.get("activityId") for a in activities}
+            gone = [r["id"] for r in conn.execute("SELECT id FROM activities WHERE date >= ?", (act_start.isoformat(),))
+                    if r["id"] not in seen]
+            db.delete_activities(conn, gone)
+            if gone:
+                log.info("Removed %d activities deleted on Garmin", len(gone))
+            db.set_meta(conn, "activities_rechecked", today.isoformat())
+        conn.commit()
 
         # Race predictions: the last year once (one request), then the days since the last sync
         pred_start = day_start if db.get_meta(conn, "predictions_backfilled") else today - timedelta(days=364)
@@ -385,7 +328,83 @@ def run_sync(db_path=None):
                 db.set_meta(conn, "vo2max_backfilled", "1")
             conn.commit()
 
+        # The daily numbers since the last sync. Once they're in, the next sync starts from here, even if a backfill
+        # below is cut short.
+        day = day_start
+        while day <= today:
+            db.upsert_daily(conn, fetch_day(client, day))
+            conn.commit()
+            day += timedelta(days=1)
+            time.sleep(0.4)  # be gentle with Garmin's rate limits
         db.set_meta(conn, "last_sync_date", today.isoformat())
+        conn.commit()
+
+        # GPS tracks for the newest activities, for the map in the last activity panel
+        missing = conn.execute(
+            "SELECT id FROM (SELECT id, raw FROM activities ORDER BY start_local DESC LIMIT ?) "
+            "WHERE json_extract(raw, '$.hasPolyline') = 1 AND id NOT IN (SELECT activity_id FROM tracks)",
+            (TRACK_ACTIVITIES,)).fetchall()
+        for row in missing:
+            points = fetch_track(client, row["id"])
+            if points is not None:  # a failed request is retried next sync
+                db.set_track(conn, row["id"], points)
+                conn.commit()
+
+        # Training status was added later: fill four weeks of history once, for the status strip.
+        if not db.get_meta(conn, "training_status_backfilled"):
+            day = today - timedelta(days=27)
+            while day < day_start:
+                db.upsert_daily(conn, {"date": day.isoformat(), **fetch_training_status(client, day)})
+                conn.commit()
+                day += timedelta(days=1)
+                time.sleep(0.4)
+            db.set_meta(conn, "training_status_backfilled", "1")
+
+        # Best efforts (400 m to marathon) for runs that don't have them yet, newest first, a batch per sync
+        todo = conn.execute(
+            "SELECT id FROM activities WHERE type LIKE '%running%' AND id NOT IN (SELECT activity_id FROM efforts) "
+            "ORDER BY start_local DESC LIMIT ?", (EFFORT_RUNS_PER_SYNC,)).fetchall()
+        for row in todo:
+            bests = fetch_efforts(client, row["id"])
+            if bests is not None:  # a failed request is retried next sync
+                db.set_efforts(conn, row["id"], bests)
+                conn.commit()
+            time.sleep(0.5)
+
+        # Full activity history: page back through everything on Garmin once, newest first.
+        # The offset is saved per page, so a rate limit just resumes from there on the next sync.
+        if not db.get_meta(conn, "activity_history_done"):
+            offset = int(db.get_meta(conn, "activity_history_offset") or 0)
+            while True:
+                page = client.get_activities(offset, ACTIVITY_PAGE)
+                page = page if isinstance(page, list) else []
+                for a in page:
+                    db.upsert_activity(conn, parse_activity(a))
+                offset += len(page)
+                db.set_meta(conn, "activity_history_offset", str(offset))
+                conn.commit()
+                if len(page) < ACTIVITY_PAGE:
+                    break
+                time.sleep(1)
+            db.set_meta(conn, "activity_history_done", "1")
+            conn.commit()
+            log.info("Activity history complete: %d activities", offset)
+
+        # Health history: a year of daily data (HRV, sleep, Body Battery...), fetched once, backwards from the oldest
+        # day already synced. A chunk per sync, saving progress per day, so a rate limit just resumes on the next sync.
+        oldest = db.get_meta(conn, "health_backfill_from") or conn.execute(
+            "SELECT min(date) FROM daily WHERE resting_hr IS NOT NULL OR sleep_s IS NOT NULL").fetchone()[0]
+        day = date.fromisoformat(oldest) if oldest else day_start
+        target = today - timedelta(days=config.HEALTH_HISTORY_DAYS)
+        for _ in range(HEALTH_DAYS_PER_SYNC):
+            if day <= target:
+                break
+            day -= timedelta(days=1)
+            db.upsert_daily(conn, fetch_day(client, day))
+            db.set_meta(conn, "health_backfill_from", day.isoformat())
+            conn.commit()
+            time.sleep(0.4)
+
         db.set_meta(conn, "last_sync_at", datetime.now().isoformat(timespec="seconds"))
         db.set_meta(conn, "last_error", "")
         conn.commit()

@@ -96,11 +96,17 @@
 
       <div class="grid">
         <section>
-          <h2>Fitness and form</h2>
+          <div class="section-head">
+            <h2>Fitness and form</h2>
+            <div class="range-switch" id="fitnessRange" role="group" aria-label="Period">
+              <button type="button" data-days="120">120 days</button>
+              <button type="button" data-days="365">1 year</button>
+            </div>
+          </div>
           <p class="form-now">Form today: <span class="state" id="state"></span></p>
           <p class="reading" id="fitnessReading"></p>
-          <div class="chart"><canvas id="fitnessChart" aria-label="Fitness and fatigue over the last 120 days" role="img"></canvas></div>
-          <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Fitness</span><span><i class="line" style="background:var(--fatigue)"></i>Fatigue</span></div>
+          <div class="chart"><canvas id="fitnessChart" role="img"></canvas></div>
+          <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Fitness</span><span><i class="line" style="background:var(--fatigue)"></i>Fatigue</span><span><i style="background:var(--fitness);opacity:.3"></i>Positive form</span><span><i style="background:var(--fatigue);opacity:.3"></i>Negative form</span></div>
         </section>
 
         <section id="weeklySection">
@@ -195,7 +201,10 @@
 
     <!-- Activities: everything, filterable by sport -->
     <div class="page" id="page-activities" data-title="Activities" hidden>
-      <header class="page-head"><h1>Activities</h1></header>
+      <header class="page-head page-head-row">
+        <h1>Activities</h1>
+        <input type="search" class="search" id="actSearch" placeholder="Search activities" aria-label="Search activities by name, place or type">
+      </header>
       <section class="activities">
         <div class="sports" id="sportFilter" role="group" aria-label="Filter by sport"></div>
         <div class="act-layout">

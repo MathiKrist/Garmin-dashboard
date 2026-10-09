@@ -33,20 +33,24 @@ async function load() {
   if (data.syncing) pollTimer = setTimeout(load, 5000);
 }
 
+// "Fri 14:27" for a timestamp from the server
+const fmtWhen = (iso) => new Date(iso).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+
 function render() {
   $("demo").hidden = !data.demo;
   $("logout").hidden = !data.login;
   const btn = $("syncBtn");
   btn.disabled = data.syncing || data.demo;
   btn.textContent = data.syncing ? "Syncing…" : "Sync now";
-  $("synced").textContent = data.meta.last_sync_at
-    ? "Synced " + new Date(data.meta.last_sync_at).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" })
+  $("synced").innerHTML = data.meta.last_sync_at
+    ? `<span class="sync-word">Synced </span>${fmtWhen(data.meta.last_sync_at)}`
     : "Not synced yet";
 
   const notice = $("notice");
   if (data.meta.last_error) {
     notice.className = "notice";
-    notice.textContent = `Last sync failed: ${data.meta.last_error}`;
+    const at = data.meta.last_error_at ? ` (${fmtWhen(data.meta.last_error_at)})` : "";
+    notice.textContent = `Last sync failed${at}: ${data.meta.last_error}`;
     notice.hidden = false;
   } else {
     notice.hidden = true;
