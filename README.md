@@ -59,7 +59,8 @@ Training load comes from Garmin when available; otherwise it falls back to Banis
 
 ```
 .
-├── Start dashboard.bat   # Double-click launcher (the desktop shortcut points here)
+├── Start dashboard.bat   # Double-click launcher: starts the server and opens the page (the desktop shortcut points here)
+├── Open dashboard.bat    # Only opens the page, for a server running on another device (DASHBOARD_URL)
 ├── README.md
 ├── requirements.txt
 ├── .env.example          # Copy to .env and adjust
@@ -145,6 +146,8 @@ python backend/sync.py
 
 `Start dashboard.bat` in the project folder starts the dashboard with a double-click and opens it in the browser. It uses the Python in `.venv`. The desktop shortcut points at this file and takes its icon from `assets/dashboard.ico`, so keep both where they are or update the shortcut.
 
+`Open dashboard.bat` only opens the dashboard in the browser, without starting a server: for a computer that isn't the one running it. It opens `DASHBOARD_URL` from `.env` (the address the server prints on start as "From other devices on wifi"), or `http://localhost:8000` when that's empty. To give it a desktop shortcut: right-click the file → **Show more options** → **Send to** → **Desktop (create shortcut)**, then pick an icon from `assets/` under the shortcut's **Properties** → **Change Icon…**.
+
 ## Configuration (`.env`)
 
 | Setting | Default | What it does |
@@ -158,6 +161,7 @@ python backend/sync.py
 | `SYNC_INTERVAL_MINUTES` | 60 | Background sync interval (minimum 5) |
 | `HOST` | 0.0.0.0 | `0.0.0.0` = reachable on LAN, `127.0.0.1` = this machine only |
 | `PORT` | 8000 | Server port |
+| `DASHBOARD_URL` | empty | Where `Open dashboard.bat` opens the dashboard, when the server runs on another device (e.g. `http://192.168.1.20:8000`); empty means this machine |
 | `DASHBOARD_PASSWORD` | empty | If set, the dashboard opens with a login page asking for it. Recommended with `HOST=0.0.0.0` |
 | `DASHBOARD_USERNAME` | empty | If set, the login page asks for this username too; empty means password only |
 | `TOKEN_DIR` | ~/.garminconnect | Where the Garmin login token is stored |
