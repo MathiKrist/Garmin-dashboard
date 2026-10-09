@@ -115,9 +115,20 @@ $("syncBtn").addEventListener("click", async () => {
   setTimeout(load, 1500);
 });
 
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+// Light or dark (js/theme.js): the charts and maps take their colors when drawn, so draw them again
+addEventListener("themechange", () => {
   if (data?.has_data) { renderNav(); showPage(); }
   redrawModalMap();
+});
+
+const markTheme = () => $("themeSwitch").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === theme.choice())));
+markTheme();
+
+$("themeSwitch").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-theme]");
+  if (!b) return;
+  theme.set(b.dataset.theme);
+  markTheme();
 });
 
 // Pick up background syncs: check every 5 minutes, and right away when the tab comes back into view.

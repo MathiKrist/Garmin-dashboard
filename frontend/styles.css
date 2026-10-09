@@ -49,50 +49,50 @@
   --sp-swim: #E34948;
   --body: "Barlow", "Segoe UI", system-ui, sans-serif;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #131A18;
-    --ink: #E3EAE6;
-    --muted: #93A099;
-    --rule: #2B3632;
-    --panel: #18211E;
-    --easy: #4FB59D;
-    --hard: #E9A443;
-    --fitness: #7FA3DB;
-    --fatigue: #E07383;
-    --nohr: #55615B;
-    --route: #FF7A1A;
-    --route-winter: #46C8FF;
-    --satellite-brightness: 0.58;
-    --hillshade-blend: screen;
-    --hillshade-opacity: 0.55;
-    --low-aerobic: #5BBDEB;
-    --high-aerobic: #F59A40;
-    --anaerobic: #B373E3;
-    --st-peaking: #B57BE6;
-    --st-productive: #4CC46C;
-    --st-maintaining: #F0C419;
-    --st-recovery: #5C93E6;
-    --st-unproductive: #F28C33;
-    --st-strained: #F27AB5;
-    --st-overreaching: #EF5A4B;
-    --st-detraining: #9AA19D;
-    --z1: #6E7A74;
-    --z2: #5BBDEB;
-    --z3: #4CC46C;
-    --z4: #F59A40;
-    --z5: #EF5A4B;
-    --sp-run: #3987E5;
-    --sp-bike: #D95926;
-    --sp-walk: #199E70;
-    --sp-hike: #C98500;
-    --sp-disc_golf: #D55181;
-    --sp-winter: #3FAA3F;  /* lighter than in light mode, to read on the dark page */
-    --sp-strength: #9085E9;
-    --sp-swim: #E66767;
-  }
+/* Dark: set by js/theme.js (at night, by the system, or by the menu's switch) */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #131A18;
+  --ink: #E3EAE6;
+  --muted: #93A099;
+  --rule: #2B3632;
+  --panel: #18211E;
+  --easy: #4FB59D;
+  --hard: #E9A443;
+  --fitness: #7FA3DB;
+  --fatigue: #E07383;
+  --nohr: #55615B;
+  --route: #FF7A1A;
+  --route-winter: #46C8FF;
+  --satellite-brightness: 0.58;
+  --hillshade-blend: screen;
+  --hillshade-opacity: 0.55;
+  --low-aerobic: #5BBDEB;
+  --high-aerobic: #F59A40;
+  --anaerobic: #B373E3;
+  --st-peaking: #B57BE6;
+  --st-productive: #4CC46C;
+  --st-maintaining: #F0C419;
+  --st-recovery: #5C93E6;
+  --st-unproductive: #F28C33;
+  --st-strained: #F27AB5;
+  --st-overreaching: #EF5A4B;
+  --st-detraining: #9AA19D;
+  --z1: #6E7A74;
+  --z2: #5BBDEB;
+  --z3: #4CC46C;
+  --z4: #F59A40;
+  --z5: #EF5A4B;
+  --sp-run: #3987E5;
+  --sp-bike: #D95926;
+  --sp-walk: #199E70;
+  --sp-hike: #C98500;
+  --sp-disc_golf: #D55181;
+  --sp-winter: #3FAA3F;  /* lighter than in light mode, to read on the dark page */
+  --sp-strength: #9085E9;
+  --sp-swim: #E66767;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -140,6 +140,9 @@ body {
 .range-switch { display: flex; gap: 0.4rem; }
 .range-switch button { border-color: var(--rule); padding: 0.35rem 0.9rem; }
 .range-switch button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+/* Light or dark, at the bottom of the menu (js/theme.js) */
+.theme-switch { margin-top: auto; gap: 0.3rem; }
+.theme-switch button { padding: 0.25rem 0.65rem; font-size: 0.82rem; }
 /* Race goal: what, when and how far off, with Garmin's prediction moving toward the target */
 .race { display: grid; gap: 1.25rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
 @media (min-width: 1000px) { .race { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; } }
@@ -389,6 +392,7 @@ body.modal-open { overflow: hidden; }
   padding: 1.5rem 0 1rem; background: var(--paper); border-bottom: 1px solid var(--rule);
 }
 .modal-head .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.modal-back { display: inline-block; margin-bottom: 0.4rem; font-size: 0.9rem; }
 .modal-head h2 { font: 700 clamp(1.8rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; overflow-wrap: anywhere; }
 button.close {
   flex: none; width: 2.5rem; height: 2.5rem; padding: 0; border-color: var(--rule);

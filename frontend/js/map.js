@@ -57,7 +57,7 @@ export function routeMap(el) {
         satellite: L.tileLayer(SATELLITE, { maxZoom: 18, className: "tiles-satellite", attribution: "Esri, Maxar, Earthstar Geographics" }),
       };
     }
-    setBase(look.map, matchMedia("(prefers-color-scheme: dark)").matches);
+    setBase(look.map, document.documentElement.dataset.theme === "dark");
     stopReplay?.();
     route?.remove();
     const line = css(look.color), paper = css("--paper");
