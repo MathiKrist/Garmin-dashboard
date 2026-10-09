@@ -40,7 +40,6 @@ Every sport you've done at least 3 times gets a page in the menu, most-used firs
 
 - **Totals**: this week, the last 4 weeks (with the change against the 4 before), this year and last year. Distance for sports that record it, time for the rest. A sport you haven't done for four weeks (a ski trip, a summer sport) shows its latest outing, this year and last year instead of zeros.
 - **Per week**: kilometres or hours per week for the last 26 weeks (or the 26 weeks up to the latest one). Running is split by Garmin's training effect, with the low aerobic share of the last 4 weeks.
-- **Aerobic efficiency** (running): your pace on easy runs, the ones with an average heart rate between 25 and 8 bpm below `AEROBIC_THRESHOLD` (133–150 bpm at 158) and at least 3 km long, using Garmin's grade-adjusted pace where it has one, so hills don't count against you. A dot per run over the last year, with the 6-week median as a line (needs 3 runs in the 6 weeks); the sentence above compares that median now with 3 and 12 months ago. Getting faster at the same heart rate is aerobic fitness growing. The band is `EFFICIENCY_BAND` in `backend/metrics.py`.
 - **This year against last year**: the running total of kilometres (or hours) through the year, this year as a solid line and last year dashed, with both totals on today's date. Shown when there's anything from last year.
 - **Per month**: kilometres (or hours) per month, this year's bars next to last year's.
 - **Personal bests**: for running, the fastest 400 m, 1 km, mile, 5 km, 10 km, half marathon and marathon within any run (distances you haven't run yet are listed as such); for every sport, the longest distance and time; for cycling and winter sports, top speed; for winter sports, most descent. Each opens its activity.
@@ -88,7 +87,6 @@ Training load comes from Garmin when available; otherwise it falls back to Banis
 │   │   ├── health.js     # Health page
 │   │   ├── activities.js # Activities page
 │   │   ├── calendar.js   # Training calendar (overview)
-│   │   ├── efficiency.js # Aerobic efficiency (running page)
 │   │   ├── sport.js      # A page per sport
 │   │   └── modal.js      # Activity popup
 │   └── vendor/
@@ -171,7 +169,7 @@ python backend/sync.py
 .venv\Scripts\python -m unittest discover tests
 ```
 
-`tests/test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, aerobic efficiency, sports, VO2 max); `tests/test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and what's kept when Garmin rate-limits).
+`tests/test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, sports, VO2 max); `tests/test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and what's kept when Garmin rate-limits).
 
 ## Troubleshooting
 

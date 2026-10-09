@@ -53,7 +53,7 @@ def seed(db_path, days=420):
         if plan and rng.random() > 0.08 and i > 0:
             kind, km_r, hr_r, pace_r = plan
             km = rng.uniform(*km_r) * build
-            pace = rng.uniform(*pace_r) * (1.04 - 0.06 * (1 - i / days))  # a little faster through the year
+            pace = rng.uniform(*pace_r)
             hr = rng.uniform(*hr_r)
             dur = km * pace
             load = dur / 60 * (hr - 120) / 30 * (1.6 if kind in ("intervals", "tempo") else 1.0)
