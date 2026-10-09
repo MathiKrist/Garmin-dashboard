@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Training</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/static/styles.css">
 </head>
@@ -132,22 +130,7 @@
               <thead id="recentHead"></thead>
               <tbody id="recentBody"></tbody>
             </table></div>
-            <aside class="volume" id="ovVolume" aria-label="Totals for your main sport">
-              <p class="eyebrow vol-sport"></p>
-              <div class="vol-block">
-                <h3>This week</h3>
-                <p class="vol-big vol-week"></p>
-                <p class="vol-note vol-week-note"></p>
-                <div class="vol-days" role="img"></div>
-                <p class="vol-note vol-long vol-week-long"></p>
-              </div>
-              <div class="vol-block">
-                <h3>This year</h3>
-                <p class="vol-big vol-year"></p>
-                <p class="vol-note vol-year-note"></p>
-                <p class="vol-note vol-long vol-year-long"></p>
-              </div>
-            </aside>
+            <aside class="volume" id="ovVolume" aria-label="Totals for your main sport"></aside>
           </div>
         </section>
       </div>
@@ -215,22 +198,7 @@
             </table></div>
             <button type="button" class="more" id="actMore" hidden>Show more</button>
           </div>
-          <aside class="volume" id="actVolume" aria-label="Activity totals">
-            <p class="eyebrow vol-sport"></p>
-            <div class="vol-block">
-              <h3>This week</h3>
-              <p class="vol-big vol-week"></p>
-              <p class="vol-note vol-week-note"></p>
-              <div class="vol-days" role="img"></div>
-                <p class="vol-note vol-long vol-week-long"></p>
-            </div>
-            <div class="vol-block">
-              <h3>This year</h3>
-              <p class="vol-big vol-year"></p>
-              <p class="vol-note vol-year-note"></p>
-                <p class="vol-note vol-long vol-year-long"></p>
-            </div>
-          </aside>
+          <aside class="volume" id="actVolume" aria-label="Activity totals"></aside>
         </div>
       </section>
     </div>
@@ -281,6 +249,23 @@
   </div>
   </div>
 </div>
+
+<template id="volumeTemplate">
+  <p class="eyebrow vol-sport"></p>
+  <div class="vol-block">
+    <h3>This week</h3>
+    <p class="vol-big vol-week"></p>
+    <p class="vol-note vol-week-note"></p>
+    <div class="vol-days" role="img"></div>
+    <p class="vol-note vol-long vol-week-long"></p>
+  </div>
+  <div class="vol-block">
+    <h3>This year</h3>
+    <p class="vol-big vol-year"></p>
+    <p class="vol-note vol-year-note"></p>
+    <p class="vol-note vol-long vol-year-long"></p>
+  </div>
+</template>
 
 <dialog class="race-dialog" id="raceDialog" aria-labelledby="raceDialogTitle">
   <form id="raceForm">

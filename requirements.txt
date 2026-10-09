@@ -1,4 +1,6 @@
-garminconnect>=0.3
-fastapi>=0.110
-uvicorn>=0.29
-python-dotenv>=1.0
+# Versions the dashboard is known to work with. garminconnect follows Garmin's unofficial API, which changes
+# now and then: if a sync starts failing, upgrading it (pip install -U garminconnect) is the first thing to try.
+garminconnect==0.3.17
+fastapi==0.142.2
+uvicorn==0.54.0
+python-dotenv==1.2.4

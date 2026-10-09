@@ -63,7 +63,8 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
 
 SESSION_COOKIE = "training_session"
 SESSION_DAYS = 365
-OPEN_PATHS = {"/login", "/static/styles.css"}  # reachable before logging in
+OPEN_PATHS = {"/login", "/static/styles.css"}  # reachable before logging in, with the fonts
+OPEN_PREFIX = "/static/vendor/fonts/"
 
 
 def _session_token():
@@ -79,8 +80,9 @@ def _logged_in(request):
 
 @app.middleware("http")
 async def login_gate(request: Request, call_next):
-    if config.DASHBOARD_PASSWORD and request.url.path not in OPEN_PATHS and not _logged_in(request):
-        if request.method == "GET" and not request.url.path.startswith(("/api/", "/static/")):
+    path = request.url.path
+    if config.DASHBOARD_PASSWORD and path not in OPEN_PATHS and not path.startswith(OPEN_PREFIX) and not _logged_in(request):
+        if request.method == "GET" and not path.startswith(("/api/", "/static/")):
             return RedirectResponse("/login", status_code=303)
         return JSONResponse({"error": "Not logged in"}, status_code=401)
     response = await call_next(request)

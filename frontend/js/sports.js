@@ -219,23 +219,18 @@ export function tableParts(rows, key, sort = null) {
 // Strava-style totals for a list of activities in the `root` panel: this week day by day, and this year.
 // For one sport (`key`) with distances, also the longest one this week and this year.
 export function renderVolume(root, list, label, key) {
+  if (!root.firstElementChild) root.append($("volumeTemplate").content.cloneNode(true));  // the panel's markup, once
   const q = (cls) => root.querySelector(`.${cls}`);
-  const today = data.generated;
-  const monday = addDays(today, -((new Date(today + "T12:00:00").getDay() + 6) % 7));
-  const year = today.slice(0, 4);
-  // Distance where the sport has it (running, cycling…), otherwise time (strength, yoga…)
-  const byKm = sum(list.filter((a) => a.date.startsWith(year)), "km") > 0;
-  const value = (as) => (byKm ? sum(as, "km") : sum(as, "duration_s"));
-  const big = (v) => (byKm ? `${v.toFixed(1)}<span>km</span>` : fmtHours(v).replace(/(\d+)([hm])/g, "$1<span>$2</span>"));
-  const small = (v) => (byKm ? `${v.toFixed(1)} km` : fmtHours(v));
-  const between = (from, to) => list.filter((a) => a.date >= from && a.date < to);  // this list only
+  const today = data.generated, monday = mondayOf(today), year = today.slice(0, 4);
+  // Distance where the sport has it (running, cycling…), otherwise time (strength, yoga…), like the weekly chart
+  const { byKm, of: value, big, small } = measureFor(list);
   const count = (n) => `${n} ${n === 1 ? "activity" : "activities"}`;
 
   q("vol-sport").textContent = label;
 
-  const week = between(monday, addDays(monday, 7));
+  const week = between(list, monday, addDays(monday, 7));
   q("vol-week").innerHTML = big(value(week));
-  const prev4 = value(between(addDays(monday, -28), monday)) / 4;
+  const prev4 = value(between(list, addDays(monday, -28), monday)) / 4;
   const weekNote = [count(week.length)];
   if (byKm && week.length) weekNote.push(fmtHours(sum(week, "duration_s")));
   if (prev4 > 0) weekNote.push(`4-week avg ${small(prev4)}`);
