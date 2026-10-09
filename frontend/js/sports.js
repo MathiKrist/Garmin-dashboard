@@ -156,16 +156,63 @@ export const SPORT_COLUMNS = {
 };
 
 // The sport's columns for these rows, minus any that are empty for every row (e.g. sets when Garmin didn't record them)
-export function tableParts(rows, key) {
+// What a column sorts by. Numbers sort biggest first on the first click (pace: fastest first), text A to Z.
+const SORT_VALUES = {
+  date: (a) => a.start || a.date,
+  name: (a) => (a.name || a.type).toLowerCase(),
+  distance: (a) => a.km || null,
+  time: (a) => a.duration_s,
+  pace: (a) => a.speed,
+  speed: (a) => a.speed,
+  ascent: (a) => a.elev_m,
+  descent: (a) => a.descent_m,
+  sets: (a) => a.sets,
+  reps: (a) => a.reps,
+  hr: (a) => a.avg_hr,
+  load: (a) => a.load || null,
+};
+// The activity list's order: newest first until a column header is clicked
+export const DEFAULT_SORT = { col: "date", desc: true };
+
+// The rows in the order `sort` asks for; rows without a value go last either way
+export function sortRows(rows, sort) {
+  const value = SORT_VALUES[sort.col];
+  if (!value) return rows;
+  return rows.slice().sort((a, b) => {
+    const x = value(a), y = value(b);
+    if (x == null || y == null) return (x == null) - (y == null);
+    return (x < y ? -1 : x > y ? 1 : 0) * (sort.desc ? -1 : 1);
+  });
+}
+
+// A click on a sortable header: the same column flips direction, a new one starts biggest first (A to Z for names)
+export function nextSort(sort, col) {
+  return col === sort.col ? { col, desc: !sort.desc } : { col, desc: col !== "name" };
+}
+
+// "Thu 8 Oct" with the weekday in its own span, which phones leave out (styles.css)
+const weekdaySpan = (date) => date.replace(/^(\S+) /, '<span class="weekday">$1 </span>');
+
+// The table for these rows. With `sort`, the headers are buttons that sort the list (see nextSort).
+export function tableParts(rows, key, sort = null) {
   const cols = (SPORT_COLUMNS[key] || SPORT_COLUMNS.other).map((k) => [k, ...COLUMNS[k]])
     .filter(([k, , , cell]) => k === "date" || k === "name" || rows.some((a) => cell(a) !== ""));
   if (key === "all") cols.find((c) => c[0] === "pace")?.splice(1, 1, "Pace / speed");
+  // A class per column, so narrow screens can leave some out (styles.css)
+  const cls = (k, num) => ` class="col-${k}${num ? " num" : ""}"`;
+  const th = (k, head, num) => {
+    if (!sort || !SORT_VALUES[k]) return `<th${cls(k, num)}>${head}</th>`;
+    const on = sort.col === k, dir = sort.desc ? "descending" : "ascending";
+    return `<th${cls(k, num)}${on ? ` aria-sort="${dir}"` : ""}><button type="button" class="sort" data-sort="${k}">${head}` +
+      `<span aria-hidden="true">${on ? (sort.desc ? " ↓" : " ↑") : ""}</span></button></th>`;
+  };
   return {
-    head: `<tr>${cols.map(([, head, num]) => `<th${num ? ' class="num"' : ""}>${head}</th>`).join("")}</tr>`,
+    head: `<tr>${cols.map(([k, head, num]) => th(k, head, num)).join("")}</tr>`,
     // The whole row opens the activity; the name is a button so it can be reached with the keyboard too
     body: rows.map((a) => `<tr data-id="${a.id}">${cols.map(([k, , num, cell]) => k === "name"
-      ? `<td class="name"><button type="button" class="act-link">${cell(a)}</button></td>`
-      : `<td${num ? ' class="num"' : ""}>${cell(a)}</td>`).join("")}</tr>`).join(""),
+      ? `<td class="name col-name"><button type="button" class="act-link">${cell(a)}</button></td>`
+      : `<td${cls(k, num)}>${k === "date" ? weekdaySpan(cell(a)) : cell(a)}</td>`).join("")}</tr>`).join(""),
+    width: cols.length,
   };
 }
 

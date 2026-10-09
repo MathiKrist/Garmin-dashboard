@@ -96,7 +96,10 @@ DAILY_ADDED = {
 
 def connect(db_path):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    # The sync and the page both write (the popup stores routes and laps); wait for each other rather than fail,
+    # and let the page read while the sync writes
+    conn = sqlite3.connect(db_path, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     have = {r["name"] for r in conn.execute("PRAGMA table_info(daily)")}
@@ -120,6 +123,12 @@ def upsert_activity(conn, row):
         f"VALUES ({','.join('?' * len(ACTIVITY_COLS))})",
         values,
     )
+
+
+def delete_activities(conn, ids):
+    """Remove activities, with their tracks, laps and best efforts."""
+    for table, col in (("activities", "id"), ("tracks", "activity_id"), ("laps", "activity_id"), ("efforts", "activity_id")):
+        conn.executemany(f"DELETE FROM {table} WHERE {col} = ?", [(i,) for i in ids])
 
 
 def upsert_daily(conn, row):

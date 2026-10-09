@@ -45,16 +45,10 @@ export function pbEvents() {
 
 export const pbText = (e) => `${data.distances[e.m]} in ${fmtDuration(e.s)}`;
 
-// A few sentences on where the athlete stands, led by Garmin's training status: what it means, VO2 max,
-// personal bests, the year so far and the recent trend in training hours
+// A few sentences on what the page's sections don't show: personal bests, the year so far and the recent trend in
+// training hours (training status and VO2 max have sections of their own)
 export function renderStory() {
-  const parts = [], today = data.generated, ts = data.training_status;
-  if (ts) parts.push(`Garmin rates your training as <strong>${ts.label.toLowerCase()}</strong>${ts.since ? ` since ${fmtShort(ts.since)}` : ""}.`);
-  const v = data.vo2max;
-  if (v) {
-    const diff = v.ago_3m != null ? Math.round((v.now - v.ago_3m) * 10) / 10 : 0;
-    parts.push(`VO2 max is ${round(v.now, 1)}${Math.abs(diff) >= 0.5 ? `, ${diff > 0 ? "up" : "down"} ${Math.abs(diff).toFixed(1)} in three months` : ""}.`);
-  }
+  const parts = [], today = data.generated;
   // Personal bests from the last four weeks, or else the latest one
   const pbs = pbEvents(), recent = pbs.filter((e) => e.a.date > addDays(today, -28));
   if (recent.length) {
@@ -137,7 +131,6 @@ export function renderTrainingStatus() {
     if (ts.acwr_status) load += `, ${ts.acwr_status.toLowerCase().replace(/_/g, " ")}`;
     facts.push(load);
   }
-  if (ts.vo2max != null) facts.push(`VO2 max ${round(ts.vo2max)}`);
   $("tsFacts").textContent = facts.join(" · ");
 
   // The last 28 days in blocks of 7, counted back from today
@@ -195,12 +188,27 @@ export function renderLastActivity() {
 
 export const lastMap = routeMap($("lastMap"));
 
+// The fitness chart's period: 120 days or the year the server sends, remembered per device
+let fitnessDays = 120;
+try { fitnessDays = Number(localStorage.getItem("fitnessDays")) || 120; } catch {}
+
+$("fitnessRange").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-days]");
+  if (!b) return;
+  fitnessDays = Number(b.dataset.days);
+  try { localStorage.setItem("fitnessDays", fitnessDays); } catch {}
+  renderFitnessCharts();
+});
+
 export function renderFitnessCharts() {
   Chart.defaults.font.family = css("--body");
   const fit = css("--fitness");
+  $("fitnessRange").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.days) === fitnessDays)));
+  $("fitnessChart").setAttribute("aria-label", `Fitness and fatigue over the last ${fitnessDays === 120 ? "120 days" : "year"}`);
 
-  // Fitness and fatigue on one scale: the gap between them is form
-  const fx = data.fitness, fat = css("--fatigue");
+  // Fitness and fatigue on one scale: the gap between them is form, shaded blue where fitness is ahead (positive
+  // form) and red where fatigue is
+  const fx = data.fitness.slice(-fitnessDays), fat = css("--fatigue");
   const last = (color) => ({ pointRadius: fx.map((_, i) => (i === fx.length - 1 ? 4 : 0)), pointBackgroundColor: color });
   const o = baseOptions();
   o.plugins.tooltip.callbacks = {
@@ -217,9 +225,10 @@ export function renderFitnessCharts() {
     data: {
       labels: fx.map((d) => fmtShort(d.date)),
       datasets: [
-        { label: "Fitness", data: fx.map((d) => d.ctl), borderColor: fit, backgroundColor: alpha(fit, 0.1), fill: "origin", borderWidth: 2.5,
+        { label: "Fitness", data: fx.map((d) => d.ctl), borderColor: fit, backgroundColor: fit, borderWidth: 2.5,
           tension: 0.3, ...last(fit) },
-        { label: "Fatigue", data: fx.map((d) => d.atl), borderColor: fat, borderWidth: 1.5, tension: 0.3, ...last(fat) },
+        { label: "Fatigue", data: fx.map((d) => d.atl), borderColor: fat, backgroundColor: fat, borderWidth: 1.5, tension: 0.3, ...last(fat),
+          fill: { target: 0, above: alpha(fat, 0.16), below: alpha(fit, 0.16) } },
       ],
     },
     options: o,

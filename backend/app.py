@@ -15,11 +15,12 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import date
+from pathlib import Path
 from urllib.parse import parse_qs
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import config
@@ -134,13 +135,29 @@ def index():
     return FileResponse(STATIC / "index.html")
 
 
+# The dashboard's numbers, kept until the database changes or the day does: every open tab asks every 5 minutes
+_dashboard_cache = {"key": None, "data": None}
+
+
+def _db_version():
+    """Changes with every write to the database (each commit touches the file or its write-ahead log) and each day."""
+    files = [Path(f"{DB_PATH}{suffix}") for suffix in ("", "-wal")]
+    return date.today(), *[(f.stat().st_mtime_ns, f.stat().st_size) if f.exists() else None for f in files]
+
+
 @app.get("/api/dashboard")
-def dashboard():
-    data = metrics.build_dashboard(DB_PATH)
-    data["demo"] = DEMO
-    data["syncing"] = sync.is_running()
-    data["login"] = bool(config.DASHBOARD_PASSWORD)  # shows the Log out button
-    return data
+def dashboard(request: Request):
+    key = _db_version()
+    if _dashboard_cache["key"] != key:
+        _dashboard_cache.update(key=key, data=metrics.build_dashboard(DB_PATH))
+    data = {**_dashboard_cache["data"], "demo": DEMO, "syncing": sync.is_running(),
+            "login": bool(config.DASHBOARD_PASSWORD)}  # login shows the Log out button
+    # An ETag, so a browser that already has this answer gets a short "not modified" instead
+    body = json.dumps(data, separators=(",", ":")).encode()
+    etag = f'"{hashlib.sha256(body).hexdigest()[:32]}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    return Response(body, media_type="application/json", headers={"ETag": etag})
 
 
 @app.get("/api/activity/{activity_id}")
