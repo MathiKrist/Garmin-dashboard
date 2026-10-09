@@ -12,6 +12,7 @@ from garminconnect import Garmin
 
 import config
 import db
+import metrics
 
 log = logging.getLogger("sync")
 _lock = threading.Lock()
@@ -19,7 +20,7 @@ ACTIVITY_PAGE = 100  # activities per request when fetching the full history
 TRACK_ACTIVITIES = 5  # GPS tracks are fetched for this many of the newest activities
 HEALTH_DAYS_PER_SYNC = 45  # the health backfill fetches this many days per sync, so one sync never runs for long
 EFFORT_RUNS_PER_SYNC = 40  # runs whose best efforts are worked out per sync (one request each)
-EFFORT_DISTANCES = (400, 1000, 1609, 5000, 10000, 21098, 42195)
+EFFORT_DISTANCES = tuple(metrics.DISTANCES)
 
 
 def _get(d, *path):
