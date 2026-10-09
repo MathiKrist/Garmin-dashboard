@@ -23,6 +23,7 @@ VO2MAX_BACKFILL_DAYS = _int("VO2MAX_BACKFILL_DAYS", 3 * 365)
 SYNC_INTERVAL_MINUTES = _int("SYNC_INTERVAL_MINUTES", 60)
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = _int("PORT", 8000)
+DASHBOARD_URL = os.getenv("DASHBOARD_URL", "").strip().rstrip("/")  # where the desktop app connects; empty = this machine
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
 DASHBOARD_USERNAME = os.getenv("DASHBOARD_USERNAME", "")  # optional; asked for on the login page only when set
 TOKEN_DIR = str(Path(os.getenv("TOKEN_DIR", "~/.garminconnect")).expanduser())
