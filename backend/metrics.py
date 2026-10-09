@@ -177,42 +177,6 @@ def _vo2max(days, today):
     }
 
 
-# Aerobic efficiency: running pace at a steady, easy heart rate, which gets faster as aerobic fitness grows.
-# Runs count when their average HR is in a band this far below AEROBIC_THRESHOLD (bpm) and they're long enough to settle.
-EFFICIENCY_BAND = (25, 8)
-EFFICIENCY_MIN_KM = 3
-EFFICIENCY_WINDOW = 42  # days behind each point of the trend: the median pace of the runs in them
-EFFICIENCY_MIN_RUNS = 3  # runs needed in a window for a trend point
-
-
-def _efficiency(acts, today):
-    """Each run in the HR band over the last year (pace, grade-adjusted where Garmin has it), a weekly trend of the
-    median pace, and that trend now, 3 months ago and a year ago."""
-    lo, hi = config.AEROBIC_THRESHOLD - EFFICIENCY_BAND[0], config.AEROBIC_THRESHOLD - EFFICIENCY_BAND[1]
-    runs = [{"id": a["id"], "date": a["date"], "pace_s": round(1000 / speed, 1), "hr": round(a["avg_hr"])}
-            for a in acts if is_run(a["type"]) and a["avg_hr"] and lo <= a["avg_hr"] <= hi
-            and (a["distance_m"] or 0) >= EFFICIENCY_MIN_KM * 1000
-            for speed in [a["gap_speed"] or a["avg_speed"]] if speed]
-    if len(runs) < EFFICIENCY_MIN_RUNS:
-        return None
-
-    def trend_at(day):
-        start, end = (day - timedelta(days=EFFICIENCY_WINDOW)).isoformat(), day.isoformat()
-        paces = [r["pace_s"] for r in runs if start < r["date"] <= end]
-        return round(median(paces), 1) if len(paces) >= EFFICIENCY_MIN_RUNS else None
-
-    since = today - timedelta(days=364)
-    sunday = today + timedelta(days=6 - today.weekday())
-    weeks = [sunday - timedelta(days=7 * i) for i in range(52, -1, -1)]
-    return {
-        "band": [lo, hi],
-        "runs": [r for r in runs if r["date"] >= since.isoformat()],
-        # A point per week (at its Sunday, or today for this week)
-        "trend": [{"date": min(w, today).isoformat(), "pace_s": trend_at(min(w, today))} for w in weeks],
-        "now": trend_at(today), "ago_3m": trend_at(today - timedelta(days=91)), "ago_12m": trend_at(today - timedelta(days=365)),
-    }
-
-
 # Garmin's predicted distances: metres -> daily column
 PREDICTED = {5000: "pred_5k", 10000: "pred_10k", 21098: "pred_half", 42195: "pred_marathon"}
 
@@ -254,7 +218,6 @@ ACTIVITY_SELECT = (
     "json_extract(raw, '$.activeSets') AS sets, json_extract(raw, '$.totalReps') AS reps, "
     "json_extract(raw, '$.locationName') AS location, json_extract(raw, '$.elevationLoss') AS elev_loss, "
     "json_extract(raw, '$.maxSpeed') AS max_speed, json_extract(raw, '$.elapsedDuration') AS elapsed_s, "
-    "json_extract(raw, '$.avgGradeAdjustedSpeed') AS gap_speed, "
     + ", ".join(f"json_extract(raw, '$.fastestSplit_{m}') AS best_{m}" for m in BEST_EFFORTS)
 )
 
@@ -423,7 +386,6 @@ def build_dashboard(db_path=None):
         "training_status": _training_status(days, today),
         "load_focus": _load_focus(days, today),
         "vo2max": _vo2max(days, today),
-        "efficiency": _efficiency(acts, today),
         "race": _race(json.loads(goal), days, acts, today) if goal else None,
         "fitness": fitness[-365:],  # the chart shows 120 days or the whole year
         "trends": trends,
