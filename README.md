@@ -2,182 +2,180 @@
 
 A personal, self-hosted training dashboard. It pulls activities and daily recovery data from Garmin Connect into a local SQLite database and serves a single-page dashboard on your home network, so any device on the wifi can open it.
 
-Built with FastAPI, SQLite and Chart.js. No cloud, no accounts beyond your own Garmin login. Everything the page needs is bundled, so it works without internet, apart from the map tiles.
+Built with FastAPI, SQLite and Chart.js. No cloud, and no accounts beyond your own Garmin login. Everything the page needs is bundled, so it works offline apart from the map tiles.
 
-## What it shows
-
-A menu on the left (a sideways-scrolling row on phones) picks the page; the address keeps it (`#overview`, `#health`, `#activities`, `#sport/run`), so a page can be bookmarked.
-
-The page is dark at night (20:00 to 07:00) and otherwise follows the system's light or dark setting. The **Auto / Light / Dark** switch at the bottom of the menu fixes it to one, remembered per device (`frontend/js/theme.js`).
-
-### Overview
-
-The athlete's story and overall progression.
-
-- **Story**: a few sentences at the top on what the sections below don't show: personal bests (any set in the last four weeks, otherwise the latest one), the year so far in your three biggest sports, and weekly training hours over the last four weeks against the four before.
-- **Race goal**: set with **+ Race goal** under the story: race name, date, distance (5 km, 10 km, half, marathon or any other in km) and target time. Saved on the server (in the `meta` table), so every device shows the same goal. Shows the date, distance and days to go, the target with its pace, Garmin's race predictor for that distance (other distances are scaled from the nearest predicted one) and the gap between them, with a chart of the prediction over the last 6 months against the target line. After race day the run on that date shows as the result against the target (its elapsed time, as a race is timed), for a week; then the goal goes away. Garmin's predictions are synced daily (a year back, once) into the `daily` table.
-- **Last night and today**: readiness, HRV, sleep and resting HR (with its 7-day average). If a value isn't from today (the watch or the sync is behind), the newest one from the last week is shown with its day ("from Wed 7 Oct"); the same goes for training status and load focus. Next to them, a ring shows today's calories burnt so far: the total in the middle, the active part in red against the resting (BMR) part in blue.
-- **Training status**: Garmin's own status (Productive, Maintaining, Recovery, Unproductive…), acute load against Garmin's optimal range, and a four-week strip of daily statuses.
-- **Load focus**: Garmin's last-four-weeks load in low aerobic, high aerobic and anaerobic against the optimal range for each, with what to train next. Training status and load focus sit in the left column under the top row.
-- **Last activity**: in the right column next to them: your newest activity's name, when and where, Garmin's training effect, and the same stats as its sport's table columns, minus ascent and load. If it was recorded with GPS, its route is drawn as a glowing line, replayed once from start to finish when the page loads (skipped with reduced motion), on Esri's grey basemap (light or dark to match the page; the map tiles need internet). Most sports get an orange line; a few get their own color and map (`ROUTE_STYLES` in `frontend/js/map.js`): winter sports are ice blue on the grey map with Esri's terrain hillshade blended in, open-water swims are aqua and disc golf is magenta, both on dimmed Esri satellite imagery. The activity popup's map uses the same styles. Routes are fetched from Garmin during the sync for the 5 newest activities and stored in the `tracks` table.
-- **Fitness and form**: one chart with fitness (42-day exponentially weighted training load, CTL) and fatigue (the same over 7 days, ATL) on one scale; form is the gap between them, as a % of fitness, named by band (Overloaded, Building, Balanced, Fresh, Rested) for today and in the tooltip, with the change in fitness over the last four weeks. The gap is shaded blue where fitness is ahead (positive form) and red where fatigue is. A switch shows the last 120 days or the whole year (remembered per device).
-- **Weekly running** (your main sport, the one you do most): kilometres per week for the last 12 weeks, split by Garmin's training effect for each run, with the low aerobic share of the last 4 weeks. Other main sports show their kilometres or hours per week. Clicking a week's bar opens that week's activities: total distance, time, count and load, and the list, each opening its activity (with a link back to the week).
-- **VO2 max**: Garmin's VO2 max estimate per week as a smooth line, up to `VO2MAX_BACKFILL_DAYS` back (fetched once in a single request), compared with three and twelve months ago.
-- **Training calendar**: the last 53 weeks, a square per day (Monday at the top), shaded by the day's training load in four steps (the quartiles of the days you trained); rest days are grey. Hovering shows what you did, and clicking opens the day's biggest activity. Above it: training days, days a week and the longest streak.
-- **Latest activities**: the 15 newest, linking to the full list, with the **This week / This year** panel for your main sport next to them.
-
-### Health
-
-- **Today**: HRV, sleep, resting HR, Body Battery peak and low, average stress (with Garmin's level), steps so far and calories burnt so far (with the active part). Training readiness is a training number, so it's on the overview only.
-- **Charts for the last 90 days or the last year** (a switch at the top, remembered per device), one measure each: HRV against Garmin's normal range, resting heart rate, sleep (score in the tooltip), Body Battery (a bar from each day's low to its high), average stress, steps (with a 7-day average line and the best day in the period) and calories burnt (Garmin's daily total, active and resting together, with a 7-day average line and the best day; the tooltip splits the day into active and resting). HRV, resting HR, sleep, steps and calories each get a sentence comparing the last 7 days with the 30 before.
-
-### Activities
-
-- **Every activity** synced from Garmin, 25 at a time with **Show more**. Buttons filter by sport (running, walking, hiking, cycling, swimming, strength, gym & cardio, disc golf, yoga, winter sports, other); only sports you have get a button, sorted by how many activities each has (Other last). The columns depend on the sport: running shows effect, distance, time, pace, avg HR and load; cycling shows speed instead of pace; winter sports show speed and descent; strength shows time, sets, reps, avg HR and load; yoga just time and avg HR; and so on (`SPORT_COLUMNS` in `frontend/js/sports.js`; the sport groups and their names are `SPORTS` in `backend/metrics.py`). A column that is empty for every row shown is left out. The **Effect** column (running, cycling, swimming, gym & cardio) shows Garmin's training effect label (Base, Tempo, Threshold, VO2 max…) with a dot in its load focus color. Runs without a Garmin label show the focus from average HR, marked "(HR)". Dates from earlier years include the year. Click a column header to sort by it (biggest or fastest first; again to reverse), and search by name, place or type in the box at the top; the totals panel follows the sport filter only. On phones the table leaves out effect, heart rate, load, climbing and the weekday, so it fits the screen; the popup has them all.
-- **This week / This year**: a side panel next to the activities, following the sport filter. This week shows the total so far, a bar per day and the 4-week average; this year shows distance, time, metres climbed and count. For a single sport with distances, each also shows the longest one (for running, the longest run). Sports without distance (strength, yoga…) count time instead.
-
-### A page per sport
-
-Every sport you've done at least 3 times gets a page in the menu, most-used first, with its own color (`--sp-*` in `frontend/styles.css`). One-offs, Other and disc golf (Garmin keeps no scores, so there's little to follow) get no page; their activities are in the activities list and its sport filter like everything else.
-
-- **Totals**: this week, the last 4 weeks (with the change against the 4 before), this year and last year. Distance for sports that record it, time for the rest. A sport you haven't done for four weeks (a ski trip, a summer sport) shows its latest outing, this year and last year instead of zeros.
-- **Per week**: kilometres or hours per week for the last 26 weeks (or the 26 weeks up to the latest one). Running is split by Garmin's training effect, with the low aerobic share of the last 4 weeks. Clicking a week opens its activities, as on the overview.
-- **This year against last year**: the running total of kilometres (or hours) through the year, this year as a solid line and last year dashed, with both totals on today's date. Shown when there's anything from last year.
-- **Per month**: kilometres (or hours) per month, this year's bars next to last year's.
-- **Personal bests**: for running, the fastest 400 m, 1 km, mile, 5 km, 10 km, half marathon and marathon within any run (distances you haven't run yet are listed as such); for every sport, the longest distance and time; for cycling and winter sports, top speed; for winter sports, most descent. Each opens its activity.
-
-  The running bests are worked out from each run's second-by-second data (elapsed time, as Garmin's own splits use, so a stop counts against a split) and stored in the `efforts` table. They match Garmin's fastest splits to the tenth of a second and add 400 m, which Garmin doesn't keep. The sync works through your runs 40 at a time, newest first, one request each; until a run has been worked out, Garmin's own splits (1 km to marathon) are used.
-- **All of the sport's activities**, with the same columns as the activities page, sortable the same way.
-
-### Activity popup
-
-- Clicking any activity row or personal best opens every stat Garmin has for it, grouped by topic (time and effort, training effect, heart rate and zones, pace or speed, running dynamics, power, swimming, elevation, breathing and more); groups the activity has no data for are left out. Cycling and winter sports show speed in km/h, the others pace. Winter sports also show the number of runs and max vertical speed, and their laps are listed as runs. The route and laps (with max speed and descent per lap) are fetched from Garmin the first time an activity is opened and stored in the `tracks` and `laps` tables.
-
-In the bar charts, a week, month or day that isn't over yet (this week, this month, today's steps and calories) is drawn paler and marked "so far" in the tooltip, so it doesn't read as a drop.
-
-Training load comes from Garmin when available; otherwise it falls back to Banister TRIMP using `MAX_HR` and your median resting HR, converted to Garmin's scale by the median ratio between the two over your activities that have both (once there are 10 of them).
-
-## Project layout
-
-```
-.
-├── Dashboard app.bat     # Opens the dashboard in its own window (the desktop app); starts a server here if none runs
-├── Start dashboard.bat   # Double-click launcher: starts the server and opens the page in the browser
-├── Open dashboard.bat    # Only opens the page in the browser, for a server running on another device (DASHBOARD_URL)
-├── README.md
-├── requirements.txt
-├── .env.example          # Copy to .env and adjust
-├── backend/              # Python: server, Garmin sync and the numbers
-│   ├── app.py            # FastAPI server, background sync loop, login
-│   ├── sync.py           # Garmin Connect → SQLite (can also run on its own)
-│   ├── metrics.py        # Turns raw tables into dashboard numbers; maps Garmin activity types to sports
-│   ├── db.py             # SQLite schema and upserts
-│   ├── config.py         # Reads settings from .env
-│   ├── login.py          # One-time Garmin login, stores a token
-│   └── demo.py           # Seeds fake data for --demo mode
-├── desktop/
-│   └── main.py           # The desktop app: a window onto the server (pywebview)
-├── frontend/             # The page the browser loads (served at /static); no build step
-│   ├── index.html        # The page's markup
-│   ├── login.html        # The login page, when DASHBOARD_PASSWORD is set
-│   ├── styles.css
-│   ├── js/               # ES modules, loaded from main.js
-│   │   ├── main.js       # Loads the data, keeps it fresh, routes between pages
-│   │   ├── theme.js      # Light or dark (a plain script, run before the page draws)
-│   │   ├── state.js      # The dashboard data, shared by every module
-│   │   ├── util.js       # Formatting and small helpers
-│   │   ├── charts.js     # Chart.js setup
-│   │   ├── map.js        # Route maps and their replay
-│   │   ├── sports.js     # Sport groups, table columns, weekly volume and the This week / This year panel
-│   │   ├── overview.js   # Overview page (with race.js for the race goal)
-│   │   ├── race.js
-│   │   ├── health.js     # Health page
-│   │   ├── activities.js # Activities page
-│   │   ├── calendar.js   # Training calendar (overview)
-│   │   ├── sport.js      # A page per sport
-│   │   └── modal.js      # Activity popup (and a week's activities)
-│   └── vendor/
-│       ├── chart.umd.js  # Chart.js, bundled so it works offline
-│       ├── fonts/        # Barlow and Barlow Condensed (SIL Open Font License), same reason
-│       └── leaflet/      # Leaflet, for the last activity's map
-├── tests/                # python -m unittest discover tests
-├── assets/
-│   └── dashboard.ico     # Icon for the desktop shortcut
-└── data/                 # athlete.db (and demo.db) live here; not in git
-```
-
-Run everything from the project folder; paths in `.env` (like `DB_PATH`) are relative to it.
-
-## Setup
+## Quick start
 
 Requires Python 3.10+. From the project folder, on Windows:
 
 ```bash
-python -m venv .venv                          # a Python just for the dashboard (Start dashboard.bat uses it)
+python -m venv .venv                          # a Python just for the dashboard (the .bat launchers use it)
 .venv\Scripts\pip install -r requirements.txt
 copy .env.example .env                        # then adjust .env
-.venv\Scripts\python backend/login.py         # once; stores a token in TOKEN_DIR
+.venv\Scripts\python backend/login.py         # once; stores a Garmin token in TOKEN_DIR
+.venv\Scripts\python backend/app.py           # or --demo for generated data, no Garmin needed
 ```
 
-On Linux/macOS it's `.venv/bin/pip`, `.venv/bin/python` and `cp` instead. `requirements.txt` pins versions the dashboard is known to work with; if a sync starts failing after Garmin changes something, `pip install -U garminconnect` is the first thing to try.
+On Linux/macOS use `.venv/bin/pip`, `.venv/bin/python` and `cp`. Run everything from the project folder; paths in `.env` (like `DB_PATH`) are relative to it.
 
-Your Garmin password never goes in `.env`. `backend/login.py` stores a token, and the sync reuses it.
+Your Garmin password never goes in `.env`: `login.py` stores a token and the sync reuses it. `requirements.txt` pins versions known to work; if a sync starts failing after Garmin changes something, try `pip install -U garminconnect` first.
 
-## Running
+On start the server prints two addresses: `http://localhost:8000` for this machine and a LAN address for other devices on the wifi. On Windows you may need to allow Python through the firewall the first time. If the dashboard is reachable from the network without `DASHBOARD_PASSWORD`, it warns you: anyone on the wifi could see your health data.
 
-```bash
-python backend/app.py          # real Garmin data
-python backend/app.py --demo   # generated demo data, no Garmin needed
-```
+## Launchers
 
-On start it prints two addresses: `http://localhost:8000` for this machine and a LAN address for phones and other devices on the same wifi. On Windows you may need to allow Python through the firewall the first time. If the dashboard is reachable from the network without `DASHBOARD_PASSWORD`, it also prints a warning: anyone on the same wifi could then see your health data.
+| File | What it does |
+|---|---|
+| `Start dashboard.bat` | Starts the server and opens the page in the browser |
+| `Dashboard app.bat` | Opens the dashboard in its own window (the desktop app), starting a local server if none runs. `--demo` for demo data |
+| `Open dashboard.bat` | Only opens the page in the browser, for a server running on another device |
 
-The server syncs in the background every `SYNC_INTERVAL_MINUTES`, and the **Sync now** button triggers one immediately. The first sync backfills `ACTIVITY_BACKFILL_DAYS` of activities and `DAILY_BACKFILL_DAYS` of daily data, which takes a few minutes because daily requests are spaced out to stay under Garmin's rate limits. Later syncs only fetch the last few days, and once a day the last 30 days of activities, so activities edited or deleted on Garmin since are changed or removed here too.
+All use the Python in `.venv`. `Dashboard app.bat` and `Open dashboard.bat` connect to `DASHBOARD_URL` from `.env` (the "From other devices on wifi" address the server prints), or this machine when it's empty.
 
-Each sync runs in order of importance: new activities, race predictions and VO2 max (a request each), the daily numbers since the last sync, then routes, best efforts and the one-off backfills. If Garmin rate-limits a step, the rest waits for the next sync, which starts after the daily numbers already saved.
+**Desktop app.** A window onto the server, with no console, using Edge WebView2 through pywebview (included in Windows 11). If it starts the server itself, it also runs the background sync and stops the server when the window closes; phones can connect meanwhile. If nothing answers at `DASHBOARD_URL`, it says so with a **Try again** button. It keeps its login and remembered switches in `data/webview` and logs from its server to `data/desktop.log`.
 
-Once, the sync also pages back through your whole Garmin activity history (100 activities per request). It saves its place after every page, so if Garmin rate-limits it, the next sync carries on where it stopped. Daily health data (HRV, sleep, Body Battery, stress, steps…) is backfilled the same way, once, back to `HEALTH_HISTORY_DAYS`: 45 days per sync, working backwards from the oldest day already synced, saving its place after every day. Calories were added later, so the days synced before then get theirs the same way, once: 45 days per sync, newest first (`calories_backfill_from` in `meta`).
+**Desktop shortcuts.** Right-click a `.bat` → **Show more options** → **Send to** → **Desktop (create shortcut)**, then pick an icon from `assets/` under the shortcut's **Properties** → **Change Icon…**. Moving the `.bat` or icon breaks the shortcut.
 
-### Login
+## What it shows
 
-With `DASHBOARD_PASSWORD` set in `.env`, the dashboard opens with a login page (and with `DASHBOARD_USERNAME` set too, it asks for that as well). Logging in keeps the device logged in for a year, with a cookie; **Log out** in the menu ends it. Wrong tries are answered after a second, to slow down guessing. The password travels unencrypted on your wifi (plain HTTP), so don't reuse an important one.
+A menu on the left (a sideways-scrolling row on phones) picks the page. The address keeps it (`#overview`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
 
-To sync without the server:
+The page is dark from 20:00 to 07:00 and otherwise follows the system setting. The **Auto / Light / Dark** switch at the bottom of the menu overrides that, per device.
 
-```bash
-python backend/sync.py
-```
+In bar charts, a period that isn't over yet (this week, this month, today) is drawn paler and marked "so far", so it doesn't read as a drop.
 
-### Desktop app
+### Overview
 
-`Dashboard app.bat` opens the dashboard in its own window instead of a browser tab, with no console. It's a client: it connects to `DASHBOARD_URL` from `.env`, or this machine when that's empty. If it's this machine and no server is running, the app starts one itself (with the background sync) and stops it when the window closes; meanwhile phones on the wifi can connect as usual. With the server running elsewhere (set `DASHBOARD_URL`), the app is only a window onto it, and if nothing answers it says so, with a **Try again** button. `Dashboard app.bat --demo` starts the local server on demo data.
+- **Story**: a few sentences on what the sections below don't show: recent personal bests, the year so far in your three biggest sports, and weekly training hours over the last four weeks against the four before.
+- **Race goal** (set with **+ Race goal**): name, date, distance and target time, stored on the server so every device shows it. Shows days to go, target pace, Garmin's race prediction for that distance (scaled from the nearest predicted distance if needed) and the gap, with a 6-month chart of the prediction against the target. For a week after race day it shows the result (the run's elapsed time) against the target, then goes away.
+- **Last night and today**: readiness, HRV, sleep and resting HR (with 7-day average), and a ring of today's calories burnt (active in red, resting in blue). A value that isn't from today is replaced by the newest from the last week, labelled with its day ("from Wed 7 Oct").
+- **Training status**: Garmin's status, acute load against the optimal range, and a four-week strip of daily statuses.
+- **Load focus**: Garmin's four-week load in low aerobic, high aerobic and anaerobic against each optimal range, with what to train next.
+- **Last activity**: name, time, place, training effect and its sport's key stats. With GPS, the route is drawn as a glowing line that replays once on load (skipped with reduced motion). Colors and basemaps per sport are in `ROUTE_STYLES` in `frontend/js/map.js`: orange on Esri grey by default, ice blue with hillshade for winter sports, aqua and magenta on dimmed satellite for open-water swims and disc golf.
+- **Fitness and form**: fitness (CTL, 42-day weighted load) and fatigue (ATL, 7-day) on one chart; form is the gap as a % of fitness, named by band (Overloaded, Building, Balanced, Fresh, Rested), shaded blue where fitness leads and red where fatigue does. Last 120 days or the whole year.
+- **Weekly running** (or your main sport): kilometres per week for 12 weeks, split by training effect, with the low aerobic share of the last 4 weeks. Other main sports show kilometres or hours. Click a week to see its activities.
+- **VO2 max**: Garmin's estimate per week, against three and twelve months ago.
+- **Training calendar**: 53 weeks, a square per day shaded by training load in four quartile steps; rest days grey. Hover for details, click to open the day's biggest activity. Above it: training days, days per week and longest streak.
+- **Latest activities**: the 15 newest, with the **This week / This year** panel for your main sport.
 
-The window keeps its login and remembered switches between runs (in `data/webview`). Logs from a server it started go to `data/desktop.log`. It uses Edge WebView2 through pywebview, which comes with Windows 11. To give it a desktop shortcut, make one for `Dashboard app.bat` as described below and pick `assets/dashboard.ico`.
+### Health
 
-### Windows shortcut
+- **Today**: HRV, sleep, resting HR, Body Battery peak and low, average stress, steps and calories burnt so far. (Readiness is a training number, so it's on the overview.)
+- **Charts** for the last 90 days or year, one measure each: HRV against Garmin's normal range, resting HR, sleep, Body Battery (daily low to high), stress, steps and calories burnt (active and resting split in the tooltip). Steps and calories show a 7-day average line and the best day. HRV, resting HR, sleep, steps and calories each get a sentence comparing the last 7 days with the 30 before.
 
-`Start dashboard.bat` in the project folder starts the dashboard with a double-click and opens it in the browser. It uses the Python in `.venv`. The desktop shortcut points at this file and takes its icon from `assets/dashboard.ico`, so keep both where they are or update the shortcut.
+### Activities
 
-`Open dashboard.bat` only opens the dashboard in the browser, without starting a server: for a computer that isn't the one running it. It opens `DASHBOARD_URL` from `.env` (the address the server prints on start as "From other devices on wifi"), or `http://localhost:8000` when that's empty. To give it a desktop shortcut: right-click the file → **Show more options** → **Send to** → **Desktop (create shortcut)**, then pick an icon from `assets/` under the shortcut's **Properties** → **Change Icon…**.
+- **Every activity**, 25 at a time with **Show more**. Sport filter buttons appear only for sports you have, sorted by count. Columns depend on the sport (`SPORT_COLUMNS` in `frontend/js/sports.js`; sport groups are `SPORTS` in `backend/metrics.py`), and columns empty for every row are hidden. The **Effect** column shows Garmin's training effect label with a dot in its load focus color; runs without one get a focus from average HR, marked "(HR)". Click a header to sort, and search by name, place or type. On phones the table drops effect, HR, load, climbing and weekday; the popup has them all.
+- **This week / This year**: a side panel following the sport filter. This week: total so far, a bar per day and the 4-week average. This year: distance, time, climbing and count. Single sports with distance also show the longest one; sports without distance count time.
+
+### A page per sport
+
+Every sport done at least 3 times gets a page, most-used first, with its own color (`--sp-*` in `frontend/styles.css`). Other and disc golf (Garmin keeps no scores) get no page.
+
+- **Totals**: this week, the last 4 weeks (against the 4 before), this year and last year, in distance or time. A sport not done for four weeks shows its latest outing instead of zeros.
+- **Per week**: the last 26 weeks (or the 26 up to the latest), running split by training effect. Click a week to see its activities.
+- **This year against last year**: the cumulative total through the year, last year dashed.
+- **Per month**: this year's bars next to last year's.
+- **Personal bests**: for running, the fastest 400 m, 1 km, mile, 5 km, 10 km, half and marathon within any run; for every sport, the longest distance and time; top speed for cycling and winter sports; most descent for winter sports. Each opens its activity.
+- **All of the sport's activities**, with the same columns as the activities page.
+
+### Activity popup
+
+Clicking an activity or personal best shows every stat Garmin has for it, grouped by topic (effort, training effect, heart rate zones, pace or speed, running dynamics, power, swimming, elevation, breathing…), with the route and laps. Empty groups are left out. Winter sports list their laps as runs, with max speed and descent each.
+
+## How the numbers are worked out
+
+- **Training load** is Garmin's when available. Otherwise it's Banister TRIMP from `MAX_HR` and your median resting HR, scaled to Garmin's by the median ratio over activities that have both (once there are 10).
+- **Running bests** come from each run's second-by-second data, using elapsed time like Garmin's splits (so stops count). They match Garmin's fastest splits to a tenth of a second and add 400 m. Until a run has been processed, Garmin's own splits are used.
+- **Form bands** and the 0.8–1.3 load ratio are rules of thumb, not medical advice. HRV range, readiness and race predictions are Garmin's own numbers, shown as they come.
+
+## Syncing
+
+The server syncs every `SYNC_INTERVAL_MINUTES`; **Sync now** triggers one immediately. To sync without the server, run `backend/sync.py`.
+
+Each sync runs in order of importance: new activities, race predictions and VO2 max, daily numbers since the last sync, then routes, best efforts and one-off backfills. If Garmin rate-limits a step, the rest waits for the next sync, which resumes where it stopped.
+
+- **First sync**: `ACTIVITY_BACKFILL_DAYS` of activities and `DAILY_BACKFILL_DAYS` of daily data. Takes a few minutes, as daily requests are spaced out for Garmin's rate limits.
+- **Later syncs**: the last few days, plus once a day the last 30 days of activities, so edits and deletions on Garmin carry over.
+- **One-off backfills**, each saving its place so they survive rate limits:
+  - full activity history, 100 per request;
+  - daily health data back to `HEALTH_HISTORY_DAYS`, 45 days per sync;
+  - calories for days synced before they were added, 45 days per sync;
+  - race predictions a year back, and VO2 max back to `VO2MAX_BACKFILL_DAYS`, one request each.
+- **Routes** for the 5 newest activities are fetched during the sync; any other activity's route and laps are fetched when first opened.
+- **Running bests** are processed 40 runs per sync, newest first.
+
+## Login
+
+With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also asking for `DASHBOARD_USERNAME` if set). A device stays logged in for a year; **Log out** in the menu ends it. Wrong tries are answered after a second to slow guessing. The password travels unencrypted over plain HTTP on your wifi, so don't reuse an important one. Changing either setting logs everyone out.
 
 ## Configuration (`.env`)
 
 | Setting | Default | What it does |
 |---|---|---|
-| `AEROBIC_THRESHOLD` | 158 | Avg HR (bpm) splitting low from high aerobic runs, only for runs without a Garmin training effect |
+| `AEROBIC_THRESHOLD` | 158 | Avg HR (bpm) splitting low from high aerobic, for runs without a Garmin training effect |
 | `MAX_HR` | 195 | Only used for TRIMP when Garmin has no load |
-| `ACTIVITY_BACKFILL_DAYS` | 180 | How far back the first activity sync goes (the full history is fetched afterwards regardless) |
+| `ACTIVITY_BACKFILL_DAYS` | 180 | How far back the first activity sync goes (the full history follows regardless) |
 | `DAILY_BACKFILL_DAYS` | 60 | How far back the first daily sync goes |
-| `HEALTH_HISTORY_DAYS` | 365 | How far back daily health data is backfilled, 45 days per sync |
-| `VO2MAX_BACKFILL_DAYS` | 1095 | How far back VO2 max history is fetched, once, for its chart |
+| `HEALTH_HISTORY_DAYS` | 365 | How far back daily health data is backfilled |
+| `VO2MAX_BACKFILL_DAYS` | 1095 | How far back VO2 max history is fetched, once |
 | `SYNC_INTERVAL_MINUTES` | 60 | Background sync interval (minimum 5) |
 | `HOST` | 0.0.0.0 | `0.0.0.0` = reachable on LAN, `127.0.0.1` = this machine only |
 | `PORT` | 8000 | Server port |
-| `DASHBOARD_URL` | empty | Where the desktop app and `Open dashboard.bat` open the dashboard, when the server runs on another device (e.g. `http://192.168.1.20:8000`); empty means this machine |
-| `DASHBOARD_PASSWORD` | empty | If set, the dashboard opens with a login page asking for it. Recommended with `HOST=0.0.0.0` |
-| `DASHBOARD_USERNAME` | empty | If set, the login page asks for this username too; empty means password only |
+| `DASHBOARD_URL` | empty | Where the desktop app and `Open dashboard.bat` connect when the server is on another device (e.g. `http://192.168.1.20:8000`) |
+| `DASHBOARD_PASSWORD` | empty | Turns on the login page. Recommended with `HOST=0.0.0.0` |
+| `DASHBOARD_USERNAME` | empty | Also asks for a username; empty means password only |
 | `TOKEN_DIR` | ~/.garminconnect | Where the Garmin login token is stored |
 | `DB_PATH` | data/athlete.db | SQLite database, relative to the project folder |
+
+## Project layout
+
+```
+.
+├── Start dashboard.bat   # Starts the server and opens the browser
+├── Dashboard app.bat     # The desktop app
+├── Open dashboard.bat    # Opens the browser only, for a server elsewhere
+├── requirements.txt
+├── .env.example          # Copy to .env and adjust
+├── backend/
+│   ├── app.py            # FastAPI server, background sync loop, login
+│   ├── sync.py           # Garmin Connect → SQLite (can also run on its own)
+│   ├── metrics.py        # Raw tables → dashboard numbers; Garmin activity types → sports
+│   ├── db.py             # SQLite schema and upserts
+│   ├── config.py         # Reads .env
+│   ├── login.py          # One-time Garmin login
+│   └── demo.py           # Fake data for --demo
+├── desktop/
+│   └── main.py           # Desktop app window (pywebview)
+├── frontend/             # Served at /static; no build step
+│   ├── index.html
+│   ├── login.html        # When DASHBOARD_PASSWORD is set
+│   ├── styles.css
+│   ├── js/               # ES modules, loaded from main.js
+│   │   ├── main.js       # Loads and refreshes data, routes between pages
+│   │   ├── theme.js      # Light or dark (plain script, runs before the page draws)
+│   │   ├── state.js      # Shared dashboard data
+│   │   ├── util.js       # Formatting helpers
+│   │   ├── charts.js     # Chart.js setup
+│   │   ├── map.js        # Route maps and replay
+│   │   ├── sports.js     # Sport groups, table columns, weekly volume, This week / This year
+│   │   ├── overview.js
+│   │   ├── race.js       # Race goal (overview)
+│   │   ├── calendar.js   # Training calendar (overview)
+│   │   ├── health.js
+│   │   ├── activities.js
+│   │   ├── sport.js      # Per-sport pages
+│   │   └── modal.js      # Activity popup and a week's activities
+│   └── vendor/           # Bundled for offline use
+│       ├── chart.umd.js  # Chart.js
+│       ├── fonts/        # Barlow and Barlow Condensed (SIL OFL)
+│       └── leaflet/      # Leaflet
+├── tests/
+├── assets/               # Shortcut icons: dashboard.ico and six icon-*.ico options
+└── data/                 # athlete.db, demo.db, desktop app data; not in git
+```
+
+Database tables of note: `daily` (health numbers and race predictions), `tracks` and `laps` (routes), `efforts` (running bests), `meta` (race goal and backfill progress).
 
 ## Tests
 
@@ -185,17 +183,13 @@ The window keeps its login and remembered switches between runs (in `data/webvie
 .venv\Scripts\python -m unittest discover tests
 ```
 
-`tests/test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, sports, VO2 max); `tests/test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and what's kept when Garmin rate-limits).
+`test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, sports, VO2 max). `test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and rate-limit handling).
 
 ## Troubleshooting
 
-- **"Not logged in to Garmin"**: run `python backend/login.py` on the machine that runs the server. Tokens expire eventually; just log in again.
-- **"Too many requests" / 429**: Garmin is rate-limiting. Wait a while and sync again; the sync resumes from the last successful date.
-- **Logged out on every device**: changing `DASHBOARD_PASSWORD` or `DASHBOARD_USERNAME` logs everyone out; log in again with the new details.
-- **Can't open it from a phone**: check that `HOST=0.0.0.0`, both devices are on the same network, and the Windows firewall allows Python.
-- **Desktop app says "Can't reach the dashboard"**: the server at `DASHBOARD_URL` isn't running, the address is wrong, or the firewall on the server blocks it. If a window it started on this machine misbehaves, look in `data/desktop.log`.
+- **"Not logged in to Garmin"**: run `backend/login.py` on the machine running the server. Tokens expire eventually.
+- **"Too many requests" / 429**: Garmin is rate-limiting. Wait and sync again; it resumes where it stopped.
+- **Logged out on every device**: `DASHBOARD_PASSWORD` or `DASHBOARD_USERNAME` changed; log in with the new details.
+- **Can't open it from a phone**: check `HOST=0.0.0.0`, that both devices are on the same network, and that the Windows firewall allows Python.
+- **Desktop app says "Can't reach the dashboard"**: the server at `DASHBOARD_URL` isn't running, the address is wrong, or a firewall blocks it. For a server the app started itself, see `data/desktop.log`.
 - **Start over**: stop the server and delete `data/athlete.db`. The next sync backfills again.
-
-## Notes
-
-The form states and the 0.8–1.3 load ratio are rules of thumb, not medical advice. HRV range and readiness are Garmin's own numbers, shown as they come.
