@@ -277,6 +277,22 @@ button:disabled { opacity: 0.55; cursor: progress; }
 
 /* Today: sleep and recovery */
 .hero { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
+/* The overview's hero: today's numbers, with today's calories as a ring at the end */
+.hero-cal { display: flex; align-items: center; gap: 1.25rem 2rem; flex-wrap: wrap; }
+.hero-cal .today { flex: 1 1 32rem; }
+.cal-ring { display: flex; align-items: center; gap: 1rem; padding-left: 2rem; border-left: 1px solid var(--rule); }
+.cal-ring svg { width: 112px; height: 112px; flex: none; }
+.cal-ring circle { fill: none; stroke-width: 11; }
+.cal-ring .cal-rest { stroke: var(--low-aerobic); }
+.cal-ring .cal-active { stroke: var(--fatigue); stroke-linecap: butt; }
+.cal-ring text { text-anchor: middle; fill: var(--ink); }
+.cal-ring .cal-total { font: 600 26px var(--display); }
+.cal-ring .cal-unit { font: 500 12px var(--body); fill: var(--muted); }
+.cal-key p { margin: 0.2rem 0; font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
+.cal-key p.eyebrow { margin-bottom: 0.4rem; }
+.cal-key b { color: var(--ink); font-weight: 600; margin-right: 0.25rem; }
+.cal-key i { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.45rem; background: var(--low-aerobic); vertical-align: -1px; }
+.cal-key i.active { background: var(--fatigue); }
 
 /* Form, inside the fitness and fatigue section */
 .form-now { margin: 0 0 0.5rem; }
@@ -472,6 +488,7 @@ button.more { margin-top: 1rem; }
   .grid { grid-template-columns: minmax(0, 1fr); }
   .today, .tiles { grid-template-columns: repeat(2, 1fr); }
   .today div:nth-child(odd), .tiles div:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .cal-ring { border-left: 0; padding-left: 0; }
 }
 
 /* Phones: the activity tables drop training effect, heart rate, load and climbing, so they fit without scrolling

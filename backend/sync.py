@@ -240,6 +240,11 @@ def fetch_predictions(client, start, end):
             for r in rows if isinstance(r, dict) and r.get("calendarDate")]
 
 
+def _calories(stats):
+    return {"cal_total": stats.get("totalKilocalories"), "cal_active": stats.get("activeKilocalories"),
+            "cal_resting": stats.get("bmrKilocalories")}
+
+
 def fetch_day(client, day):
     d = day.isoformat()
     stats = _try(client.get_stats, d) or {}
@@ -262,6 +267,7 @@ def fetch_day(client, day):
         "bb_low": stats.get("bodyBatteryLowestValue"),
         "stress_avg": stats.get("averageStressLevel"),
         "steps": stats.get("totalSteps"),
+        **_calories(stats),
         "hrv_last_night": hs.get("lastNightAvg"),
         "hrv_weekly_avg": hs.get("weeklyAvg"),
         "hrv_low": _get(hs, "baseline", "balancedLow"),
@@ -395,6 +401,22 @@ def run_sync(db_path=None):
             db.set_meta(conn, "health_backfill_from", day.isoformat())
             conn.commit()
             time.sleep(0.4)
+
+        # Calories for the days synced before they were stored: once, backwards from the newest day without them,
+        # a chunk per sync (one request a day), saving its place after every day
+        start = db.get_meta(conn, "calories_backfill_from")
+        day = date.fromisoformat(start) if start else day_start
+        done = 0
+        while day > target and done < HEALTH_DAYS_PER_SYNC:
+            day -= timedelta(days=1)
+            row = conn.execute("SELECT cal_total FROM daily WHERE date = ?", (day.isoformat(),)).fetchone()
+            if row and row["cal_total"] is None:
+                stats = _try(client.get_stats, day.isoformat()) or {}
+                db.upsert_daily(conn, {"date": day.isoformat(), **_calories(stats)})
+                done += 1
+                time.sleep(0.4)
+            db.set_meta(conn, "calories_backfill_from", day.isoformat())
+            conn.commit()
 
         db.set_meta(conn, "last_sync_at", datetime.now().isoformat(timespec="seconds"))
         db.set_meta(conn, "last_error", "")

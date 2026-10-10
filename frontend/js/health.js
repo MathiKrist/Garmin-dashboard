@@ -24,10 +24,13 @@ export function todayItems() {
     ["Body Battery peak", t.bb_high != null ? round(t.bb_high) : null, t.bb_low != null ? `Lowest ${round(t.bb_low)}` : "", day("bb_high")],
     ["Average stress", t.stress_avg != null ? round(t.stress_avg) : null, t.stress_avg != null ? stressLevel(t.stress_avg) : "", day("stress_avg")],
     ["Steps today", t.steps != null ? Math.round(t.steps).toLocaleString("en-GB") : null, "", day("steps")],
+    ["Calories today", t.cal_total != null ? `${kcal(t.cal_total)}<span>kcal</span>` : null, t.cal_active != null ? `${kcal(t.cal_active)} active` : "", day("cal_total")],
   ].filter((i) => i[1] != null).map(([label, val, note, from]) => [label, val, [note, from].filter(Boolean).join(" · ")]);
 }
 
 // Average of a daily field over the days from `from` to `to` days ago (to excluded), skipping days without it
+const kcal = (v) => Math.round(v).toLocaleString("en-GB");
+
 export function trendAvg(field, from, to) {
   const lo = addDays(data.generated, -from), hi = addDays(data.generated, -to);
   const vals = data.trends.filter((d) => d.date > lo && d.date <= hi && d[field] != null).map((d) => d[field]);
@@ -56,6 +59,9 @@ export function healthReadings() {
   const st7 = trendAvg("steps", 8, 1), st30 = trendAvg("steps", 38, 8);
   $("stepsReading").textContent = st7 == null ? "" : `${Math.round(st7).toLocaleString("en-GB")} steps a day over the last 7 days` +
     (st30 != null ? `, against ${Math.round(st30).toLocaleString("en-GB")} the 30 days before.` : ".");
+  const cal7 = trendAvg("cal_total", 8, 1), act7 = trendAvg("cal_active", 8, 1), cal30 = trendAvg("cal_total", 38, 8);
+  $("caloriesReading").textContent = cal7 == null ? "" : `${kcal(cal7)} kcal a day over the last 7 days` +
+    (act7 != null ? ` (${kcal(act7)} active)` : "") + (cal30 != null ? `, against ${kcal(cal30)} the 30 days before.` : ".");
 
 }
 
@@ -129,22 +135,44 @@ export function renderHealth() {
     data: { labels, datasets: [bars("Stress", tr.map((d) => d.stress_avg), css("--hard"))] },
     options: opts({ min: 0, max: 100 }, (c) => ` Average stress: ${c.parsed.y} (${stressLevel(c.parsed.y).toLowerCase()})`),
   });
-  // The 7-day average of the days with steps, counted over the whole history so the first days of the view have one
-  const all = data.trends, avg7 = all.map((d, i) => {
-    const week = all.slice(Math.max(0, i - 6), i + 1).filter((x) => x.steps != null);
-    return d.steps != null && week.length ? Math.round(week.reduce((t, x) => t + x.steps, 0) / week.length) : null;
+  // The 7-day average of the days with a value, counted over the whole history so the first days of the view have one
+  const all = data.trends, avg7 = (f) => all.map((d, i) => {
+    const week = all.slice(Math.max(0, i - 6), i + 1).filter((x) => x[f] != null);
+    return d[f] != null && week.length ? Math.round(week.reduce((t, x) => t + x[f], 0) / week.length) : null;
   }).slice(all.length - tr.length);
+  const isToday = (i) => tr[i].date === data.generated;
   const steps = (v) => `${Math.round(v).toLocaleString("en-GB")} steps`;
   chart("stepsSection", "stepsChart", has("steps") && {
     data: { labels, datasets: [
       // Today's steps are still counting: paler, like the other unfinished periods
       bars("Steps", tr.map((d) => d.steps), tr.map((d) => alpha(fit, d.date === data.generated ? 0.55 * PARTIAL_ALPHA : 0.55))),
-      { type: "line", label: "7-day average", data: avg7, borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true },
+      { type: "line", label: "7-day average", data: avg7("steps"), borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true },
     ] },
     options: opts({ min: 0 }, (c) => c.dataset.label === "Steps"
-      ? ` ${steps(c.parsed.y)}${tr[c.dataIndex].date === data.generated ? " so far" : ""}` : ` 7-day average: ${steps(c.parsed.y)}`),
+      ? ` ${steps(c.parsed.y)}${isToday(c.dataIndex) ? " so far" : ""}` : ` 7-day average: ${steps(c.parsed.y)}`),
   });
   // Best day in the period shown
   const best = tr.filter((d) => d.steps != null).reduce((b, d) => (!b || d.steps > b.steps ? d : b), null);
   if (best) $("stepsReading").textContent += ` Best day: ${steps(best.steps)} on ${fmtShort(best.date)}.`;
+
+  // Calories: the day's total, today's paler as it's still counting; the split into active and resting in the tooltip
+  const red = css("--fatigue");
+  chart("caloriesSection", "caloriesChart", has("cal_total") && {
+    data: { labels, datasets: [
+      bars("Calories", tr.map((d) => d.cal_total), tr.map((d) => alpha(red, d.date === data.generated ? 0.6 * PARTIAL_ALPHA : 0.6))),
+      { type: "line", label: "7-day average", data: avg7("cal_total"), borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true },
+    ] },
+    options: (() => {
+      const o = opts({ min: 0 }, (c) => c.dataset.label === "Calories"
+        ? ` ${kcal(c.parsed.y)} kcal${isToday(c.dataIndex) ? " so far" : ""}` : ` 7-day average: ${kcal(c.parsed.y)} kcal`);
+      o.plugins.tooltip.callbacks.afterLabel = (c) => {
+        const d = tr[c.dataIndex];
+        return c.dataset.label === "Calories" && d.cal_active != null
+          ? ` ${kcal(d.cal_active)} active · ${kcal(d.cal_total - d.cal_active)} resting` : "";
+      };
+      return o;
+    })(),
+  });
+  const bestCal = tr.filter((d) => d.cal_total != null && d.date !== data.generated).reduce((b, d) => (!b || d.cal_total > b.cal_total ? d : b), null);
+  if (bestCal) $("caloriesReading").textContent += ` Best day: ${kcal(bestCal.cal_total)} kcal on ${fmtShort(bestCal.date)}.`;
 }

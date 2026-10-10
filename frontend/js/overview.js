@@ -172,6 +172,30 @@ export function renderHero() {
   $("fitnessReading").textContent = fitnessReading(f);
 
   $("today").innerHTML = statItems(todayItems().slice(0, 4));
+  renderCalRing();
+}
+
+// Today's calories so far as a ring: active against resting, the total in the middle
+function renderCalRing() {
+  const t = data.today, ring = $("calRing");
+  ring.hidden = t.cal_total == null;
+  if (ring.hidden) return;
+  const fmt = (v) => Math.round(v).toLocaleString("en-GB");
+  const active = t.cal_active || 0, resting = t.cal_resting ?? t.cal_total - active;
+  const r = 52, c = 2 * Math.PI * r, share = Math.min(1, active / t.cal_total);
+  const from = t.dates.cal_total === data.generated ? "Burnt today" : `Burnt ${fmtDay(t.dates.cal_total)}`;
+  ring.innerHTML = `
+    <svg viewBox="0 0 120 120" role="img" aria-label="${fmt(t.cal_total)} kcal: ${fmt(active)} active, ${fmt(resting)} resting">
+      <circle cx="60" cy="60" r="${r}" class="cal-rest"/>
+      <circle cx="60" cy="60" r="${r}" class="cal-active" stroke-dasharray="${(share * c).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 60 60)"/>
+      <text x="60" y="60" class="cal-total">${fmt(t.cal_total)}</text>
+      <text x="60" y="78" class="cal-unit">kcal</text>
+    </svg>
+    <div class="cal-key">
+      <p class="eyebrow">${from}</p>
+      <p><i class="active"></i><b>${fmt(active)}</b> active</p>
+      <p><i></i><b>${fmt(resting)}</b> resting</p>
+    </div>`;
 }
 
 // The newest activity at the top: name, when, the sport's stats, and its route on a map when it has GPS

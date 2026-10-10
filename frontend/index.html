@@ -61,8 +61,9 @@
         </div>
       </section>
 
-      <section class="hero" aria-label="Last night and today">
+      <section class="hero hero-cal" aria-label="Last night and today">
         <dl class="today" id="today"></dl>
+        <div class="cal-ring" id="calRing" hidden></div>
       </section>
 
       <div class="overview">
@@ -191,6 +192,12 @@
           <p class="reading" id="stepsReading"></p>
           <div class="chart"><canvas id="stepsChart" aria-label="Steps per day" role="img"></canvas></div>
           <div class="legend"><span><i style="background:var(--fitness)"></i>Steps</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
+        </section>
+        <section class="wide" id="caloriesSection">
+          <h2>Calories burnt</h2>
+          <p class="reading" id="caloriesReading"></p>
+          <div class="chart"><canvas id="caloriesChart" aria-label="Calories burnt per day" role="img"></canvas></div>
+          <div class="legend"><span><i style="background:var(--fatigue)"></i>Calories burnt</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
         </section>
       </div>
     </div>

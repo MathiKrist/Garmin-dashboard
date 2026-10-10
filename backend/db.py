@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS daily (
     bb_low         REAL,
     stress_avg     REAL,
     steps          REAL,
+    cal_total      REAL,  -- calories burnt in the day: total, active and resting (BMR)
+    cal_active     REAL,
+    cal_resting    REAL,
     readiness      REAL,
     training_status       TEXT,
     training_status_since TEXT,
@@ -82,7 +85,7 @@ ACTIVITY_COLS = [
 DAILY_COLS = [
     "date", "resting_hr", "hrv_last_night", "hrv_weekly_avg", "hrv_low",
     "hrv_high", "hrv_status", "sleep_s", "sleep_score", "bb_high", "bb_low",
-    "stress_avg", "steps", "readiness", "training_status", "training_status_since",
+    "stress_avg", "steps", "cal_total", "cal_active", "cal_resting", "readiness", "training_status", "training_status_since",
     "acute_load", "acute_load_min", "acute_load_max", "acwr_status", "vo2max",
     "load_low", "load_low_min", "load_low_max", "load_high", "load_high_min", "load_high_max", "load_anaerobic", "load_anaerobic_min", "load_anaerobic_max", "load_focus",
     "pred_5k", "pred_10k", "pred_half", "pred_marathon",
@@ -97,6 +100,11 @@ def connect(db_path):
     conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    # Columns added since the table was first made
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(daily)")}
+    for col in DAILY_COLS:
+        if col not in have:
+            conn.execute(f"ALTER TABLE daily ADD COLUMN {col} REAL")
     return conn
 
 
