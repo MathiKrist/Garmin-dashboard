@@ -355,7 +355,8 @@ def build_dashboard(db_path=None):
     # Health trends for the health page (the last year; the page shows 90 days or all of it)
     cutoff = (today - timedelta(days=364)).isoformat()
     trends = [{k: d.get(k) for k in ("date", "hrv_last_night", "hrv_low", "hrv_high", "resting_hr", "sleep_s",
-                                       "sleep_score", "bb_high", "bb_low", "stress_avg", "steps")}
+                                       "sleep_score", "bb_high", "bb_low", "stress_avg", "steps",
+                                       "cal_total", "cal_active", "cal_resting")}
               for d in days if d["date"] >= cutoff]
 
     # Today: newest value of each field from the last week, with the day it's from (the page marks older ones)
@@ -367,7 +368,7 @@ def build_dashboard(db_path=None):
 
     today_vals, today_dates = {}, {}
     for f in ("readiness", "hrv_last_night", "hrv_low", "hrv_high", "sleep_s", "sleep_score", "resting_hr",
-              "bb_high", "bb_low", "stress_avg", "steps"):
+              "bb_high", "bb_low", "stress_avg", "steps", "cal_total", "cal_active", "cal_resting"):
         today_vals[f], today_dates[f] = latest(f)
     today_vals["dates"] = today_dates
     week_rhr = [d["resting_hr"] for d in days if d.get("resting_hr") and d["date"] > (today - timedelta(days=7)).isoformat()]

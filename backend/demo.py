@@ -98,6 +98,7 @@ def seed(db_path, days=420):
         new_status = "RECOVERY" if recovery_week else "PRODUCTIVE" if build > 0.95 else "MAINTAINING"
         if new_status != status:
             status, since = new_status, d.isoformat()
+        active = round(450 + load * 5 + rng.gauss(0, 80))
         hrv = 64 - fatigue * 0.12 + rng.gauss(0, 5)
         vo2 = 50 + (1 - i / days) * 2
         pred_5k = 1250 - (vo2 - 50) * 35 + rng.gauss(0, 4)
@@ -108,6 +109,8 @@ def seed(db_path, days=420):
             "sleep_s": rng.uniform(6.2, 8.6) * 3600, "sleep_score": rng.randint(62, 92),
             "bb_high": rng.randint(70, 98), "bb_low": rng.randint(10, 35), "stress_avg": rng.randint(20, 40),
             "steps": rng.randint(5000, 15000),
+            # Calories: resting (BMR) plus active, which follows the day's training
+            "cal_resting": 1750, "cal_active": active, "cal_total": 1750 + active,
             "readiness": max(5, min(100, round(85 - fatigue * 0.5 + rng.gauss(0, 8)))),
             "training_status": status, "training_status_since": since,
             "acute_load": round(sum(loads[-7:])), "acute_load_min": 300, "acute_load_max": 560,

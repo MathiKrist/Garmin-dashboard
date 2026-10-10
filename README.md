@@ -16,7 +16,7 @@ The athlete's story and overall progression.
 
 - **Story**: a few sentences at the top on what the sections below don't show: personal bests (any set in the last four weeks, otherwise the latest one), the year so far in your three biggest sports, and weekly training hours over the last four weeks against the four before.
 - **Race goal**: set with **+ Race goal** under the story: race name, date, distance (5 km, 10 km, half, marathon or any other in km) and target time. Saved on the server (in the `meta` table), so every device shows the same goal. Shows the date, distance and days to go, the target with its pace, Garmin's race predictor for that distance (other distances are scaled from the nearest predicted one) and the gap between them, with a chart of the prediction over the last 6 months against the target line. After race day the run on that date shows as the result against the target (its elapsed time, as a race is timed), for a week; then the goal goes away. Garmin's predictions are synced daily (a year back, once) into the `daily` table.
-- **Last night and today**: readiness, HRV, sleep and resting HR (with its 7-day average). If a value isn't from today (the watch or the sync is behind), the newest one from the last week is shown with its day ("from Wed 7 Oct"); the same goes for training status and load focus.
+- **Last night and today**: readiness, HRV, sleep and resting HR (with its 7-day average). If a value isn't from today (the watch or the sync is behind), the newest one from the last week is shown with its day ("from Wed 7 Oct"); the same goes for training status and load focus. Next to them, a ring shows today's calories burnt so far: the total in the middle, the active part in red against the resting (BMR) part in blue.
 - **Training status**: Garmin's own status (Productive, Maintaining, Recovery, Unproductive…), acute load against Garmin's optimal range, and a four-week strip of daily statuses.
 - **Load focus**: Garmin's last-four-weeks load in low aerobic, high aerobic and anaerobic against the optimal range for each, with what to train next. Training status and load focus sit in the left column under the top row.
 - **Last activity**: in the right column next to them: your newest activity's name, when and where, Garmin's training effect, and the same stats as its sport's table columns, minus ascent and load. If it was recorded with GPS, its route is drawn as a glowing line, replayed once from start to finish when the page loads (skipped with reduced motion), on Esri's grey basemap (light or dark to match the page; the map tiles need internet). Most sports get an orange line; a few get their own color and map (`ROUTE_STYLES` in `frontend/js/map.js`): winter sports are ice blue on the grey map with Esri's terrain hillshade blended in, open-water swims are aqua and disc golf is magenta, both on dimmed Esri satellite imagery. The activity popup's map uses the same styles. Routes are fetched from Garmin during the sync for the 5 newest activities and stored in the `tracks` table.
@@ -28,8 +28,8 @@ The athlete's story and overall progression.
 
 ### Health
 
-- **Today**: HRV, sleep, resting HR, Body Battery peak and low, average stress (with Garmin's level) and steps so far. Training readiness is a training number, so it's on the overview only.
-- **Charts for the last 90 days or the last year** (a switch at the top, remembered per device), one measure each: HRV against Garmin's normal range, resting heart rate, sleep (score in the tooltip), Body Battery (a bar from each day's low to its high), average stress and steps (with a 7-day average line and the best day in the period). HRV, resting HR, sleep and steps each get a sentence comparing the last 7 days with the 30 before.
+- **Today**: HRV, sleep, resting HR, Body Battery peak and low, average stress (with Garmin's level), steps so far and calories burnt so far (with the active part). Training readiness is a training number, so it's on the overview only.
+- **Charts for the last 90 days or the last year** (a switch at the top, remembered per device), one measure each: HRV against Garmin's normal range, resting heart rate, sleep (score in the tooltip), Body Battery (a bar from each day's low to its high), average stress, steps (with a 7-day average line and the best day in the period) and calories burnt (Garmin's daily total, active and resting together, with a 7-day average line and the best day; the tooltip splits the day into active and resting). HRV, resting HR, sleep, steps and calories each get a sentence comparing the last 7 days with the 30 before.
 
 ### Activities
 
@@ -53,7 +53,7 @@ Every sport you've done at least 3 times gets a page in the menu, most-used firs
 
 - Clicking any activity row or personal best opens every stat Garmin has for it, grouped by topic (time and effort, training effect, heart rate and zones, pace or speed, running dynamics, power, swimming, elevation, breathing and more); groups the activity has no data for are left out. Cycling and winter sports show speed in km/h, the others pace. Winter sports also show the number of runs and max vertical speed, and their laps are listed as runs. The route and laps (with max speed and descent per lap) are fetched from Garmin the first time an activity is opened and stored in the `tracks` and `laps` tables.
 
-In the bar charts, a week, month or day that isn't over yet (this week, this month, today's steps) is drawn paler and marked "so far" in the tooltip, so it doesn't read as a drop.
+In the bar charts, a week, month or day that isn't over yet (this week, this month, today's steps and calories) is drawn paler and marked "so far" in the tooltip, so it doesn't read as a drop.
 
 Training load comes from Garmin when available; otherwise it falls back to Banister TRIMP using `MAX_HR` and your median resting HR, converted to Garmin's scale by the median ratio between the two over your activities that have both (once there are 10 of them).
 
@@ -136,7 +136,7 @@ The server syncs in the background every `SYNC_INTERVAL_MINUTES`, and the **Sync
 
 Each sync runs in order of importance: new activities, race predictions and VO2 max (a request each), the daily numbers since the last sync, then routes, best efforts and the one-off backfills. If Garmin rate-limits a step, the rest waits for the next sync, which starts after the daily numbers already saved.
 
-Once, the sync also pages back through your whole Garmin activity history (100 activities per request). It saves its place after every page, so if Garmin rate-limits it, the next sync carries on where it stopped. Daily health data (HRV, sleep, Body Battery, stress, steps…) is backfilled the same way, once, back to `HEALTH_HISTORY_DAYS`: 45 days per sync, working backwards from the oldest day already synced, saving its place after every day.
+Once, the sync also pages back through your whole Garmin activity history (100 activities per request). It saves its place after every page, so if Garmin rate-limits it, the next sync carries on where it stopped. Daily health data (HRV, sleep, Body Battery, stress, steps…) is backfilled the same way, once, back to `HEALTH_HISTORY_DAYS`: 45 days per sync, working backwards from the oldest day already synced, saving its place after every day. Calories were added later, so the days synced before then get theirs the same way, once: 45 days per sync, newest first (`calories_backfill_from` in `meta`).
 
 ### Login
 
