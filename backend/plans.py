@@ -515,7 +515,9 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
         "phases": PHASES, "over": today > end,
     }
     coming = coming_week(plan, today)
-    plan["send"] = {"key": week_key(coming), "count": len(coming), "sent": bool(coming) and all(s["sent"] for s in coming)}
+    plan["send"] = {"key": week_key(coming), "count": len(coming), "sent": bool(coming) and all(s["sent"] for s in coming),
+                    # Days from today on with a plan workout on Garmin (one sent before its paces changed counts too)
+                    "on_watch": len({x["date"] for x in sent if x["date"] >= today.isoformat()})}
     return plan
 
 

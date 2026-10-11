@@ -258,7 +258,7 @@ def to_garmin(w, day):
     sport = GARMIN_SPORT[w["sport"]]
     steps, _ = _garmin_steps(w["steps"], 0)
     workout = {
-        "workoutName": f"{w['title']} {day.day}/{day.month}",
+        "workoutName": w["title"],
         "sportType": sport, "estimatedDurationInSecs": w["total_s"],
         "workoutSegments": [{"segmentOrder": 1, "sportType": sport, "workoutSteps": steps}],
     }

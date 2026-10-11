@@ -4,7 +4,7 @@
 import { data } from "./state.js";
 import { $, fmtDay, fmtShort, fmtDuration, fmtPace, fmtRange, escapeHtml, addDays } from "./util.js";
 import { raceDistance, isRaceDistance, parseTime } from "./race.js";
-import { total, barHtml, stepsHtml, mainPace, currentSport, todaysWorkout, showWorkout } from "./workout.js";
+import { total, barHtml, stepsHtml, mainPace, currentSport, todaysWorkout, showWorkout, watchButton, watchRequest } from "./workout.js";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -80,8 +80,7 @@ export function renderPlan() {
 
   const send = p.send, btn = $("planSend"), note = $("planSendNote");
   btn.hidden = !send.count;
-  btn.disabled = send.sent;
-  btn.textContent = send.sent ? "Next 7 days on the watch ✓" : "Send next 7 days";
+  watchButton(btn, send.sent, "Send next 7 days");
   note.className = "";
   note.textContent = !send.count ? "" : send.sent ? `${send.count} sessions in the Garmin calendar` : `${send.count} session${send.count > 1 ? "s" : ""}`;
 }
@@ -155,26 +154,15 @@ $("planChart").addEventListener("click", (e) => {
 
 addEventListener("sportchange", renderPlan);
 
-// Only this button sends the plan to Garmin
-$("planSend").addEventListener("click", async () => {
-  const btn = $("planSend"), note = $("planSendNote");
-  btn.disabled = true;
-  btn.textContent = "Sending…";
-  let error = "";
-  try {
-    const res = await fetch("/api/plan/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: data.plan.send.key }) });
-    if (!res.ok) error = (await res.json().catch(() => ({}))).error || "Sending failed.";
-  } catch {
-    error = "Couldn't reach the dashboard server.";
+// Only this button sends the plan to Garmin, or, once the next 7 days are on it, takes the plan's sessions from today
+// on off again (the watch drops them at its next sync)
+$("planSend").addEventListener("click", () => {
+  const btn = $("planSend"), note = $("planSendNote"), send = data.plan.send;
+  if (!send.sent) return watchRequest(btn, note, "POST", "/api/plan/send", { key: send.key });
+  const n = send.on_watch;
+  if (confirm(`Remove the plan's ${n === 1 ? "session" : `${n} sessions`} from today on from Garmin and the watch?`)) {
+    watchRequest(btn, note, "DELETE", "/api/plan/send");
   }
-  if (error) {
-    btn.disabled = false;
-    btn.textContent = "Send next 7 days";
-    note.className = "error";
-    note.textContent = error;
-    return;
-  }
-  dispatchEvent(new Event("reload"));
 });
 
 // ---- Setting the plan up

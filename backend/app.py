@@ -263,6 +263,77 @@ async def send_workout(sport: str, request: Request):
     return {"status": "sent"}
 
 
+def _delete_from_garmin(ids):
+    """Delete workouts from Garmin Connect, which takes them off its calendar too; the watch drops them at its next
+    sync. One already gone on Garmin is skipped. Returns how many went."""
+    client, gone = sync._client(), 0
+    for i in ids:
+        try:
+            client.delete_workout(i)
+            gone += 1
+        except Exception as e:  # deleted on Garmin already, most likely
+            log.info("Couldn't delete the workout %s: %s", i, e)
+    return gone
+
+
+def _forget_sent(conn, ids):
+    """Take workouts out of both sent lists, so the page shows them as not sent."""
+    for key in ("workouts_sent", "plan_sent"):
+        kept = [x for x in json.loads(db.get_meta(conn, key) or "[]") if x["id"] not in ids]
+        db.set_meta(conn, key, json.dumps(kept))
+
+
+@app.delete("/api/workout/{sport}")
+def remove_workout(sport: str):
+    """Take today's workout for the sport off Garmin and the watch. Only ever called by the page's Remove from watch
+    link."""
+    if DEMO:
+        return JSONResponse({"error": "Demo mode doesn't change anything on Garmin."}, status_code=400)
+    today = date.today().isoformat()
+    conn = db.connect(DB_PATH)
+    try:
+        ids = {x["id"] for x in json.loads(db.get_meta(conn, "workouts_sent") or "[]")
+               if x["date"] == today and x.get("sport") == sport}
+        ids |= {x["id"] for x in json.loads(db.get_meta(conn, "plan_sent") or "[]")
+                if x["date"] == today and sport == "run"}
+        if not ids:
+            return JSONResponse({"error": "Today's workout isn't on the watch."}, status_code=400)
+        try:
+            gone = _delete_from_garmin(ids)
+        except Exception as e:
+            log.error("Removing the workout failed: %s", e)
+            return JSONResponse({"error": f"Couldn't reach Garmin: {e}"}, status_code=502)
+        _forget_sent(conn, ids)
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "removed", "count": gone}
+
+
+@app.delete("/api/plan/send")
+def remove_plan_week():
+    """Take the plan's sessions from today on off Garmin and the watch. Only ever called by the page's Remove from
+    watch link; sessions already past stay."""
+    if DEMO:
+        return JSONResponse({"error": "Demo mode doesn't change anything on Garmin."}, status_code=400)
+    today = date.today().isoformat()
+    conn = db.connect(DB_PATH)
+    try:
+        ids = {x["id"] for x in json.loads(db.get_meta(conn, "plan_sent") or "[]") if x["date"] >= today}
+        if not ids:
+            return JSONResponse({"error": "None of the plan's sessions are on the watch."}, status_code=400)
+        try:
+            gone = _delete_from_garmin(ids)
+        except Exception as e:
+            log.error("Removing the plan's sessions failed: %s", e)
+            return JSONResponse({"error": f"Couldn't reach Garmin: {e}"}, status_code=502)
+        _forget_sent(conn, ids)
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "removed", "count": gone}
+
+
 def _plan_from(body, old, profile, pred_5k, today):
     """The plan setup from the form, checked. Editing a plan keeps its start and starting fitness, so its history and
     adaptation carry on."""

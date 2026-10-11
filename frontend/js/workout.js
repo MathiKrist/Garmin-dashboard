@@ -79,8 +79,7 @@ export function showWorkout(w, day = null) {
   $("wkSend").parentElement.hidden = !today || !w.steps.length;
 
   const btn = $("wkSend"), note = $("wkSendNote");
-  btn.disabled = w.sent;
-  btn.textContent = w.sent ? "Sent to watch ✓" : "Send to watch";
+  watchButton(btn, w.sent, "Send to watch");
   note.className = "";
   note.textContent = w.sent ? "In today's Garmin calendar" : "Adds it to today's Garmin calendar";
 }
@@ -94,24 +93,39 @@ $("workoutSport").addEventListener("click", (e) => {
   dispatchEvent(new Event("sportchange"));
 });
 
-// Only this button sends anything to Garmin
-$("wkSend").addEventListener("click", async () => {
-  const w = data.workouts.find((x) => x.sport === sport), btn = $("wkSend"), note = $("wkSendNote");
+// A send button: "Send …" until sent, then "On the watch ✓", which turns into "Remove from watch" on hover or focus
+export function watchButton(btn, onWatch, sendText) {
+  btn.disabled = false;
+  btn.classList.toggle("on-watch", !!onWatch);
+  btn.dataset.send = sendText;
+  btn.innerHTML = onWatch ? '<span class="ok">On the watch ✓</span><span class="rm">Remove from watch</span>' : sendText;
+}
+
+// Sending to or removing from Garmin through the server; the page reloads when it's done, or the note shows the error
+export async function watchRequest(btn, note, method, url, body) {
+  const sending = method === "POST";
   btn.disabled = true;
-  btn.textContent = "Sending…";
+  btn.textContent = sending ? "Sending…" : "Removing…";
   let error = "";
   try {
-    const res = await fetch(`/api/workout/${w.sport}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: w.title }) });
-    if (!res.ok) error = (await res.json().catch(() => ({}))).error || "Sending failed.";
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body && JSON.stringify(body) });
+    if (!res.ok) error = (await res.json().catch(() => ({}))).error || (sending ? "Sending failed." : "Removing failed.");
   } catch {
     error = "Couldn't reach the dashboard server.";
   }
   if (error) {
-    btn.disabled = false;
-    btn.textContent = "Send to watch";
+    watchButton(btn, !sending, btn.dataset.send);
     note.className = "error";
     note.textContent = error;
     return;
   }
-  dispatchEvent(new Event("reload"));  // the server now marks it as sent
+  dispatchEvent(new Event("reload"));  // the server now marks it as sent, or not
+}
+
+// Only this button sends today's workout to Garmin, or takes it off again (deleted on Garmin, gone from the watch at
+// its next sync)
+$("wkSend").addEventListener("click", () => {
+  const w = data.workouts.find((x) => x.sport === sport), btn = $("wkSend"), note = $("wkSendNote");
+  if (!w.sent) return watchRequest(btn, note, "POST", `/api/workout/${w.sport}`, { title: w.title });
+  if (confirm("Remove today's workout from Garmin and the watch?")) watchRequest(btn, note, "DELETE", `/api/workout/${w.sport}`);
 });

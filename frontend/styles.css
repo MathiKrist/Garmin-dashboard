@@ -173,6 +173,11 @@ body {
   background: var(--volt); border-color: var(--volt); color: var(--on-volt);
 }
 #page-workout button.primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+/* A sent workout's button: "On the watch ✓", turning into "Remove from watch" in Puls on hover or focus */
+#page-workout button.on-watch .rm { display: none; }
+#page-workout button.on-watch:is(:hover, :focus-visible) .ok { display: none; }
+#page-workout button.on-watch:is(:hover, :focus-visible) .rm { display: inline; }
+#page-workout button.on-watch:is(:hover, :focus-visible):not(:disabled) { background: var(--fatigue); border-color: var(--fatigue); color: var(--paper); }
 
 /* The chat on the workout page: the conversation, then the box to write in */
 .chat { padding: 1.25rem 0; border-bottom: 1px solid var(--rule); }
