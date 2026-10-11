@@ -1,5 +1,5 @@
-// Plan: weeks of runs toward a race or general fitness (worked out on the server), the time it projects, and the
-// button that sends the coming week to the watch
+// Training plan, on the workout page: weeks of runs toward a race or general fitness (worked out on the server), the
+// time it projects, and the button that sends the coming week to the watch
 
 import { data } from "./state.js";
 import { $, css, fmtDay, fmtDayYear, fmtShort, fmtDuration, fmtPace, fmtRange, statItems, escapeHtml, addDays } from "./util.js";

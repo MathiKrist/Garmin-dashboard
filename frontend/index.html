@@ -25,7 +25,6 @@
       <ul>
         <li><a href="#overview" data-page="overview">Overview</a></li>
         <li><a href="#workout" data-page="workout">Workout</a></li>
-        <li><a href="#plan" data-page="plan">Plan</a></li>
         <li><a href="#health" data-page="health">Health</a></li>
         <li><a href="#activities" data-page="activities">Activities<span class="count" id="navActCount"></span></a></li>
       </ul>
@@ -43,7 +42,8 @@
   <div id="notice" class="notice" role="status" hidden></div>
 
   <main id="main" hidden>
-    <!-- Workout: today's suggested session per sport, which the Send to watch button puts in the Garmin calendar -->
+    <!-- Workout: today's session per sport, which the Send to watch button puts in the Garmin calendar, and the
+         training plan it comes from: weeks of runs toward a race or general fitness, with the time it projects -->
     <div class="page" id="page-workout" data-title="Workout" hidden>
       <header class="page-head page-head-row">
         <h1>Workout</h1>
@@ -65,14 +65,7 @@
           <ol class="wk-steps" id="wkSteps"></ol>
         </div>
       </section>
-    </div>
-
-    <!-- Plan: weeks of runs toward a race or general fitness, with the time it projects; paces follow how runs go -->
-    <div class="page" id="page-plan" data-title="Plan" hidden>
-      <header class="page-head">
-        <h1>Plan</h1>
-        <button type="button" class="link-btn" id="planAdd" hidden>+ Training plan</button>
-      </header>
+      <p class="plan-add"><button type="button" class="link-btn" id="planAdd" hidden>+ Training plan</button></p>
       <div id="plan" hidden>
         <section class="race" aria-labelledby="planName">
           <div>

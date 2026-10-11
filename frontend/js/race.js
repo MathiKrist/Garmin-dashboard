@@ -38,7 +38,7 @@ export function renderRace() {
         ["Gap", gap > 0 ? fmtDuration(gap) : "On target", gap > 0 ? "to find" : ""]);
     }
     // The training plan's projection for race day, a range
-    if (r.plan) items.push(["Plan projects", fmtRange(r.plan.low, r.plan.high), '<a href="#plan">Plan</a>']);
+    if (r.plan) items.push(["Plan projects", fmtRange(r.plan.low, r.plan.high), '<a href="#workout">Plan</a>']);
   }
   $("raceStats").innerHTML = statItems(items);
 

@@ -38,7 +38,7 @@ All use the Python in `.venv`. `Dashboard app.bat` and `Open dashboard.bat` conn
 
 ## What it shows
 
-A menu on the left (a sideways-scrolling row on phones) picks the page. The address keeps it (`#overview`, `#workout`, `#plan`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
+A menu on the left (a sideways-scrolling row on phones) picks the page. The address keeps it (`#overview`, `#workout`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
 
 The page is dark from 20:00 to 07:00 and otherwise follows the system setting. The **Auto / Light / Dark** switch at the bottom of the menu overrides that, per device.
 
@@ -60,6 +60,8 @@ In bar charts, a period that isn't over yet (this week, this month, today) is dr
 
 ### Workout
 
+Today's session and, below it, the training plan it comes from (or **+ Training plan** to start one).
+
 Today's suggested session for running and cycling (the one you do most first), in steps like a Garmin workout: warm-up, the main set with its repeats and targets, cool-down. A bar shows its shape, each block as long as the step and as tall as it's hard. Under the title: total time, distance for runs, and what decided it.
 
 - **Which session**: readiness under 25 or Overreaching gives a recovery session; readiness under 50 or a hard session yesterday or today gives an easy one. Otherwise the load focus decides: short on high aerobic gives threshold intervals (VO2 max intervals if you've done threshold in the last week), short on anaerobic gives anaerobic repeats, short on low aerobic a long session. Balanced gives threshold every third day or so. In the 10 days before a race goal the volume drops by 30%, and the last 2 days are a shakeout.
@@ -68,9 +70,9 @@ Today's suggested session for running and cycling (the one you do most first), i
 - **Send to watch**: puts the workout in today's Garmin Connect calendar; the watch has it after its next sync. Nothing is ever sent unless you press it. If the suggestion has changed since the page loaded, it asks you to look again first. The button then shows it's sent for the rest of the day.
 - **With a training plan** the run is the plan's session for today, or a rest day with the next session. A low readiness or Overreaching adds a note but doesn't change the session. Cycling is unchanged.
 
-### Plan
+#### Training plan
 
-A running plan toward a race or general fitness, set up with **+ Training plan**. You pick the race day (or end date), the distance, an optional target time, the run days, the long-run day and your current km a week (prefilled from the last 4 weeks). A race plan also sets the race goal; without a target time the projection is used.
+A running plan toward a race or general fitness, set up with **+ Training plan** under today's workout. You pick the race day (or end date), the distance, an optional target time, the run days, the long-run day and your current km a week (prefilled from the last 4 weeks). A race plan also sets the race goal; without a target time the projection is used.
 
 - **Header**: the projected time on race day as a range with its pace, the target, and how far the projection has moved since the start. Below it, a chart of the projection per week against the target.
 - **This week**: each session with its distance, time and main pace. Click one to see its steps. Done sessions show the run's pace and whether it was faster, on plan or slower; missed ones are crossed out.
@@ -188,7 +190,7 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 │   │   ├── sports.js     # Sport groups, table columns, weekly volume, This week / This year
 │   │   ├── overview.js
 │   │   ├── workout.js    # Today's workout and Send to watch
-│   │   ├── plan.js       # Training plan, its setup and Send week
+│   │   ├── plan.js       # Training plan (on the workout page), its setup and Send week
 │   │   ├── race.js       # Race goal (overview)
 │   │   ├── calendar.js   # Training calendar (overview)
 │   │   ├── health.js

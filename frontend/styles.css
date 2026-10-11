@@ -525,8 +525,9 @@ button.more { margin-top: 1rem; }
   .act-table th, .act-table td { padding-right: 0.5rem; }
 }
 
-/* Plan: the week's sessions, each opening its steps, and every week of the plan */
+/* Training plan, under today's workout: the week's sessions, each opening its steps, and every week of the plan */
 .plan-week { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
+.plan-add { margin: 1.25rem 0 0; }
 .plan-week .wk-send { margin-top: 0; }
 .plan-sessions, .plan-weeks { list-style: none; margin: 0.75rem 0 0; padding: 0; }
 .ps { border-top: 1px solid var(--rule); }

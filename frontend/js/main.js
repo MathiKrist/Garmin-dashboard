@@ -1,5 +1,5 @@
 // Entry point: loads the data, keeps it fresh and shows the page picked in the menu
-// (kept in the address: #overview, #workout, #plan, #health, #activities, #sport/run)
+// (kept in the address: #overview, #workout, #health, #activities, #sport/run)
 
 import { data, setData } from "./state.js";
 import { $ } from "./util.js";
@@ -73,11 +73,13 @@ function render() {
   showPage();
 }
 
-const PAGES = { overview: renderOverview, workout: renderWorkout, plan: renderPlan, health: renderHealth, activities: renderActivities };
+// The workout page also holds the training plan its run comes from
+const PAGES = { overview: renderOverview, workout: () => { renderWorkout(); renderPlan(); }, health: renderHealth, activities: renderActivities };
 
 function route() {
   const [page, key] = location.hash.slice(1).split("/");
   if (page === "sport" && hasPage(key)) return { page: "sport", key, id: `sport/${key}` };
+  if (page === "plan") return { page: "workout", id: "workout" };  // the plan's own page, before it joined the workout
   return PAGES[page] ? { page, id: page } : { page: "overview", id: "overview" };
 }
 
