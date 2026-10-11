@@ -1,5 +1,5 @@
 // Entry point: loads the data, keeps it fresh and shows the page picked in the menu
-// (kept in the address: #overview, #workout, #health, #activities, #sport/run)
+// (kept in the address: #overview, #workout, #plan, #health, #activities, #sport/run)
 
 import { data, setData } from "./state.js";
 import { $ } from "./util.js";
@@ -9,13 +9,14 @@ import { renderOverview, lastMap } from "./overview.js";
 import { renderActivities } from "./activities.js";
 import { renderSport } from "./sport.js";
 import { renderWorkout } from "./workout.js";
+import { renderPlan } from "./plan.js";
 import { redrawModalMap } from "./modal.js";
 
 let pollTimer = null;
 
 let lastJson = "";
 
-// The race goal form asks for a reload after saving; redraw even if nothing else changed
+// The race goal and plan forms ask for a reload after saving; redraw even if nothing else changed
 addEventListener("reload", () => { lastJson = ""; load().catch(() => {}); });
 
 async function load() {
@@ -72,7 +73,7 @@ function render() {
   showPage();
 }
 
-const PAGES = { overview: renderOverview, workout: renderWorkout, health: renderHealth, activities: renderActivities };
+const PAGES = { overview: renderOverview, workout: renderWorkout, plan: renderPlan, health: renderHealth, activities: renderActivities };
 
 function route() {
   const [page, key] = location.hash.slice(1).split("/");

@@ -38,7 +38,7 @@ All use the Python in `.venv`. `Dashboard app.bat` and `Open dashboard.bat` conn
 
 ## What it shows
 
-A menu on the left (a sideways-scrolling row on phones) picks the page. The address keeps it (`#overview`, `#workout`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
+A menu on the left (a sideways-scrolling row on phones) picks the page. The address keeps it (`#overview`, `#workout`, `#plan`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
 
 The page is dark from 20:00 to 07:00 and otherwise follows the system setting. The **Auto / Light / Dark** switch at the bottom of the menu overrides that, per device.
 
@@ -47,7 +47,7 @@ In bar charts, a period that isn't over yet (this week, this month, today) is dr
 ### Overview
 
 - **Story**: a few sentences on what the sections below don't show: recent personal bests, the year so far in your three biggest sports, and weekly training hours over the last four weeks against the four before.
-- **Race goal** (set with **+ Race goal**): name, date, distance and target time, stored on the server so every device shows it. Shows days to go, target pace, Garmin's race prediction for that distance (scaled from the nearest predicted distance if needed) and the gap, with a 6-month chart of the prediction against the target. For a week after race day it shows the result (the run's elapsed time) against the target, then goes away.
+- **Race goal** (set with **+ Race goal**, or by a race plan): name, date, distance and target time, stored on the server so every device shows it. Shows days to go, target pace, Garmin's race prediction for that distance (scaled from the nearest predicted distance if needed) and the gap, the plan's projected range when a plan leads to this race, with a 6-month chart of the prediction against the target. For a week after race day it shows the result (the run's elapsed time) against the target, then goes away.
 - **Last night and today**: readiness, HRV, sleep and resting HR (with 7-day average), and a ring of today's calories burnt (active in red, resting in blue). A value that isn't from today is replaced by the newest from the last week, labelled with its day ("from Wed 7 Oct").
 - **Training status**: Garmin's status, acute load against the optimal range, and a four-week strip of daily statuses.
 - **Load focus**: Garmin's four-week load in low aerobic, high aerobic and anaerobic against each optimal range, with what to train next.
@@ -66,6 +66,17 @@ Today's suggested session for running and cycling (the one you do most first), i
 - **How long**: your median session for that sport over the last 60 days (45 min run, 75 min ride without any); long sessions are 1.4 times that.
 - **Targets**: run paces as a share of Garmin's lactate threshold pace (easy 74–82%, threshold 97–101%), intervals off Garmin's predicted 5 km pace. Without a threshold it's estimated from the 5 km prediction. Rides use Garmin's heart rate zones (from `MAX_HR` until they're synced).
 - **Send to watch**: puts the workout in today's Garmin Connect calendar; the watch has it after its next sync. Nothing is ever sent unless you press it. If the suggestion has changed since the page loaded, it asks you to look again first. The button then shows it's sent for the rest of the day.
+- **With a training plan** the run is the plan's session for today, or a rest day with the next session. A low readiness or Overreaching adds a note but doesn't change the session. Cycling is unchanged.
+
+### Plan
+
+A running plan toward a race or general fitness, set up with **+ Training plan**. You pick the race day (or end date), the distance, an optional target time, the run days, the long-run day and your current km a week (prefilled from the last 4 weeks). A race plan also sets the race goal; without a target time the projection is used.
+
+- **Header**: the projected time on race day as a range with its pace, the target, and how far the projection has moved since the start. Below it, a chart of the projection per week against the target.
+- **This week**: each session with its distance, time and main pace. Click one to see its steps. Done sessions show the run's pace and whether it was faster, on plan or slower; missed ones are crossed out.
+- **All weeks**: phase, km done / planned and the key sessions, each week opening its sessions.
+- **Send week to watch**: puts the next 7 days in the Garmin calendar. If paces have adapted since, pressing it again replaces the changed sessions on Garmin. Nothing is ever sent unless you press it.
+- **Edit** keeps the plan's start and history; **End plan** removes it (the race goal stays).
 
 ### Health
 
@@ -96,6 +107,9 @@ Clicking an activity or personal best shows every stat Garmin has for it, groupe
 
 - **Training load** is Garmin's when available. Otherwise it's Banister TRIMP from `MAX_HR` and your median resting HR, scaled to Garmin's by the median ratio over activities that have both (once there are 10).
 - **Running bests** come from each run's second-by-second data, using elapsed time like Garmin's splits (so stops count). They match Garmin's fastest splits to a tenth of a second and add 400 m. Until a run has been processed, Garmin's own splits are used.
+- **The plan**: the weeks split into base, build, peak and a taper (1 week for 5–10 km, 2 for the half, 3 for the marathon; a fitness plan has none). Volume climbs at most 8% a week from your current km toward 1.3–1.7 times it (by distance), every 4th week is 25% lighter, and the taper drops to 75/60/45% of the peak. The long run is about 30% of the week; one hard session a week in base and taper, two in build and peak with 4 or more days (threshold, VO2 max, race pace for the half and longer), kept away from the long run. The last two plan days before the race are shakeouts.
+- **Plan paces** are Workout's paces from a threshold speed that starts at Garmin's lactate threshold and is planned to rise 0.5% a week (8% at most, plus 1.5% from the taper). How the runs go moves it: interval runs by the pace of their work laps against the target (when run as the plan's workout, so the laps match the steps; faster at a heart rate above zone 4 doesn't count), easy and long runs by pace at their heart rate against your easy runs in the 60 days before the plan. Each run moves it 30% of the way (15% for easy runs), less than 1% off counts as on plan, and it moves at most 1.5% a week. The projection is that threshold on race day as a 5 km time, scaled to the distance like the race goal, ±1% plus 0.15% per week to go.
+- **Missed sessions**: a run on the planned day or a day either side counts. A hard or long session missed this week moves to the next easy day from today, which is dropped; a missed easy run is just missed.
 - **Form bands** and the 0.8–1.3 load ratio are rules of thumb, not medical advice. HRV range, readiness and race predictions are Garmin's own numbers, shown as they come.
 
 ## Syncing
@@ -112,6 +126,7 @@ Each sync runs in order of importance: new activities, race predictions and VO2 
   - calories for days synced before they were added, 45 days per sync;
   - race predictions a year back, and VO2 max back to `VO2MAX_BACKFILL_DAYS`, one request each.
 - **Lactate threshold and heart rate zones**, for the workout targets: once a day.
+- **Laps of the plan's runs**, so the plan sees how intervals went: 20 per sync.
 - **Routes** for the 5 newest activities are fetched during the sync; any other activity's route and laps are fetched when first opened.
 - **Running bests** are processed 40 runs per sync, newest first.
 
@@ -152,6 +167,7 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 │   ├── sync.py           # Garmin Connect → SQLite (can also run on its own)
 │   ├── metrics.py        # Raw tables → dashboard numbers; Garmin activity types → sports
 │   ├── workouts.py       # Today's suggested workout, and Garmin's workout format for Send to watch
+│   ├── plans.py          # The training plan: weeks, sessions, adaptation and projection
 │   ├── db.py             # SQLite schema and upserts
 │   ├── config.py         # Reads .env
 │   ├── login.py          # One-time Garmin login
@@ -172,6 +188,7 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 │   │   ├── sports.js     # Sport groups, table columns, weekly volume, This week / This year
 │   │   ├── overview.js
 │   │   ├── workout.js    # Today's workout and Send to watch
+│   │   ├── plan.js       # Training plan, its setup and Send week
 │   │   ├── race.js       # Race goal (overview)
 │   │   ├── calendar.js   # Training calendar (overview)
 │   │   ├── health.js
@@ -187,7 +204,7 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 └── data/                 # athlete.db, demo.db, desktop app data; not in git
 ```
 
-Database tables of note: `daily` (health numbers and race predictions), `tracks` and `laps` (routes), `efforts` (running bests), `meta` (race goal, training profile, workouts sent, backfill progress).
+Database tables of note: `daily` (health numbers and race predictions), `tracks` and `laps` (routes), `efforts` (running bests), `meta` (race goal, training plan, training profile, workouts sent, plan sessions sent, backfill progress).
 
 ## Tests
 
@@ -195,7 +212,7 @@ Database tables of note: `daily` (health numbers and race predictions), `tracks`
 .venv\Scripts\python -m unittest discover tests
 ```
 
-`test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, sports, VO2 max). `test_workouts.py` checks which session is picked, its targets and Garmin's workout format. `test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and rate-limit handling).
+`test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, sports, VO2 max). `test_workouts.py` checks which session is picked, its targets and Garmin's workout format. `test_plans.py` checks the plan's phases, volume, session days, adaptation, reshuffling and projection. `test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and rate-limit handling).
 
 ## Troubleshooting
 

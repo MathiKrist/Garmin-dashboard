@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 import config
 import db
 import metrics
+import plans
 import sync
 import workouts
 
@@ -226,6 +227,8 @@ async def send_workout(sport: str, request: Request):
     w = next((w for w in _dashboard_data()["workouts"] if w["sport"] == sport), None)
     if not w or w["title"] != title:
         return JSONResponse({"error": "Today's workout has changed. Look it over and press again."}, status_code=409)
+    if not w["steps"]:
+        return JSONResponse({"error": "There's no workout to send today."}, status_code=400)
     if DEMO:
         return JSONResponse({"error": "Demo mode doesn't send anything to Garmin."}, status_code=400)
     today = date.today()
@@ -241,7 +244,118 @@ async def send_workout(sport: str, request: Request):
         sent = [x for x in json.loads(db.get_meta(conn, "workouts_sent") or "[]") if x.get("date") == today.isoformat()]
         sent.append({"date": today.isoformat(), "sport": sport, "title": title, "id": created["workoutId"]})
         db.set_meta(conn, "workouts_sent", json.dumps(sent))
+        if w.get("plan"):  # the plan page shows it as sent too
+            plan_sent = json.loads(db.get_meta(conn, "plan_sent") or "[]")
+            plan_sent.append({"date": today.isoformat(), "key": w["key"], "id": created["workoutId"]})
+            db.set_meta(conn, "plan_sent", json.dumps(plan_sent))
         conn.commit()
+    finally:
+        conn.close()
+    return {"status": "sent"}
+
+
+def _plan_from(body, old, profile, pred_5k, today):
+    """The plan setup from the form, checked. Editing a plan keeps its start and starting fitness, so its history and
+    adaptation carry on."""
+    days = sorted({int(d) for d in body["days"]})
+    cfg = {
+        "goal": body["goal"],
+        "name": str(body.get("name") or "").strip()[:80] or ("Race" if body["goal"] == "race" else "General fitness"),
+        "metres": float(body["metres"]),
+        "date": date.fromisoformat(body["date"]).isoformat(),
+        "target_s": int(body["target_s"]) if body.get("target_s") else None,
+        "days": days,
+        "long_day": int(body["long_day"]),
+        "start_km": float(body["start_km"]),
+        "start": old["start"] if old else today.isoformat(),
+        "fitness0": old["fitness0"] if old else plans.fitness_now(profile, pred_5k),
+    }
+    weeks = (date.fromisoformat(cfg["date"]) - date.fromisoformat(cfg["start"])).days / 7
+    assert cfg["goal"] in plans.GOALS and 1000 <= cfg["metres"] <= 100_000 and 2 <= weeks <= 52
+    assert cfg["date"] > today.isoformat() and 2 <= len(days) <= 7 and all(0 <= d <= 6 for d in days)
+    assert cfg["long_day"] in days and 0 < cfg["start_km"] <= 300 and (cfg["target_s"] or 1) > 0
+    return cfg
+
+
+@app.post("/api/plan")
+async def set_plan(request: Request):
+    """Save the training plan: {goal, name, metres, date, target_s or null, days: [0-6, Monday first], long_day,
+    start_km}. A race plan also sets the race goal, with the projected time as target when none is given."""
+    body = await request.json()
+    today = date.today()
+    conn = db.connect(DB_PATH)
+    try:
+        old = json.loads(db.get_meta(conn, "training_plan") or "null")
+        profile = json.loads(db.get_meta(conn, "training_profile") or "{}")
+        row = conn.execute("SELECT pred_5k FROM daily WHERE pred_5k IS NOT NULL ORDER BY date DESC LIMIT 1").fetchone()
+        try:
+            cfg = _plan_from(body, old, profile, row and row["pred_5k"], today)
+        except (KeyError, TypeError, ValueError, AssertionError):
+            return JSONResponse({"error": "Give an end date 2 to 52 weeks from the plan's start, a distance, 2 to 7 run "
+                                          "days with the long run on one of them, and your weekly km."}, status_code=400)
+        if cfg["goal"] == "race":
+            target = cfg["target_s"] or (plans.build(cfg, [], {}, profile, today)["projection"] or {}).get("s")
+            if not target:
+                return JSONResponse({"error": "Garmin has no threshold or race prediction yet to project a time from. "
+                                              "Enter a target time."}, status_code=400)
+            db.set_meta(conn, "race_goal", json.dumps({"name": cfg["name"], "date": cfg["date"], "metres": cfg["metres"],
+                                                       "target_s": int(target)}))
+        db.set_meta(conn, "training_plan", json.dumps(cfg))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "saved"}
+
+
+@app.delete("/api/plan")
+def remove_plan():
+    """End the plan. The race goal stays."""
+    conn = db.connect(DB_PATH)
+    try:
+        conn.execute("DELETE FROM meta WHERE key IN ('training_plan', 'plan_sent')")
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "removed"}
+
+
+@app.post("/api/plan/send")
+async def send_plan_week(request: Request):
+    """Put the plan's next 7 days in the Garmin calendar. Only ever called by the page's Send week button, with the
+    key of the week it shows, so sessions changed since (after a sync) aren't sent unseen. A session sent before and
+    changed since (its paces adapted) replaces the old one on Garmin."""
+    key = (await request.json()).get("key")
+    plan = _dashboard_data()["plan"]
+    today = date.today()
+    week = plans.coming_week(plan, today) if plan else []
+    if not week or plans.week_key(week) != key:
+        return JSONResponse({"error": "The plan has changed. Look it over and press again."}, status_code=409)
+    if DEMO:
+        return JSONResponse({"error": "Demo mode doesn't send anything to Garmin."}, status_code=400)
+    conn = db.connect(DB_PATH)
+    try:
+        sent = json.loads(db.get_meta(conn, "plan_sent") or "[]")
+        client = sync._client()
+        for s in week:
+            if any(x["date"] == s["date"] and x["key"] == s["key"] for x in sent):
+                continue
+            for old in [x for x in sent if x["date"] == s["date"]]:
+                try:
+                    client.delete_workout(old["id"])
+                except Exception as e:  # already deleted on Garmin, most likely
+                    log.info("Couldn't delete the old workout %s: %s", old["id"], e)
+                sent.remove(old)
+            w = {"sport": "run", "title": s["title"], "steps": s["steps"], "total_s": s["total_s"],
+                 "why": [plan["config"]["name"]]}
+            day = date.fromisoformat(s["date"])
+            created = client.upload_workout(workouts.to_garmin(w, day))
+            client.schedule_workout(created["workoutId"], s["date"])
+            sent.append({"date": s["date"], "key": s["key"], "id": created["workoutId"]})
+            db.set_meta(conn, "plan_sent", json.dumps(sent))  # saved per session, so a failure halfway keeps what went
+            conn.commit()
+    except Exception as e:
+        log.error("Sending the plan's week failed: %s", e)
+        return JSONResponse({"error": f"Garmin didn't take the workouts: {e}"}, status_code=502)
     finally:
         conn.close()
     return {"status": "sent"}

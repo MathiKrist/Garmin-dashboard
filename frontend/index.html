@@ -25,6 +25,7 @@
       <ul>
         <li><a href="#overview" data-page="overview">Overview</a></li>
         <li><a href="#workout" data-page="workout">Workout</a></li>
+        <li><a href="#plan" data-page="plan">Plan</a></li>
         <li><a href="#health" data-page="health">Health</a></li>
         <li><a href="#activities" data-page="activities">Activities<span class="count" id="navActCount"></span></a></li>
       </ul>
@@ -64,6 +65,42 @@
           <ol class="wk-steps" id="wkSteps"></ol>
         </div>
       </section>
+    </div>
+
+    <!-- Plan: weeks of runs toward a race or general fitness, with the time it projects; paces follow how runs go -->
+    <div class="page" id="page-plan" data-title="Plan" hidden>
+      <header class="page-head">
+        <h1>Plan</h1>
+        <button type="button" class="link-btn" id="planAdd" hidden>+ Training plan</button>
+      </header>
+      <div id="plan" hidden>
+        <section class="race" aria-labelledby="planName">
+          <div>
+            <p class="eyebrow" id="planWhen"></p>
+            <div class="race-title"><h2 id="planName"></h2><button type="button" class="link-btn" id="planEdit">Edit</button></div>
+            <dl class="race-stats" id="planStats"></dl>
+          </div>
+          <div class="race-trend" id="planTrend">
+            <div class="chart"><canvas id="planChart" aria-label="The plan's projected race time per week against the target" role="img"></canvas></div>
+            <div class="legend" id="planLegend"></div>
+          </div>
+        </section>
+        <section class="plan-week">
+          <div class="section-head">
+            <h2 id="planWeekTitle"></h2>
+            <div class="wk-send">
+              <button type="button" id="planSend">Send week to watch</button>
+              <span id="planSendNote" role="status"></span>
+            </div>
+          </div>
+          <p class="reading" id="planWeekSub"></p>
+          <ol class="plan-sessions" id="planSessions"></ol>
+        </section>
+        <section class="plan-week">
+          <h2>All weeks</h2>
+          <ol class="plan-weeks" id="planWeeks"></ol>
+        </section>
+      </div>
     </div>
 
     <!-- Overview: the athlete's story, with the big picture of fitness and training -->
@@ -333,6 +370,34 @@
       <button type="submit" class="primary">Save</button>
       <button type="button" id="raceCancel">Cancel</button>
       <button type="button" class="link-btn" id="raceRemove">Remove goal</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="race-dialog" id="planDialog" aria-labelledby="planDialogTitle">
+  <form id="planForm">
+    <h2 id="planDialogTitle">Training plan</h2>
+    <label>Goal
+      <select id="planInGoal"><option value="race">Race</option><option value="fitness">General fitness</option></select>
+    </label>
+    <label id="planInNameWrap">Race <input id="planInName" maxlength="80" placeholder="Odense Half"></label>
+    <label><span id="planInDateLabel">Race day</span> <input id="planInDate" type="date" required></label>
+    <label><span id="planInDistLabel">Distance</span>
+      <select id="planInDist"></select>
+    </label>
+    <label id="planInKmWrap" hidden>Kilometres <input id="planInKm" type="number" min="1" max="100" step="0.01"></label>
+    <label id="planInTimeWrap">Target time (optional) <input id="planInTime" placeholder="50:00 or 1:45:00"></label>
+    <fieldset class="plan-days">
+      <legend>Run days</legend>
+      <div id="planInDays"></div>
+    </fieldset>
+    <label>Long run on <select id="planInLong"></select></label>
+    <label>Running now, km a week <input id="planInVol" type="number" min="1" max="300" step="1" required></label>
+    <p class="form-error" id="planError" role="alert" hidden></p>
+    <div class="form-actions">
+      <button type="submit" class="primary">Save</button>
+      <button type="button" id="planCancel">Cancel</button>
+      <button type="button" class="link-btn" id="planRemove">End plan</button>
     </div>
   </form>
 </dialog>

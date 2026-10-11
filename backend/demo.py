@@ -17,6 +17,8 @@ PLAN = {
     6: ("long", (16, 24), (145, 156), (320, 350)),
 }
 
+DEMO_VERSION = "2"  # bumped when the demo data changes, so an existing demo database is rebuilt the same day
+
 # Other sports, so every page has something: weekday -> (Garmin type, name, chance, km range, speed m/s range,
 # avg HR range, load per hour, training effect label)
 OTHER = {
@@ -31,16 +33,26 @@ EFFORT_PACE = {400: 0.86, 1000: 0.9, 1609: 0.92, 5000: 0.96, 10000: 0.98, 21098:
 def seed(db_path, days=420):
     """Made-up data up to today, built once a day. 420 days, so this year can be set against last year."""
     conn = db.connect(db_path)
-    if db.get_meta(conn, "demo_date") == date.today().isoformat():
+    if db.get_meta(conn, "demo_date") == date.today().isoformat() and db.get_meta(conn, "demo_version") == DEMO_VERSION:
         conn.close()
         return
-    goal = db.get_meta(conn, "race_goal")  # a race goal set in demo mode outlives the daily rebuild
+    # A race goal and plan set in demo mode outlive the daily rebuild
+    kept = {k: db.get_meta(conn, k) for k in ("race_goal", "training_plan", "plan_sent")}
     conn.executescript("DELETE FROM activities; DELETE FROM daily; DELETE FROM tracks; DELETE FROM laps; "
                        "DELETE FROM efforts; DELETE FROM meta;")
-    if goal:
-        db.set_meta(conn, "race_goal", goal)
+    for k, v in kept.items():
+        if v:
+            db.set_meta(conn, k, v)
     rng = random.Random(7)
     today = date.today()
+    if not kept["training_plan"]:  # a half marathon plan, 5 weeks in
+        start = today - timedelta(days=today.weekday(), weeks=5)
+        plan = {"goal": "race", "name": "Odense Half", "metres": 21098, "date": (start + timedelta(weeks=12, days=-1)).isoformat(),
+                "target_s": 6300, "start": start.isoformat(), "days": [1, 3, 5, 6], "long_day": 6, "start_km": 32,
+                "fitness0": 3.45}
+        db.set_meta(conn, "training_plan", json.dumps(plan))
+        db.set_meta(conn, "race_goal", json.dumps({k: plan[k] for k in ("name", "date", "metres", "target_s")}))
+    plan_start = json.loads(db.get_meta(conn, "training_plan"))["start"]
     fatigue = 0.0
     loads = []
     status = since = None
@@ -69,6 +81,8 @@ def seed(db_path, days=420):
                 "te_label": {"intervals": rng.choice(["VO2MAX", "ANAEROBIC_CAPACITY"]), "tempo": rng.choice(["TEMPO", "LACTATE_THRESHOLD"]),
                              "easy": "AEROBIC_BASE", "long": "AEROBIC_BASE"}[kind], "raw": None,
             })
+            if kind in ("intervals", "tempo") and d.isoformat() >= plan_start:
+                db.set_laps(conn, int(d.strftime("%Y%m%d")) * 10 + 1, interval_laps(rng, kind, hr))
             # Best efforts within the run, a bit faster than its average pace over shorter stretches
             db.set_efforts(conn, int(d.strftime("%Y%m%d")) * 10 + 1, {
                 m: round(m / 1000 * pace * f * rng.uniform(0.98, 1.02), 1) for m, f in EFFORT_PACE.items() if m <= km * 1000})
@@ -131,10 +145,24 @@ def seed(db_path, days=420):
     now = datetime.now().isoformat(timespec="seconds")
     db.set_meta(conn, "last_sync_at", now)
     db.set_meta(conn, "demo_date", today.isoformat())
+    db.set_meta(conn, "demo_version", DEMO_VERSION)
     # Lactate threshold (4:50 /km) and heart rate zones, for the workout targets
     db.set_meta(conn, "training_profile", json.dumps({"lt_speed": 3.45, "lt_hr": 172, "zones": [98, 117, 137, 156, 175, 195]}))
     conn.commit()
     conn.close()
+
+
+def interval_laps(rng, kind, hr):
+    """Laps as a watch records a structured workout: warm-up, work reps with jogs between, cool-down. The reps run
+    a little faster than the plan's targets (threshold 4:52-5:00 /km, VO2 max off the 5 km pace)."""
+    work_s, n, pace = (480, 4, rng.uniform(282, 292)) if kind == "tempo" else (180, 5, rng.uniform(262, 272))
+    lap = lambda s, p, h: {"km": round(s / p, 3), "duration_s": s, "speed": 1000 / p, "avg_hr": round(h)}
+    laps = [lap(900, 345, hr - 18)]
+    for i in range(n):
+        laps.append(lap(work_s, pace * rng.uniform(0.99, 1.01), hr + 2 + i))
+        if i < n - 1:
+            laps.append(lap(120 if kind == "tempo" else 180, 420, hr - 15))
+    return laps + [lap(600, 350, hr - 14)]
 
 
 def demo_track(rng, km, lat=55.3959, lon=10.3883, points=240):

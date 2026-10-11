@@ -21,6 +21,12 @@ export function fmtDuration(s) {
   return h ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
 }
 
+// A projected time range: "1:36–1:41" from an hour (whole minutes), "23:10–24:00" below
+export function fmtRange(lo, hi) {
+  const hm = (s) => `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
+  return hi >= 3600 ? `${hm(lo)}–${hm(hi)}` : `${fmtDuration(lo)}–${fmtDuration(hi)}`;
+}
+
 export function fmtPace(sPerKm) {
   if (!sPerKm) return "";
   const m = Math.floor(sPerKm / 60), s = Math.round(sPerKm % 60);

@@ -524,3 +524,45 @@ button.more { margin-top: 1rem; }
   .act-table .weekday { display: none; }
   .act-table th, .act-table td { padding-right: 0.5rem; }
 }
+
+/* Plan: the week's sessions, each opening its steps, and every week of the plan */
+.plan-week { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
+.plan-week .wk-send { margin-top: 0; }
+.plan-sessions, .plan-weeks { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.ps { border-top: 1px solid var(--rule); }
+.ps-row { display: grid; grid-template-columns: 7rem minmax(0, 1.4fr) 8.5rem 8.5rem minmax(0, 1.4fr); gap: 0.25rem 1rem; align-items: baseline; padding: 0.7rem 0; cursor: pointer; list-style: none; }
+div.ps-row { cursor: default; }
+.ps-row::-webkit-details-marker { display: none; }
+.ps-day, .ps-size, .ps-pace { color: var(--muted); font-size: 0.92rem; white-space: nowrap; }
+.ps-title { font-weight: 600; }
+.ps-status { font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; }
+.ps-done { color: var(--easy); font-weight: 600; white-space: nowrap; }
+.ps-missed { color: var(--muted); }
+.is-missed .ps-title, .is-moved .ps-title { color: var(--muted); text-decoration: line-through; }
+.verdict { color: var(--muted); }
+.verdict.better { color: var(--easy); }
+.verdict.worse { color: var(--fatigue); }
+.ps-steps { padding: 0.25rem 0 1.25rem; max-width: 46rem; }
+.ps-steps .wk-steps { margin-top: 1rem; }
+.pw { border-top: 1px solid var(--rule); }
+.pw > details > summary { display: grid; grid-template-columns: 2rem 4.5rem 9rem 7.5rem minmax(0, 1fr); gap: 0.25rem 1rem; align-items: baseline; padding: 0.65rem 0; cursor: pointer; list-style: none; }
+.pw > details > summary::-webkit-details-marker { display: none; }
+.pw-n { font: 600 1.15rem/1 var(--display); }
+.pw-date, .pw-phase, .pw-km { color: var(--muted); font-size: 0.92rem; white-space: nowrap; }
+.pw-key { font-size: 0.92rem; }
+.pw.past { opacity: 0.7; }
+.pw.now .pw-n, .pw.now .pw-phase { color: var(--fitness); }
+.pw .plan-sessions { margin: 0 0 0.75rem 3rem; }
+.plan-days { border: 0; margin: 0; padding: 0; }
+.plan-days legend { color: var(--muted); font-size: 0.9rem; padding: 0; margin-bottom: 0.4rem; }
+.plan-days div { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; }
+.plan-days label { display: flex; align-items: center; gap: 0.3rem; color: var(--ink); font-size: 0.95rem; }
+.race-stats .note a { color: var(--fitness); }
+@media (max-width: 760px) {
+  .ps-row { grid-template-columns: 5.5rem minmax(0, 1fr); }
+  .ps-size, .ps-pace, .ps-status { grid-column: 2; }
+  .pw > details > summary { grid-template-columns: 1.5rem 4rem minmax(0, 1fr); }
+  .pw-km { grid-column: 3; }
+  .pw-key { grid-column: 2 / -1; }
+  .pw .plan-sessions { margin-left: 0; }
+}

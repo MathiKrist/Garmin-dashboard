@@ -21,6 +21,7 @@ ACTIVITY_PAGE = 100  # activities per request when fetching the full history
 TRACK_ACTIVITIES = 5  # GPS tracks are fetched for this many of the newest activities
 HEALTH_DAYS_PER_SYNC = 45  # the health backfill fetches this many days per sync, so one sync never runs for long
 EFFORT_RUNS_PER_SYNC = 40  # runs whose best efforts are worked out per sync (one request each)
+PLAN_LAPS_PER_SYNC = 20  # runs in the training plan whose laps are fetched per sync
 RECHECK_DAYS = 30  # once a day, activities this far back are fetched again, to pick up edits and deletions on Garmin
 EFFORT_DISTANCES = tuple(metrics.DISTANCES)
 
@@ -380,6 +381,19 @@ def run_sync(db_path=None):
             if points is not None:  # a failed request is retried next sync
                 db.set_track(conn, row["id"], points)
                 conn.commit()
+
+        # Laps of the training plan's runs, so the plan can see how the intervals went
+        plan = json.loads(db.get_meta(conn, "training_plan") or "null")
+        if plan:
+            todo = conn.execute(
+                "SELECT id FROM activities WHERE type LIKE '%running%' AND date >= ? "
+                "AND id NOT IN (SELECT activity_id FROM laps) ORDER BY start_local DESC LIMIT ?",
+                (plan["start"], PLAN_LAPS_PER_SYNC)).fetchall()
+            for row in todo:
+                laps = fetch_laps(client, row["id"])
+                if laps is not None:  # a failed request is retried next sync
+                    db.set_laps(conn, row["id"], laps)
+                    conn.commit()
 
         # Best efforts (400 m to marathon) for runs that don't have them yet, newest first, a batch per sync
         todo = conn.execute(

@@ -6,6 +6,7 @@ from statistics import median
 
 import config
 import db
+import plans
 import workouts
 
 CTL_DAYS = 42  # fitness: long-term average load
@@ -319,6 +320,12 @@ def build_dashboard(db_path=None):
         goal = db.get_meta(conn, "race_goal")
         profile = json.loads(db.get_meta(conn, "training_profile") or "{}")
         sent = json.loads(db.get_meta(conn, "workouts_sent") or "[]")
+        plan_cfg = json.loads(db.get_meta(conn, "training_plan") or "null")
+        plan_sent = json.loads(db.get_meta(conn, "plan_sent") or "[]")
+        # Laps of the plan's runs, to see how the intervals went
+        plan_laps = {r["activity_id"]: json.loads(r["laps"]) for r in conn.execute(
+            "SELECT l.activity_id, l.laps FROM laps l JOIN activities a ON a.id = l.activity_id WHERE a.date >= ?",
+            (plan_cfg["start"],))} if plan_cfg else {}
         meta = {
             "last_sync_at": db.get_meta(conn, "last_sync_at"),
             "last_error": db.get_meta(conn, "last_error") or None,
@@ -388,6 +395,18 @@ def build_dashboard(db_path=None):
         focus_title=focus and focus["title"], race=race, profile=profile,
         pred_5k=next((d["pred_5k"] for d in recent if d.get("pred_5k")), None), sent=sent)
 
+    # The training plan; on its days its run replaces the suggested one, on the days between it's a rest day
+    plan = plans.build(plan_cfg, recent_acts, plan_laps, profile, today, plan_sent) if plan_cfg else None
+    plan_run = plans.todays(plan, today) if plan else None
+    if plan_run:
+        if (today_vals["readiness"] is not None and today_vals["readiness"] < 25) or (status and status["code"] == "OVERREACHING"):
+            plan_run["why"].append("Low readiness: consider an easy run instead")
+        workout_list = [plan_run if w["sport"] == "run" else w for w in workout_list]
+        if not any(w["sport"] == "run" for w in workout_list):
+            workout_list.insert(0, plan_run)
+    if race and plan and plan["projection"] and plan_cfg["goal"] == "race" and plan_cfg["date"] == race["date"]:
+        race["plan"] = {k: plan["projection"][k] for k in ("low", "high")}
+
     return {
         "generated": today.isoformat(),
         "meta": meta,
@@ -400,6 +419,7 @@ def build_dashboard(db_path=None):
         "vo2max": _vo2max(days, today),
         "race": race,
         "workouts": workout_list,
+        "plan": plan,
         "fitness": fitness[-365:],  # the chart shows 120 days or the whole year
         "trends": trends,
         "activities": recent_acts,

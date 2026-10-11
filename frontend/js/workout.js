@@ -11,9 +11,9 @@ let sport = null;
 
 try { sport = localStorage.getItem("workoutSport"); } catch {}
 
-const total = (s) => { const m = Math.round(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+export const total = (s) => { const m = Math.round(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
 
-const pace = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+export const pace = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 const len = (s) => (s < 60 ? `${s} s` : s % 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} min` : `${s / 60} min`);
 
@@ -31,6 +31,19 @@ const stepItem = (s) => `<li style="--c:${COLOR[s.intensity]}"><span class="len"
 // The steps in order, with each repeat once per round, for the workout's shape
 const flat = (steps) => steps.flatMap((s) => (s.kind === "repeat" ? Array(s.n).fill(s.steps).flat() : [s]));
 
+// The workout's shape: each block as long as the step and as tall as it's hard
+export const barHtml = (steps) => flat(steps).map((s) => `<i style="flex:${s.s};height:${HEIGHT[s.intensity]}%;background:${COLOR[s.intensity]}"></i>`).join("");
+
+export const stepsHtml = (steps) => steps.map((s) => (s.kind === "repeat"
+  ? `<li class="reps" style="--c:${COLOR[s.steps[0].intensity]}"><span class="len">${s.n} ×</span><ol>${s.steps.map(stepItem).join("")}</ol></li>`
+  : stepItem(s))).join("");
+
+// The pace the session is about: its first hard step's, else its first step's
+export function mainPace(steps) {
+  const all = flat(steps), s = all.find((x) => x.intensity === "high") || all[0];
+  return s?.target?.type === "pace" ? `${pace(s.target.fast)}–${pace(s.target.slow)} /km` : "";
+}
+
 export function renderWorkout() {
   const list = data.workouts || [];
   if (!list.some((w) => w.sport === sport)) sport = list[0]?.sport;
@@ -41,13 +54,14 @@ export function renderWorkout() {
 
   $("wkWhen").textContent = `${fmtDay(data.generated)} · ${w.label}`;
   $("wkTitle").textContent = w.title;
-  $("wkTotal").textContent = total(w.total_s) + (w.km ? ` · about ${w.km.toFixed(1)} km` : "");
+  $("wkTotal").textContent = w.kind === "rest" ? (w.next ? `Next: ${w.next.title}, ${fmtDay(w.next.date)}` : "")
+    : (w.total_s ? total(w.total_s) : "") + (w.km ? ` · about ${w.km.toFixed(1)} km` : "");
   $("wkWhy").textContent = w.why.join(" · ");
-  $("wkBar").innerHTML = flat(w.steps).map((s) => `<i style="flex:${s.s};height:${HEIGHT[s.intensity]}%;background:${COLOR[s.intensity]}"></i>`).join("");
+  $("wkBar").innerHTML = barHtml(w.steps);
   $("wkBar").setAttribute("aria-label", `${w.title}, ${total(w.total_s)}`);
-  $("wkSteps").innerHTML = w.steps.map((s) => (s.kind === "repeat"
-    ? `<li class="reps" style="--c:${COLOR[s.steps[0].intensity]}"><span class="len">${s.n} ×</span><ol>${s.steps.map(stepItem).join("")}</ol></li>`
-    : stepItem(s))).join("");
+  $("wkSteps").innerHTML = stepsHtml(w.steps);
+  // A rest day or race day has nothing to send
+  $("wkSend").parentElement.hidden = !w.steps.length;
 
   const btn = $("wkSend"), note = $("wkSendNote");
   btn.disabled = w.sent;

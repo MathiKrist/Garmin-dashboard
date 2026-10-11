@@ -1,7 +1,7 @@
 // Race goal: target, Garmin's prediction and how far apart they are; the result after race day
 
 import { data } from "./state.js";
-import { $, css, fmtDayYear, fmtShort, fmtDuration, fmtPace, statItems } from "./util.js";
+import { $, css, fmtDayYear, fmtShort, fmtDuration, fmtPace, fmtRange, statItems } from "./util.js";
 import { baseOptions, draw } from "./charts.js";
 
 export const isRaceDistance = (m) => data.race_distances.includes(m);
@@ -31,10 +31,14 @@ export function renderRace() {
     const gap = r.result.s - r.target_s;
     items.push(["Result", fmtDuration(r.result.s),
       `<span class="${gap > 0 ? "over" : "under"}">${gap > 0 ? "+" : "−"}${fmtDuration(Math.abs(gap)) || "0:00"}</span> vs target`]);
-  } else if (r.predicted_s) {
-    const gap = r.predicted_s - r.target_s;
-    items.push(["Garmin predicts", fmtDuration(r.predicted_s), pace(r.predicted_s)],
-      ["Gap", gap > 0 ? fmtDuration(gap) : "On target", gap > 0 ? "to find" : ""]);
+  } else {
+    if (r.predicted_s) {
+      const gap = r.predicted_s - r.target_s;
+      items.push(["Garmin predicts", fmtDuration(r.predicted_s), pace(r.predicted_s)],
+        ["Gap", gap > 0 ? fmtDuration(gap) : "On target", gap > 0 ? "to find" : ""]);
+    }
+    // The training plan's projection for race day, a range
+    if (r.plan) items.push(["Plan projects", fmtRange(r.plan.low, r.plan.high), '<a href="#plan">Plan</a>']);
   }
   $("raceStats").innerHTML = statItems(items);
 
