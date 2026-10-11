@@ -12,7 +12,15 @@
 </head>
 <body>
 <div class="app">
-  <aside class="side">
+  <!-- Phones: a bar with the page's name and a button that slides the menu in from the left -->
+  <header class="topbar">
+    <button type="button" class="menu-btn" id="menuBtn" aria-label="Menu" aria-controls="side" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <span class="topbar-title" id="topbarTitle">Training</span>
+  </header>
+  <div class="scrim" id="scrim"></div>
+  <aside class="side" id="side">
     <div class="side-top">
       <div class="brand">Training<small id="demo" hidden>Demo data</small></div>
       <div class="sync">

@@ -38,7 +38,7 @@ All use the Python in `.venv`. `Dashboard app.bat` and `Open dashboard.bat` conn
 
 ## What it shows
 
-A menu on the left (a sideways-scrolling row on phones) picks the page. The address keeps it (`#overview`, `#workout`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
+A menu on the left picks the page. On phones it hides behind the ☰ button in the bar on top, which also shows the page's name, and slides in from the left. The address keeps it (`#overview`, `#workout`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
 
 The page is dark from 20:00 to 07:00 and otherwise follows the system setting. The **Auto / Light / Dark** switch at the bottom of the menu overrides that, per device.
 

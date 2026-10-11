@@ -97,13 +97,28 @@ export function showPage() {
   if (r.page === "sport") renderSport(r.key); else PAGES[r.page]();
   const title = r.page === "sport" ? sportLabel(r.key) : $(`page-${r.page}`).dataset.title;
   document.title = r.page === "overview" ? "Training" : `${title} · Training`;
+  $("topbarTitle").textContent = title;
   if (r.id !== shownPage) {  // a new page starts at the top; a background refresh of the same page keeps its place
     if (shownPage) scrollTo(0, 0);
     shownPage = r.id;
   }
 }
 
-addEventListener("hashchange", () => { if (data?.has_data) showPage(); });
+addEventListener("hashchange", () => { setMenu(false); if (data?.has_data) showPage(); });
+
+// Phones: the menu slides in from the left; picking a page, tapping beside it or Escape closes it
+function setMenu(open) {
+  if (document.body.classList.contains("menu-open") === open) return;
+  document.body.classList.toggle("menu-open", open);
+  $("menuBtn").setAttribute("aria-expanded", String(open));
+  if (open) ($("nav").querySelector("[aria-current]") || $("syncBtn")).focus({ preventScroll: true });
+  else if ($("side").contains(document.activeElement)) $("menuBtn").focus({ preventScroll: true });
+}
+$("menuBtn").addEventListener("click", () => setMenu(true));
+$("scrim").addEventListener("click", () => setMenu(false));
+$("nav").addEventListener("click", (e) => { if (e.target.closest("a")) setMenu(false); });  // also the page already shown
+addEventListener("keydown", (e) => { if (e.key === "Escape") setMenu(false); });
+matchMedia("(min-width: 901px)").addEventListener("change", (e) => { if (e.matches) setMenu(false); });
 
 export function renderNav() {
   const counts = sportCounts(), sports = sportsByCount(counts).filter(([key]) => hasPage(key, counts));
