@@ -2,7 +2,7 @@
 
 A personal, self-hosted training dashboard. It pulls activities and daily recovery data from Garmin Connect into a local SQLite database and serves a single-page dashboard on your home network, so any device on the wifi can open it.
 
-Built with FastAPI, SQLite and Chart.js. No cloud, and no accounts beyond your own Garmin login. Everything the page needs is bundled, so it works offline apart from the map tiles.
+Built with FastAPI, SQLite and Chart.js. No cloud, and no accounts beyond your own Garmin login (and Claude, for the workout chat). Everything the page needs is bundled, so it works offline apart from the map tiles.
 
 ## Quick start
 
@@ -60,7 +60,19 @@ In bar charts, a period that isn't over yet (this week, this month, today) is dr
 
 ### Workout
 
-Today's session and, below it, the training plan it comes from (or **+ Training plan** to start one).
+A chat at the top, then today's session and, below it, the training plan it comes from (or **+ Training plan** to start one).
+
+#### Chat
+
+Tell it what to change, as you would a coach: "I only have 40 minutes today", "move Thursday's intervals to Friday", "make today a ride instead". Claude (Sonnet) changes the sessions and lists each change under its answer; the workout and plan redraw at once.
+
+- **Which Claude**: Claude Code on the machine running the server, covered by its Claude subscription. Install it and log in once (run `claude` in a terminal); the server finds it on PATH or in `~/.local/bin`. A reply takes about 10 seconds and counts toward the subscription's usage limits. With `ANTHROPIC_API_KEY` in `.env` the chat uses the Anthropic API instead: a few seconds a reply, about a cent or two a message, billed to the API account.
+
+- **What it can do**: put a session on any day from today on (a standard one by kind and minutes, or its own steps), make a rest day, move a session to another day (leaving a rest day), and undo a change. With each message it gets today's numbers, the workouts, the plan's next three weeks and the last 14 days of activities.
+- **Paces stay yours**: a changed session names its targets (easy, threshold, zone 2…) and gets the same paces as everything else, so a changed plan day still adapts. A moved session keeps the paces it had.
+- **Where changes show**: today's run or ride, marked "Changed in chat" with the reason; plan days the same; later days outside a plan listed under today's workout. Changed plan days are left alone when a missed session moves. Nothing goes to the watch until you press Send.
+- **One chat a day**, kept on the server so every device sees it. **New chat** starts over (the changes stay); **Undo all changes** takes back every change from today on.
+- Claude Code keeps the day's conversation as a session run from `data/coach`, where it sees none of the project's files and has no tools of its own: it answers with a reply and the changes to make, which the server checks and carries out (telling it about any that fail).
 
 Today's suggested session for running and cycling (the one you do most first), in steps like a Garmin workout: warm-up, the main set with its repeats and targets, cool-down. A bar shows its shape, each block as long as the step and as tall as it's hard. Under the title: total time, distance for runs, and what decided it.
 
@@ -152,6 +164,7 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 | `DASHBOARD_URL` | empty | Where the desktop app and `Open dashboard.bat` connect when the server is on another device (e.g. `http://192.168.1.20:8000`) |
 | `DASHBOARD_PASSWORD` | empty | Turns on the login page. Recommended with `HOST=0.0.0.0` |
 | `DASHBOARD_USERNAME` | empty | Also asks for a username; empty means password only |
+| `ANTHROPIC_API_KEY` | empty | The workout chat uses the Anthropic API (billed per message) instead of Claude Code |
 | `TOKEN_DIR` | ~/.garminconnect | Where the Garmin login token is stored |
 | `DB_PATH` | data/athlete.db | SQLite database, relative to the project folder |
 

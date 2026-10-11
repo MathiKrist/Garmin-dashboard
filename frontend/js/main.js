@@ -10,6 +10,7 @@ import { renderActivities } from "./activities.js";
 import { renderSport } from "./sport.js";
 import { renderWorkout } from "./workout.js";
 import { renderPlan } from "./plan.js";
+import "./chat.js";
 import { redrawModalMap } from "./modal.js";
 
 let pollTimer = null;

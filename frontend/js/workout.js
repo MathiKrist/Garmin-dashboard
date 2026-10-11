@@ -57,6 +57,10 @@ export function renderWorkout() {
   $("wkTotal").textContent = w.kind === "rest" ? (w.next ? `Next: ${w.next.title}, ${fmtDay(w.next.date)}` : "")
     : (w.total_s ? total(w.total_s) : "") + (w.km ? ` · about ${w.km.toFixed(1)} km` : "");
   $("wkWhy").textContent = w.why.join(" · ");
+  // Later days changed in the chat, outside a plan (the plan shows its own)
+  const ahead = (data.workouts_ahead || []).filter((x) => x.sport === w.sport);
+  $("wkAhead").hidden = !ahead.length;
+  $("wkAhead").innerHTML = ahead.map((x) => `<li>${fmtDay(x.date)} · <b>${escapeHtml(x.title)}</b>${x.total_s ? ` · ${total(x.total_s)}` : ""}</li>`).join("");
   $("wkBar").innerHTML = barHtml(w.steps);
   $("wkBar").setAttribute("aria-label", `${w.title}, ${total(w.total_s)}`);
   $("wkSteps").innerHTML = stepsHtml(w.steps);

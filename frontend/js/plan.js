@@ -25,6 +25,7 @@ function status(s) {
   const parts = [];
   if (s.status === "today") parts.push("<b>Today</b>");
   if (s.moved_from) parts.push(`Moved from ${DAYS[(new Date(s.moved_from + "T12:00:00").getDay() + 6) % 7]}`);
+  if (s.changed) parts.push("Changed in chat");
   if (s.sent) parts.push("On the watch");
   return parts.join(" · ");
 }

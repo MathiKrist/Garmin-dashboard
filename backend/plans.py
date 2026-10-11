@@ -8,8 +8,9 @@ import json
 import math
 from datetime import date, timedelta
 
+import changes as chat_changes
 import workouts
-from workouts import LT_FROM_5K, _flat, _repeat, _round5, _run_steps, _step
+from workouts import LT_FROM_5K, _flat, _repeat, _round5, _run_steps, _step, km_of
 
 GOALS = {"race": "Race", "fitness": "General fitness"}
 PHASES = {"base": "Base", "build": "Build", "peak": "Peak", "taper": "Taper"}
@@ -166,15 +167,6 @@ def _long_steps(total, t, race_finish):
             _step("interval", "Race pace finish", finish * 60, "high", t.race() or t.hr(4))]
 
 
-def km_of(steps, t):
-    """Distance from the middle of each step's pace range, steps without one at easy pace."""
-    easy = t.pace("easy")
-    if not easy:
-        return None
-    mid = lambda p: (p["slow"] + p["fast"]) / 2
-    return round(sum(s["s"] / mid(s["target"] if (s["target"] or {}).get("type") == "pace" else easy) for s in _flat(steps)), 1)
-
-
 def make_session(kind, day, cfg, phase, deload, t, km=None):
     """One session: its steps, length and distance. `km` sets the length of easy and long runs."""
     easy = t.pace("easy")
@@ -323,18 +315,28 @@ def _match(sessions, runs):
 
 def reshuffle(sessions, today):
     """A key session (hard or long) missed this week moves to the next plan day from today on, in place of an easy
-    run, which is dropped; a missed easy run is just missed. A run on that day counts for the moved session."""
+    run, which is dropped; a missed easy run is just missed. A run on that day counts for the moved session. Days
+    changed in the chat stay as they are."""
     for s in sessions:
-        if s["status"] != "missed" or s["kind"] not in KEY_KINDS:
+        if s["status"] != "missed" or s["kind"] not in KEY_KINDS or s.get("changed"):
             continue
         spot = next((x for x in sessions if x["kind"] == "easy" and x["date"] >= today.isoformat()
-                     and not x.get("moved_from")), None)
+                     and not x.get("moved_from") and not x.get("changed")), None)
         if spot:
             moved = {**s, "date": spot["date"], "status": spot["status"], "run": spot["run"],
                      "moved_from": s["date"]}
             sessions[sessions.index(spot)] = moved
             s["status"] = "moved"
     return sessions
+
+
+def apply_changes(sessions, changes, t):
+    """The week's sessions with the chat's changes: a changed day's session replaced, removed for a rest day, or
+    added on a day without one."""
+    days = {c["date"]: c for c in changes}
+    out = [s for s in sessions if s["date"] not in days]
+    out += [x for x in (chat_changes.session(c, t) for c in days.values()) if x]
+    return sorted(out, key=lambda s: s["date"])
 
 
 # ---- The whole plan
@@ -344,8 +346,9 @@ def fitness_now(profile, pred_5k):
     return workouts.Targets(profile, pred_5k).lt
 
 
-def build(cfg, acts, laps_by_id, profile, today, sent=()):
-    """The plan as the page shows it. `acts` are the activity summaries (any order)."""
+def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
+    """The plan as the page shows it. `acts` are the activity summaries (any order); `changes` are the chat's, of which
+    the runs within the plan count."""
     start = date.fromisoformat(cfg["start"])
     end = date.fromisoformat(cfg["date"])
     weeks = layout(cfg)
@@ -375,7 +378,10 @@ def build(cfg, acts, laps_by_id, profile, today, sent=()):
         week_start = wk[0]
         if week_start <= today:
             history.append({"date": max(week_start, start).isoformat(), "s": race_s})
+        week_end = week_start + timedelta(days=6)
         sessions = week_sessions(cfg, i, wk, km, t, start)
+        sessions = apply_changes(sessions, [c for c in changes if c["sport"] == "run" and max(week_start, start)
+                                            <= date.fromisoformat(c["date"]) <= min(week_end, end)], t)
         week_runs = [r for r in runs if monday(date.fromisoformat(r["date"])) == week_start]
         matched = _match(sessions, week_runs)
         for j, s in enumerate(sessions):
@@ -454,6 +460,8 @@ def todays(plan, today):
     if found:
         w, s = found
         why.append(PHASES[w["phase"]] + (" · deload" if w["deload"] else ""))
+        if s.get("changed"):
+            why.append("Changed in chat" + (f": {s['reason']}" if s["reason"] else ""))
         return {"sport": "run", "label": workouts.SPORTS["run"], "kind": s["kind"], "title": s["title"],
                 "total_s": s["total_s"] or 0, "km": s["km"], "why": why, "steps": s["steps"], "paces": True,
                 "plan": True, "key": s["key"], "sent": s["sent"]}

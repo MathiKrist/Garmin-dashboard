@@ -6,6 +6,7 @@ from statistics import median
 
 import config
 import db
+import changes as chat_changes
 import plans
 import workouts
 
@@ -322,6 +323,7 @@ def build_dashboard(db_path=None):
         sent = json.loads(db.get_meta(conn, "workouts_sent") or "[]")
         plan_cfg = json.loads(db.get_meta(conn, "training_plan") or "null")
         plan_sent = json.loads(db.get_meta(conn, "plan_sent") or "[]")
+        changes = chat_changes.load(conn)
         # Laps of the plan's runs, to see how the intervals went
         plan_laps = {r["activity_id"]: json.loads(r["laps"]) for r in conn.execute(
             "SELECT l.activity_id, l.laps FROM laps l JOIN activities a ON a.id = l.activity_id WHERE a.date >= ?",
@@ -390,13 +392,13 @@ def build_dashboard(db_path=None):
     status, focus = _training_status(days, today), _load_focus(days, today)
     race = _race(json.loads(goal), days, acts, today) if goal else None
     focus_phrase = next((d["load_focus"] for d in recent if d.get("load_focus")), None)
+    pred_5k = next((d["pred_5k"] for d in recent if d.get("pred_5k")), None)
     workout_list = workouts.recommend(
         recent_acts, today, readiness=today_vals["readiness"], status=status and status["code"], focus=focus_phrase,
-        focus_title=focus and focus["title"], race=race, profile=profile,
-        pred_5k=next((d["pred_5k"] for d in recent if d.get("pred_5k")), None), sent=sent)
+        focus_title=focus and focus["title"], race=race, profile=profile, pred_5k=pred_5k, sent=sent)
 
     # The training plan; on its days its run replaces the suggested one, on the days between it's a rest day
-    plan = plans.build(plan_cfg, recent_acts, plan_laps, profile, today, plan_sent) if plan_cfg else None
+    plan = plans.build(plan_cfg, recent_acts, plan_laps, profile, today, plan_sent, changes) if plan_cfg else None
     plan_run = plans.todays(plan, today) if plan else None
     if plan_run:
         if (today_vals["readiness"] is not None and today_vals["readiness"] < 25) or (status and status["code"] == "OVERREACHING"):
@@ -404,6 +406,25 @@ def build_dashboard(db_path=None):
         workout_list = [plan_run if w["sport"] == "run" else w for w in workout_list]
         if not any(w["sport"] == "run" for w in workout_list):
             workout_list.insert(0, plan_run)
+    # Changes made in the chat, outside the plan's runs (the plan has those): today's replaces the suggestion, later
+    # ones are listed under it
+    in_plan = lambda c: plan and not plan["over"] and c["sport"] == "run" and plan_cfg["start"] <= c["date"] <= plan_cfg["date"]
+    targets = workouts.Targets(profile, pred_5k)
+    upcoming = []
+    for c in changes:
+        if c["date"] < today.isoformat() or in_plan(c):
+            continue
+        if c["date"] == today.isoformat():
+            w = chat_changes.workout(c, targets, sent)
+            if any(x["sport"] == c["sport"] for x in workout_list):
+                workout_list = [w if x["sport"] == c["sport"] else x for x in workout_list]
+            else:
+                workout_list.append(w)
+        else:
+            x = chat_changes.session(c, targets)
+            upcoming.append({"date": c["date"], "sport": c["sport"], "title": x["title"] if x else "Rest day",
+                             "total_s": x["total_s"] if x else 0, "km": x["km"] if x else None})
+
     if race and plan and plan["projection"] and plan_cfg["goal"] == "race" and plan_cfg["date"] == race["date"]:
         race["plan"] = {k: plan["projection"][k] for k in ("low", "high")}
 
@@ -419,6 +440,7 @@ def build_dashboard(db_path=None):
         "vo2max": _vo2max(days, today),
         "race": race,
         "workouts": workout_list,
+        "workouts_ahead": upcoming,  # later days changed in the chat, outside a plan
         "plan": plan,
         "fitness": fitness[-365:],  # the chart shows 120 days or the whole year
         "trends": trends,

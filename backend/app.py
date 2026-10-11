@@ -23,6 +23,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+import changes as chat_changes
+import coach
 import config
 import db
 import metrics
@@ -359,6 +361,45 @@ async def send_plan_week(request: Request):
     finally:
         conn.close()
     return {"status": "sent"}
+
+
+@app.get("/api/chat")
+def chat_log():
+    """Today's chat on the Workout page, and whether it can run (it needs Claude Code on this machine or
+    ANTHROPIC_API_KEY)."""
+    return {"enabled": coach.backend() is not None, "log": coach.history(DB_PATH)}
+
+
+@app.post("/api/chat")
+async def chat(request: Request):
+    """One message to the chat: {text}. Claude may change sessions while answering."""
+    text = str((await request.json()).get("text") or "").strip()[:2000]
+    if not text:
+        return JSONResponse({"error": "Write a message first."}, status_code=400)
+    if not coach.backend():
+        return JSONResponse({"error": "The chat needs Claude Code installed on the machine running the server, "
+                                      "or ANTHROPIC_API_KEY in .env."}, status_code=400)
+    return await asyncio.to_thread(coach.send, DB_PATH, text, _dashboard_data)
+
+
+@app.delete("/api/chat")
+def new_chat():
+    """Start the chat over. Changes it made stay."""
+    coach.clear(DB_PATH)
+    return {"status": "cleared"}
+
+
+@app.delete("/api/changes")
+def undo_changes():
+    """Take back every change the chat made from today on: the suggested and planned sessions return."""
+    conn = db.connect(DB_PATH)
+    try:
+        today = date.today()
+        chat_changes.save(conn, [c for c in chat_changes.load(conn) if c["date"] < today.isoformat()], today)
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "removed"}
 
 
 @app.post("/api/sync")

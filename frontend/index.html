@@ -42,19 +42,32 @@
   <div id="notice" class="notice" role="status" hidden></div>
 
   <main id="main" hidden>
-    <!-- Workout: today's session per sport, which the Send to watch button puts in the Garmin calendar, and the
-         training plan it comes from: weeks of runs toward a race or general fitness, with the time it projects -->
+    <!-- Workout: a chat with Claude that changes the sessions, today's session per sport, which the Send to watch
+         button puts in the Garmin calendar, and the training plan it comes from: weeks of runs toward a race or
+         general fitness, with the time it projects -->
     <div class="page" id="page-workout" data-title="Workout" hidden>
       <header class="page-head page-head-row">
         <h1>Workout</h1>
         <div class="range-switch" id="workoutSport" role="group" aria-label="Sport"></div>
       </header>
+      <section class="chat" aria-label="Chat about the workout">
+        <ol class="chat-log" id="chatLog" aria-live="polite" hidden></ol>
+        <form class="chat-form" id="chatForm">
+          <textarea id="chatInput" rows="1" maxlength="2000" aria-label="Message"
+            placeholder="Change it: only 30 minutes today, move Thursday's intervals to Friday…"></textarea>
+          <button type="submit" class="primary" id="chatSend">Send</button>
+        </form>
+        <p class="chat-foot"><span id="chatNote" role="status"></span>
+          <button type="button" class="link-btn" id="chatUndo" hidden>Undo all changes</button>
+          <button type="button" class="link-btn" id="chatNew" hidden>New chat</button></p>
+      </section>
       <section class="wk" id="workout" aria-labelledby="wkTitle">
         <div>
           <p class="eyebrow" id="wkWhen"></p>
           <h2 id="wkTitle"></h2>
           <p class="wk-total" id="wkTotal"></p>
           <p class="wk-why" id="wkWhy"></p>
+          <ul class="wk-ahead" id="wkAhead" hidden></ul>
           <div class="wk-send">
             <button type="button" id="wkSend">Send to watch</button>
             <span id="wkSendNote" role="status"></span>

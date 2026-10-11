@@ -127,6 +127,15 @@ def _flat(steps):
             yield s
 
 
+def km_of(steps, t):
+    """Distance from the middle of each step's pace range, steps without one at easy pace."""
+    easy = t.pace("easy")
+    if not easy:
+        return None
+    mid = lambda p: (p["slow"] + p["fast"]) / 2
+    return round(sum(s["s"] / mid(s["target"] if (s["target"] or {}).get("type") == "pace" else easy) for s in _flat(steps)), 1)
+
+
 def _ago(n):
     return "today" if n == 0 else "yesterday" if n == 1 else f"{n} days ago"
 
@@ -190,14 +199,8 @@ def recommend(acts, today, *, readiness, status, focus, focus_title, race, profi
                  "shakeout": 25 if sport == "run" else 40}.get(kind, typical)
         total = _round5(total * (1 if kind in ("recovery", "shakeout") else volume))
         steps = (_run_steps if sport == "run" else _bike_steps)(kind, total, t)
-        flat = list(_flat(steps))
-        total_s = sum(s["s"] for s in flat)
-        # Distance from the middle of each step's pace range; steps without one at easy pace
-        easy = t.pace("easy")
-        km = None
-        if sport == "run" and easy:
-            mid = lambda p: (p["slow"] + p["fast"]) / 2
-            km = round(sum(s["s"] / mid(s["target"] if (s["target"] or {}).get("type") == "pace" else easy) for s in flat), 1)
+        total_s = sum(s["s"] for s in _flat(steps))
+        km = km_of(steps, t) if sport == "run" else None
         title = f"{TITLES[kind]} {NOUN[sport]}" if kind in ("recovery", "easy", "long", "shakeout") else TITLES[kind]
         out.append({
             "sport": sport, "label": SPORTS[sport], "kind": kind, "title": title, "total_s": total_s, "km": km,

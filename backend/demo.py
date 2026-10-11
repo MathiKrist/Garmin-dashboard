@@ -36,8 +36,8 @@ def seed(db_path, days=420):
     if db.get_meta(conn, "demo_date") == date.today().isoformat() and db.get_meta(conn, "demo_version") == DEMO_VERSION:
         conn.close()
         return
-    # A race goal and plan set in demo mode outlive the daily rebuild
-    kept = {k: db.get_meta(conn, k) for k in ("race_goal", "training_plan", "plan_sent")}
+    # A race goal, plan and chat changes set in demo mode outlive the daily rebuild
+    kept = {k: db.get_meta(conn, k) for k in ("race_goal", "training_plan", "plan_sent", "workout_changes", "coach_chat")}
     conn.executescript("DELETE FROM activities; DELETE FROM daily; DELETE FROM tracks; DELETE FROM laps; "
                        "DELETE FROM efforts; DELETE FROM meta;")
     for k, v in kept.items():

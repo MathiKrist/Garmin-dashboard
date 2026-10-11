@@ -144,6 +144,32 @@ body {
 .theme-switch { margin-top: auto; gap: 0.3rem; }
 .theme-switch button { padding: 0.25rem 0.65rem; font-size: 0.82rem; }
 /* Workout: today's session on the left, its shape and steps on the right */
+/* The chat on the workout page: the conversation, then the box to write in */
+.chat { padding: 1.25rem 0; border-bottom: 1px solid var(--rule); }
+.chat-log { list-style: none; margin: 0 0 1rem; padding: 0 0.25rem 0 0; display: grid; gap: 0.75rem; max-height: 24rem; overflow-y: auto; }
+.chat-log li { max-width: min(42rem, 88%); line-height: 1.45; overflow-wrap: anywhere; }
+.chat-log .user { justify-self: end; background: var(--ink); color: var(--paper); padding: 0.5rem 0.85rem; border-radius: 14px 14px 4px 14px; white-space: pre-wrap; }
+.chat-log .assistant { justify-self: start; }
+.chat-log .assistant p { margin: 0 0 0.5rem; }
+.chat-log .assistant p:last-child { margin-bottom: 0; }
+.chat-log .error { color: var(--fatigue); }
+.chat-log .pending { color: var(--muted); }
+.chat-changes { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chat-changes li { font-size: 0.85rem; color: var(--easy); border: 1px solid var(--easy); border-radius: 999px; padding: 0.1rem 0.6rem; }
+.chat-form { display: flex; gap: 0.6rem; align-items: flex-end; }
+.chat-form textarea {
+  flex: 1; min-width: 0; resize: none; max-height: 9rem; font: 400 1rem/1.4 var(--body); color: var(--ink);
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 18px; padding: 0.5rem 0.9rem;
+}
+.chat-form button { padding: 0.5rem 1.1rem; }
+.chat-foot { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: baseline; margin: 0.5rem 0 0; color: var(--muted); font-size: 0.85rem; }
+.chat-foot span:empty { display: none; }
+.chat-foot .link-btn { font-size: 0.85rem; }
+.chat-foot span.error { color: var(--fatigue); }
+.wk-ahead { list-style: none; margin: 0.9rem 0 0; padding: 0; font-size: 0.95rem; }
+.wk-ahead li { padding: 0.2rem 0; }
+.wk-ahead b { font-weight: 600; }
+
 .wk { display: grid; gap: 1.5rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
 @media (min-width: 60rem) { .wk { grid-template-columns: minmax(16rem, 2fr) 3fr; } }
 .wk .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
