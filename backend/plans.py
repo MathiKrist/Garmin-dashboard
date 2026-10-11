@@ -23,6 +23,11 @@ RAMP = 1.08  # weekly volume grows at most this much
 DELOAD = 0.75  # every 4th week
 TAPER_VOLUME = (0.75, 0.6, 0.45)  # of peak volume, the last taper week (race week) last
 EASY_MIN_KM = 4
+MAX_GROWTH = 2.5  # the weekly volume never goes past this times the starting volume
+LONG_STEP = (0.5, 1.5)  # km the long run grows in a normal week, at least and at most
+LONG_SHARE = 0.5  # of the week's km, at most
+LONG_DOWN = {False: (0.7,), True: (0.75, 0.55)}  # the long run after its peak, as a share of it, for races up to 10 km and longer
+TOUCH_REPS = 3  # race week's race-pace session: this many km at race pace
 
 # Adaptation: each run moves the fitness factor this share of the way toward what it showed (half for easy runs,
 # whose heart rate says less), unless within the deadband ("on plan"); the factor moves at most WEEK_CAP a week and
@@ -43,14 +48,22 @@ def taper_weeks(metres):
     return 1 if metres <= 10000 else 2 if metres <= 21098 else 3
 
 
-def peak_multiple(goal, metres):
+def ceiling_km(goal, metres):
+    """The weekly km a plan builds toward, by race distance (a fitness plan as for 10 km)."""
     if goal == "fitness":
-        return 1.25
-    return 1.3 if metres <= 5000 else 1.4 if metres <= 10000 else 1.5 if metres <= 21098 else 1.7
+        return 45
+    return 35 if metres <= 5000 else 45 if metres <= 10000 else 50 if metres <= 21098 else 70
+
+
+def long_peak_km(goal, metres):
+    """The longest long run, by race distance."""
+    if goal == "fitness":
+        return 16
+    return 12 if metres <= 5000 else 16 if metres <= 10000 else 19 if metres <= 21098 else 32
 
 
 def long_cap_min(metres):
-    return 90 if metres <= 10000 else 120 if metres <= 21098 else 180
+    return 110 if metres <= 10000 else 150 if metres <= 21098 else 210
 
 
 def monday(d):
@@ -85,24 +98,59 @@ def layout(cfg):
     out = []
     for i in range(n):
         phase = "base" if i < base else "build" if i < base + build else "peak" if i < train else "taper"
-        deload = phase != "taper" and (i + 1) % 4 == 0 and i < n - 1
+        # Every 4th week is lighter, up to the long run's peak week and the last before the taper (or the plan's end)
+        deload = phase != "taper" and (i + 1) % 4 == 0 and i < min(train - 1, long_peak_week(cfg, n))
         out.append((first + timedelta(weeks=i), phase, deload))
     return out
 
 
 def volumes(cfg, weeks):
-    """Planned km per week: up RAMP a week from the starting volume to the peak, less in deload weeks (which don't
-    count as a step up) and taper weeks."""
-    peak = cfg["start_km"] * peak_multiple(cfg["goal"], cfg["metres"])
-    out, level, tapers = [], cfg["start_km"], [w for w in weeks if w[1] == "taper"]
-    for i, (start, phase, deload) in enumerate(weeks):
+    """Planned km per week: up RAMP a week from the starting volume until the taper, stopping at the distance's
+    ceiling (or MAX_GROWTH times the start, if lower); less in deload weeks (which don't count as a step up) and taper
+    weeks, which take a share of the highest week."""
+    start = cfg["start_km"]
+    ceiling = max(start, min(ceiling_km(cfg["goal"], cfg["metres"]), start * MAX_GROWTH))
+    out, level, tapers = [], start, [w for w in weeks if w[1] == "taper"]
+    for i, (_, phase, deload) in enumerate(weeks):
         if phase == "taper":
-            out.append(peak * TAPER_VOLUME[len(TAPER_VOLUME) - len(tapers) + tapers.index((start, phase, deload))])
+            out.append(level * TAPER_VOLUME[len(TAPER_VOLUME) - len(tapers) + tapers.index(weeks[i])])
         elif deload:
             out.append(level * DELOAD)
         else:
-            level = min(peak, level * RAMP) if i else level
+            level = min(ceiling, level * RAMP) if i else level
             out.append(level)
+    return out
+
+
+def long_peak_week(cfg, n):
+    """The week (index) of the longest long run: 3 weeks before race week for the half and longer, 2 for shorter races,
+    the last week for a fitness plan."""
+    if cfg["goal"] != "race":
+        return n - 1
+    return max(0, n - 1 - len(LONG_DOWN[cfg["metres"] > 10000]) - 1)
+
+
+def long_runs(cfg, weeks, kms):
+    """The long run's km each week: from 30% of the starting week, up a steady step each normal week so it reaches the
+    distance's longest in its peak week (long_peak_week); never more than LONG_SHARE of its week. Deload weeks take
+    DELOAD of it without stepping; after the peak it steps down by LONG_DOWN of the longest, to race week."""
+    race = cfg["goal"] == "race"
+    first = max(6 if race else 5, cfg["start_km"] * 0.3)
+    top = max(first, long_peak_km(cfg["goal"], cfg["metres"]))
+    peak = long_peak_week(cfg, len(weeks))
+    down = LONG_DOWN[cfg["metres"] > 10000]
+    steps = sum(1 for i, w in enumerate(weeks) if 0 < i <= peak and not w[2])
+    step = min(LONG_STEP[1], max(LONG_STEP[0], (top - first) / steps)) if steps else 0
+    out, level, longest = [], first, first
+    for i, (w, km) in enumerate(zip(weeks, kms)):
+        if i > peak:
+            out.append(max(first, longest * down[min(i - peak, len(down)) - 1]))
+            continue
+        if i and not w[2]:
+            level = min(top, level + step)
+        long_km = max(first, min(level * (DELOAD if w[2] else 1), km * LONG_SHARE))
+        longest = max(longest, long_km)
+        out.append(long_km)
     return out
 
 
@@ -159,6 +207,15 @@ def _race_pace_steps(total, t):
             _step("cooldown", "Cool-down", 600, "easy")]
 
 
+def _touch_steps(t):
+    """Race week: a little race pace to stay sharp, 15 min easy then TOUCH_REPS × 1 km with jogs."""
+    rep = round(1000 / t.race_speed) if t.race_speed else 300
+    return [_step("warmup", "Warm-up", 900, "easy", t.run("easy", 2)),
+            _repeat(TOUCH_REPS, _step("interval", "Race pace", rep, "high", t.race() or t.hr(4)),
+                    _step("recovery", "Easy jog", 120, "rest")),
+            _step("cooldown", "Cool-down", 300, "easy")]
+
+
 def _long_steps(total, t, race_finish):
     if not race_finish:
         return _run_steps("long", total, t)
@@ -167,8 +224,9 @@ def _long_steps(total, t, race_finish):
             _step("interval", "Race pace finish", finish * 60, "high", t.race() or t.hr(4))]
 
 
-def make_session(kind, day, cfg, phase, deload, t, km=None):
-    """One session: its steps, length and distance. `km` sets the length of easy and long runs."""
+def make_session(kind, day, cfg, phase, deload, t, km=None, touch=False):
+    """One session: its steps, length and distance. `km` sets the length of easy and long runs; `touch` makes a race
+    pace session race week's short one."""
     easy = t.pace("easy")
     easy_pace = (easy["slow"] + easy["fast"]) / 120 if easy else 6.5  # min/km
     if kind == "race":
@@ -184,49 +242,75 @@ def make_session(kind, day, cfg, phase, deload, t, km=None):
         steps = _run_steps("shakeout", 25, t)
     else:
         total = 40 if deload or phase == "taper" else {"base": 45, "build": 50, "peak": 55}[phase]
-        steps = _race_pace_steps(total, t) if kind == "race_pace" else _run_steps(kind, total, t)
-    title = f"{TITLES[kind]} run" if kind in ("easy", "long", "shakeout") else TITLES[kind]
+        steps = (_touch_steps(t) if touch else _race_pace_steps(total, t)) if kind == "race_pace" else _run_steps(kind, total, t)
+    title = "Race pace touch" if touch else f"{TITLES[kind]} run" if kind in ("easy", "long", "shakeout") else TITLES[kind]
     flat = list(_flat(steps))
     return {"date": day.isoformat(), "kind": kind, "title": title, "steps": steps,
             "total_s": sum(s["s"] for s in flat), "km": km_of(steps, t) or (round(km, 1) if km else None)}
 
 
-def week_sessions(cfg, i, week, km, t, first_day):
-    """The week's sessions, in date order. Days before the plan started and after its end are left out; the last two
-    plan days before a race are shakeouts and race day is the race."""
+def race_week(cfg):
+    """{date: kind} for the plan days in the 5 days before a race: the one closest to 4 days out (3 at the least) is
+    a touch of race pace, the last one a shakeout, and the rest rest days (None)."""
+    end = date.fromisoformat(cfg["date"])
+    before = [end - timedelta(days=k) for k in range(5, 0, -1) if (end - timedelta(days=k)).weekday() in cfg["days"]]
+    roles = dict.fromkeys(before)
+    far = [d for d in before if (end - d).days >= 3]
+    touch = min(far, key=lambda d: (abs((end - d).days - 4), -(end - d).days)) if far else None
+    if touch:
+        roles[touch] = "race_pace"
+    shake = next((d for d in reversed(before) if d != touch), None)
+    if shake:
+        roles[shake] = "shakeout"
+    return roles
+
+
+def week_sessions(cfg, i, week, km, t, first_day, long_km):
+    """The week's sessions, in date order. Days before the plan started and after its end are left out. The 5 days
+    before a race hold only a race pace touch and a shakeout (race_week), and race day is the race. When the long run,
+    the hard sessions and the shortest easy runs come to more than the week's km, the second hard session is easy."""
     start, phase, deload = week
     end = date.fromisoformat(cfg["date"])
     days = session_days(cfg["days"], cfg["long_day"], hard_kinds(cfg, phase, len(cfg["days"]), i))
     race = cfg["goal"] == "race"
-    long_share = 0.25 if cfg["goal"] == "fitness" else 0.3
-    long_km = max(6 if race else 5, km * long_share)
-    # Hard sessions are as long as their shape; the easy runs share what's left of the week's km
-    hard_km, out = 0, []
+    roles = race_week(cfg) if race else {}
+    out = []
     for wd in sorted(days):
         day = start + timedelta(days=wd)
         if day < first_day or day > end:
             continue
         kind = days[wd]
-        if race and (end - day).days <= 2:
-            kind = "race" if day == end else "shakeout"
+        if race and day == end:
+            kind = "race"
+        elif day in roles:
+            if roles[day] is None:
+                continue
+            kind = roles[day]
         out.append([day, kind])
     if race and start <= end < start + timedelta(days=7) and all(d != end for d, _ in out):
         out.append([end, "race"])
         out.sort()
-    sessions = []
-    for day, kind in out:
-        if kind in HARD_KINDS:
-            s = make_session(kind, day, cfg, phase, deload, t)
-            hard_km += s["km"] or 0
-            sessions.append(s)
-        else:
-            sessions.append((day, kind))
-    n_easy = sum(1 for x in sessions if isinstance(x, tuple) and x[1] == "easy")
+
+    def hard(day, kind):
+        return make_session(kind, day, cfg, phase, deload, t, touch=roles.get(day) == "race_pace")
+
+    hard_runs = {d: hard(d, k) for d, k in out if k in HARD_KINDS}
+    n_easy = sum(1 for _, k in out if k == "easy")
+    # Room for the long run: two hard sessions only when they leave the easy runs their shortest within the week's km
+    # The week's first hard kind stays; the second goes
+    kinds = hard_kinds(cfg, phase, len(cfg["days"]), i)
+    hard_order = sorted(hard_runs, key=lambda d: kinds.index(hard_runs[d]["kind"]) if hard_runs[d]["kind"] in kinds else len(kinds))
+    if len(hard_order) > 1 and long_km + sum(s["km"] or 0 for s in hard_runs.values()) + n_easy * EASY_MIN_KM > km * 1.05:
+        second = hard_order[1]
+        del hard_runs[second]
+        next(x for x in out if x[0] == second)[1] = "easy"
+        n_easy += 1
+    hard_km = sum(s["km"] or 0 for s in hard_runs.values())
     # An easy run is never longer than 80% of the long run, even when the week then comes out shorter
     easy_km = max(EASY_MIN_KM, min(long_km * 0.8, (km - long_km - hard_km) / n_easy)) if n_easy else 0
-    return [x if isinstance(x, dict) else make_session(x[1], x[0], cfg, phase, deload, t,
-                                                       long_km if x[1] == "long" else easy_km)
-            for x in sessions]
+    return [hard_runs[day] if day in hard_runs else make_session(kind, day, cfg, phase, deload, t,
+                                                                  long_km if kind == "long" else easy_km)
+            for day, kind in out]
 
 
 # ---- How the runs went
@@ -353,6 +437,7 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
     end = date.fromisoformat(cfg["date"])
     weeks = layout(cfg)
     kms = volumes(cfg, weeks)
+    longs = long_runs(cfg, weeks, kms)
     lt0 = cfg.get("fitness0")
     zones = profile.get("zones") or workouts.Targets(profile, None).floors
     model = hr_model(acts, start, zones)
@@ -371,13 +456,13 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
         return round(race_time(lt, cfg["metres"]))
 
     factor, change, out_weeks, this_week = 1.0, None, [], monday(today)
-    for i, (wk, km) in enumerate(zip(weeks, kms)):
+    for i, (wk, km, long_km) in enumerate(zip(weeks, kms, longs)):
         lt = lt0 * gain(i) * factor if lt0 else None
         race_s = projection(factor)
         t = Paces(profile, lt, cfg["metres"] / race_s if race_s and race else None)
         week_start = wk[0]
         week_end = week_start + timedelta(days=6)
-        sessions = week_sessions(cfg, i, wk, km, t, start)
+        sessions = week_sessions(cfg, i, wk, km, t, start, long_km)
         sessions = apply_changes(sessions, [c for c in changes if c["sport"] == "run" and max(week_start, start)
                                             <= date.fromisoformat(c["date"]) <= min(week_end, end)], t)
         week_runs = [r for r in runs if monday(date.fromisoformat(r["date"])) == week_start]

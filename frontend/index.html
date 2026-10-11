@@ -7,7 +7,7 @@
 <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#131A18">
+<meta name="theme-color" content="#0E1116">
 <link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/static/styles.css">
@@ -61,17 +61,19 @@
         <h1>Workout</h1>
         <div class="range-switch" id="workoutSport" role="group" aria-label="Sport"></div>
       </header>
-      <section class="chat" aria-label="Chat about the workout">
-        <ol class="chat-log" id="chatLog" aria-live="polite" hidden></ol>
-        <form class="chat-form" id="chatForm">
-          <textarea id="chatInput" rows="1" maxlength="2000" aria-label="Message"
-            placeholder="Change it: only 30 minutes today, move Thursday's intervals to Friday…"></textarea>
-          <button type="submit" class="primary" id="chatSend">Send</button>
-        </form>
-        <p class="chat-foot"><span id="chatNote" role="status"></span>
-          <button type="button" class="link-btn" id="chatUndo" hidden>Undo all changes</button>
-          <button type="button" class="link-btn" id="chatNew" hidden>New chat</button></p>
-      </section>
+      <p class="plan-add"><button type="button" class="link-btn" id="planAdd" hidden>+ Training plan</button></p>
+      <!-- The plan's line and the next 7 days; a day opens below -->
+      <div id="planTop" hidden>
+        <div class="plan-line">
+          <h2 id="planName"></h2>
+          <span class="plan-stat" id="planProj"></span>
+          <span class="plan-stat" id="planChange"></span>
+          <span class="plan-stat" id="planTarget"></span>
+          <span class="plan-when" id="planWhen"></span>
+          <button type="button" class="link-btn" id="planEdit">Edit</button>
+        </div>
+        <div class="strip" id="planStrip" role="group" aria-label="The next 7 days"></div>
+      </div>
       <section class="wk" id="workout" aria-labelledby="wkTitle">
         <div>
           <p class="eyebrow" id="wkWhen"></p>
@@ -89,31 +91,30 @@
           <ol class="wk-steps" id="wkSteps"></ol>
         </div>
       </section>
-      <p class="plan-add"><button type="button" class="link-btn" id="planAdd" hidden>+ Training plan</button></p>
-      <div id="plan" hidden>
-        <section class="race" aria-labelledby="planName">
-          <div>
-            <p class="eyebrow" id="planWhen"></p>
-            <div class="race-title"><h2 id="planName"></h2><button type="button" class="link-btn" id="planEdit">Edit</button></div>
-            <dl class="race-stats" id="planStats"></dl>
+      <section class="plan-weeks" id="planWeeksSec" aria-labelledby="planWeeksTitle" hidden>
+        <div class="section-head">
+          <h2 id="planWeeksTitle">Week by week</h2>
+          <div class="wk-send">
+            <button type="button" id="planSend">Send next 7 days</button>
+            <span id="planSendNote" role="status"></span>
           </div>
-        </section>
-        <section class="plan-week">
-          <div class="section-head">
-            <h2 id="planWeekTitle"></h2>
-            <div class="wk-send">
-              <button type="button" id="planSend">Send week to watch</button>
-              <span id="planSendNote" role="status"></span>
-            </div>
-          </div>
-          <p class="reading" id="planWeekSub"></p>
-          <ol class="plan-sessions" id="planSessions"></ol>
-        </section>
-        <section class="plan-week">
-          <h2>All weeks</h2>
-          <ol class="plan-weeks" id="planWeeks"></ol>
-        </section>
-      </div>
+        </div>
+        <div class="kind-legend" id="planLegend"></div>
+        <div class="kmchart" id="planChart" role="group" aria-label="Planned km per week"></div>
+        <h3 class="plan-week-title" id="planWeekTitle"></h3>
+        <ol class="plan-sessions" id="planSessions"></ol>
+      </section>
+      <section class="chat" aria-label="Chat about the workout">
+        <ol class="chat-log" id="chatLog" aria-live="polite" hidden></ol>
+        <form class="chat-form" id="chatForm">
+          <textarea id="chatInput" rows="1" maxlength="2000" aria-label="Message"
+            placeholder="Change it: only 30 minutes today, move Thursday's intervals to Friday…"></textarea>
+          <button type="submit" class="primary" id="chatSend">Send</button>
+        </form>
+        <p class="chat-foot"><span id="chatNote" role="status"></span>
+          <button type="button" class="link-btn" id="chatUndo" hidden>Undo all changes</button>
+          <button type="button" class="link-btn" id="chatNew" hidden>New chat</button></p>
+      </section>
     </div>
 
     <!-- Overview: the athlete's story, with the big picture of fitness and training -->

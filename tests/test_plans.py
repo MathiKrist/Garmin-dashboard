@@ -60,7 +60,43 @@ class Layout(unittest.TestCase):
         for km, w in zip(kms, weeks):
             if w[2]:
                 self.assertLess(km, max(normal))
-        self.assertAlmostEqual(max(kms), 30 * 1.5)
+        self.assertAlmostEqual(max(kms), 50)  # the half's ceiling
+
+    def test_volume_keeps_building_on_a_long_plan(self):
+        # 30 weeks from 19 km: up to 2.5 times the start, under the half's ceiling, and held until the taper
+        cfg = config(start_km=19, date=(START + timedelta(weeks=29, days=5)).isoformat())
+        weeks = plans.layout(cfg)
+        kms = plans.volumes(cfg, weeks)
+        self.assertAlmostEqual(max(kms), 19 * plans.MAX_GROWTH)
+        last = max(i for i, w in enumerate(weeks) if w[1] != "taper" and not w[2])
+        self.assertAlmostEqual(kms[last], max(kms))
+
+    def test_long_run_builds_to_the_distance(self):
+        cfg = config(start_km=19, date=(START + timedelta(weeks=29, days=5)).isoformat())
+        weeks = plans.layout(cfg)
+        kms = plans.volumes(cfg, weeks)
+        longs = plans.long_runs(cfg, weeks, kms)
+        # The longest 3 weeks before race week, then down to 75% and 55% of it
+        peak = len(weeks) - 4
+        self.assertEqual(plans.long_peak_week(cfg, len(weeks)), peak)
+        self.assertAlmostEqual(longs[peak], plans.long_peak_km("race", 21098))
+        self.assertEqual(longs.index(max(longs)), peak)
+        self.assertAlmostEqual(longs[peak + 1], longs[peak] * 0.75)
+        self.assertAlmostEqual(longs[peak + 2], longs[peak] * 0.55)
+        self.assertFalse(any(w[2] for w in weeks[peak:]))
+        for km, long_km in zip(kms, longs):
+            self.assertLessEqual(long_km, max(6, km * plans.LONG_SHARE) + 1e-9)
+        normal = [x for x, w in zip(longs, weeks) if w[1] != "taper" and not w[2]]
+        for a, b in zip(normal, normal[1:]):
+            self.assertLessEqual(b - a, plans.LONG_STEP[1] + 1e-9)
+
+    def test_short_plan_peaks_lower(self):
+        # 8 weeks from 30 km: the ramp limits it before the ceiling, and the long run steps at most LONG_STEP
+        cfg = config(date=(START + timedelta(weeks=7, days=5)).isoformat())
+        weeks = plans.layout(cfg)
+        kms = plans.volumes(cfg, weeks)
+        self.assertLess(max(kms), 50)
+        self.assertLess(max(plans.long_runs(cfg, weeks, kms)), plans.long_peak_km("race", 21098))
 
 
 class Sessions(unittest.TestCase):
@@ -84,6 +120,27 @@ class Sessions(unittest.TestCase):
         self.assertEqual(last[-1]["kind"], "race")
         self.assertEqual(last[-1]["date"], config()["date"])
         self.assertEqual(last[-2]["kind"], "shakeout")
+
+    def test_race_week_is_a_touch_of_race_pace_and_a_shakeout(self):
+        # Race week's days: Tue, Thu, Sat, Sun race. Tuesday (5 days out) gets the race pace touch, Saturday the
+        # shakeout, and Thursday is rest
+        last = sessions(build(), -1)
+        kinds = [s["kind"] for s in last]
+        self.assertEqual(kinds, ["race_pace", "shakeout", "race"])
+        touch = [s for s in last if s["kind"] == "race_pace"]
+        self.assertEqual(len(touch), 1)
+        self.assertEqual(touch[0]["title"], "Race pace touch")
+        self.assertEqual(touch[0]["date"], (START + timedelta(weeks=12, days=1)).isoformat())
+
+    def test_one_hard_session_when_the_long_run_needs_room(self):
+        # 4 days on a small volume: the long run and two hard sessions don't fit, so the second is easy
+        small = build(config(start_km=19, date=(START + timedelta(weeks=12, days=6)).isoformat()))
+        peak = plans.long_peak_week(small["config"], len(small["weeks"]))
+        for w in small["weeks"][:peak + 1]:
+            self.assertLessEqual(sum(1 for s in w["sessions"] if s["kind"] in plans.HARD_KINDS), 1)
+        # On a bigger volume both stay
+        big = build(config(start_km=45))
+        self.assertEqual(sum(1 for s in sessions(big, 6) if s["kind"] in plans.HARD_KINDS), 2)
 
     def test_race_pace_in_the_peak_for_a_half(self):
         plan = build()

@@ -1,14 +1,27 @@
 :root {
+  /* Kridt ground and Midnat text here, the other way round in dark */
   --paper: #F2F4F1;
-  --ink: #21302B;
-  --muted: #66716B;
-  --rule: #D5DBD5;
-  --panel: #FAFBF9;
+  --ink: #0E1116;
+  --muted: #5F656E;
+  --rule: #DADDD6;
+  --panel: #FFFFFF;
+  --volt: #C6FF3D;     /* the Workout page's buttons and selected options, with Midnat text */
+  --on-volt: #0E1116;
   --easy: #2F8C78;
   --hard: #D98A1F;
   --fitness: #2C4F86;
   --fatigue: #C24A5A;
+  --good: #2F8C78;     /* text for better or done */
   --nohr: #A9B2AC;
+  --sleep: #4B4FC9;
+  --body-battery: #1F6FE0;
+  --stress: #9A4FA6;
+  /* Workout page sessions: Volt for easy running (dimmer for easy, full for long), Puls for hard (darker for threshold) */
+  --k-easy: #B9EB4F;
+  --k-long: #8ACB00;
+  --k-threshold: #FF9B80;
+  --k-vo2: #FF5A36;
+  --k-jog: #D3D7D0;
   --route: #FF6A00;  /* the glowing route line on the maps */
   /* Sports with their own route color and map (ROUTE_STYLES in js/map.js); swim and disc golf sit on satellite
      photos in both themes, so they always take the bright color */
@@ -40,8 +53,8 @@
   /* One fixed color per sport, for the menu and the sport pages (the dataviz reference palette, in its validated
      order); sports without one use --nohr */
   --sp-run: #2A78D6;
-  --sp-bike: #EB6834;
-  --sp-walk: #1BAF7A;
+  --sp-bike: #1BAF7A;
+  --sp-walk: #EB6834;
   --sp-hike: #EDA100;
   --sp-disc_golf: #E87BA4;
   --sp-winter: #008300;
@@ -54,16 +67,25 @@
 /* Dark: set by js/theme.js (at night, by the system, or by the menu's switch) */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #131A18;
-  --ink: #E3EAE6;
-  --muted: #93A099;
-  --rule: #2B3632;
-  --panel: #18211E;
+  --paper: #0E1116;
+  --ink: #F2F4F1;
+  --muted: #8A909A;
+  --rule: #262B34;
+  --panel: #171B22;
   --easy: #4FB59D;
   --hard: #E9A443;
   --fitness: #7FA3DB;
   --fatigue: #E07383;
+  --good: #4FB59D;
   --nohr: #55615B;
+  --sleep: #7B7FF2;
+  --body-battery: #4DA8FF;
+  --stress: #C27BC9;
+  --k-easy: #7CA02D;
+  --k-long: #C6FF3D;
+  --k-threshold: #A8432C;
+  --k-vo2: #FF5A36;
+  --k-jog: #2A2F38;
   --route: #FF7A1A;
   --route-winter: #46C8FF;
   --satellite-brightness: 0.58;
@@ -86,8 +108,8 @@
   --z4: #F59A40;
   --z5: #EF5A4B;
   --sp-run: #3987E5;
-  --sp-bike: #D95926;
-  --sp-walk: #199E70;
+  --sp-bike: #199E70;
+  --sp-walk: #D95926;
   --sp-hike: #C98500;
   --sp-disc_golf: #D55181;
   --sp-winter: #3FAA3F;  /* lighter than in light mode, to read on the dark page */
@@ -144,6 +166,14 @@ body {
 .theme-switch { margin-top: auto; gap: 0.3rem; }
 .theme-switch button { padding: 0.25rem 0.65rem; font-size: 0.82rem; }
 /* Workout: today's session on the left, its shape and steps on the right */
+/* The Workout page in Volt and Puls; the other pages keep the data colours above */
+#page-workout { --fitness: #4F7F00; --fatigue: #E8492A; --good: #4F7F00; }
+:root[data-theme="dark"] #page-workout { --fitness: #C6FF3D; --fatigue: #FF5A36; --good: #C6FF3D; }
+#page-workout button.primary, #page-workout .range-switch button[aria-pressed="true"] {
+  background: var(--volt); border-color: var(--volt); color: var(--on-volt);
+}
+#page-workout button.primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
 /* The chat on the workout page: the conversation, then the box to write in */
 .chat { padding: 1.25rem 0; border-bottom: 1px solid var(--rule); }
 .chat-log { list-style: none; margin: 0 0 1rem; padding: 0 0.25rem 0 0; display: grid; gap: 0.75rem; max-height: 24rem; overflow-y: auto; }
@@ -155,7 +185,7 @@ body {
 .chat-log .error { color: var(--fatigue); }
 .chat-log .pending { color: var(--muted); }
 .chat-changes { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
-.chat-changes li { font-size: 0.85rem; color: var(--easy); border: 1px solid var(--easy); border-radius: 999px; padding: 0.1rem 0.6rem; }
+.chat-changes li { font-size: 0.85rem; color: var(--good); border: 1px solid var(--good); border-radius: 999px; padding: 0.1rem 0.6rem; }
 .chat-form { display: flex; gap: 0.6rem; align-items: flex-end; }
 .chat-form textarea {
   flex: 1; min-width: 0; resize: none; max-height: 9rem; font: 400 1rem/1.4 var(--body); color: var(--ink);
@@ -197,8 +227,6 @@ body {
 /* Race goal: what, when and how far off, with Garmin's prediction moving toward the target */
 .race { display: grid; gap: 1.25rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
 @media (min-width: 1000px) { .race { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; } }
-#plan .race { grid-template-columns: minmax(0, 1fr); }
-#plan .race-stats { max-width: 42rem; }
 .race .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .race-title { display: flex; align-items: baseline; gap: 1rem; }
 .race h2 { font: 700 clamp(1.9rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; }
@@ -207,7 +235,7 @@ body {
 .race-stats dt { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
 .race-stats .note { display: block; color: var(--ink); font-size: 0.85rem; }
 .race-stats .over { color: var(--fatigue); }
-.race-stats .under { color: var(--easy); }
+.race-stats .under { color: var(--good); }
 .race-trend .chart { height: 190px; }
 button.link-btn { all: unset; cursor: pointer; color: var(--fitness); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 button.link-btn:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
@@ -238,7 +266,7 @@ button.primary { background: var(--ink); color: var(--paper); }
 .tiles dd span { font: 500 1rem var(--body); color: var(--muted); margin-left: 0.15rem; }
 .tiles dt { color: var(--muted); font-size: 0.9rem; margin-top: 0.35rem; }
 .tiles .note { display: block; color: var(--ink); font-size: 0.85rem; }
-.tiles .up { color: var(--easy); }
+.tiles .up { color: var(--good); }
 .tiles .down { color: var(--fatigue); }
 
 /* Personal bests: label, value and date, each opening its activity */
@@ -566,10 +594,65 @@ button.more { margin-top: 1rem; }
 }
 
 /* Training plan, under today's workout: the week's sessions, each opening its steps, and every week of the plan */
-.plan-week { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
-.plan-add { margin: 1.25rem 0 0; }
-.plan-week .wk-send { margin-top: 0; }
-.plan-sessions, .plan-weeks { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.plan-add { margin: 0 0 0.5rem; }
+.plan-add:has(> [hidden]) { display: none; }
+
+/* The plan in one line: name, projected range, last change, target, where in the plan */
+.plan-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1.6rem; padding: 0.9rem 0; border-block: 1px solid var(--rule); }
+.plan-line h2 { font: 700 1.6rem/1.1 var(--display); margin: 0; }
+.plan-stat { display: flex; align-items: baseline; gap: 0.45rem; color: var(--muted); font-size: 0.92rem; }
+.plan-stat b { font: 600 1.6rem/1 var(--display); color: var(--ink); }
+.plan-stat .under, .plan-stat .over { font-weight: 600; font-size: 1rem; }
+.plan-stat .under { color: var(--good); }
+.plan-stat .over { color: var(--fatigue); }
+.plan-when { color: var(--muted); font-size: 0.92rem; }
+
+/* The next 7 days: each run tinted with its type's colour, rest days dashed */
+.strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.45rem; margin: 1.25rem 0 0; }
+.strip .day {
+  all: unset; box-sizing: border-box; cursor: pointer; position: relative; display: flex; flex-direction: column; gap: 0.15rem;
+  min-height: 6.2rem; padding: 0.6rem 0.65rem 0.65rem; border-radius: 8px; overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, var(--rule)); background: color-mix(in srgb, var(--c) 13%, transparent);
+}
+.strip .day::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--c); }
+.strip .day.rest { border: 1px dashed var(--rule); background: none; }
+.strip .day.rest::before { display: none; }
+.strip .day:hover { color: var(--ink); background: color-mix(in srgb, var(--c, var(--rule)) 22%, transparent); }
+.strip .day[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.strip .day:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
+.strip .dn { color: var(--muted); font-size: 0.8rem; }
+.strip .dt { font: 600 1.08rem/1.1 var(--display); }
+.strip .rest .dt { color: var(--muted); font-weight: 500; }
+.strip .dk { margin-top: auto; color: var(--muted); font-size: 0.8rem; }
+.strip .tag { position: absolute; top: 0.5rem; right: 0.5rem; padding: 0 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.05em; text-transform: uppercase; background: var(--volt); color: var(--on-volt); }
+.strip .tag.sent { background: none; color: var(--good); font-size: 0.8rem; }
+
+/* Week by week: planned km per week split by session type, the km done as a line, phases underneath */
+.plan-weeks { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
+.plan-weeks .wk-send { margin-top: 0; }
+.kind-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0.6rem 0 1rem; color: var(--muted); font-size: 0.82rem; }
+.kind-legend i { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -1px; }
+.kmchart .bars, .kmchart .wnums, .kmchart .wphases { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 0.45rem; }
+.kmchart .bars { height: 170px; align-items: end; border-bottom: 1px solid var(--rule); }
+.wbar { all: unset; box-sizing: border-box; cursor: pointer; position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.2rem; }
+.wbar .km { color: var(--muted); font-size: 0.78rem; text-align: center; }
+.wbar .stack { display: flex; flex-direction: column-reverse; gap: 2px; min-height: 2px; border-radius: 4px 4px 0 0; overflow: hidden; }
+.wbar .stack i { display: block; min-height: 2px; }
+.wbar.light .stack { opacity: 0.5; }
+.wbar .done { position: absolute; left: -2px; right: -2px; height: 2px; border-radius: 1px; background: var(--ink); }
+.wbar[aria-pressed="true"] .km { color: var(--ink); font-weight: 600; }
+.wbar[aria-pressed="true"] .stack { outline: 2px solid var(--ink); outline-offset: 2px; }
+.wbar:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
+.kmchart .wbar:hover { background: none; color: inherit; }
+.kmchart .wbar:hover .stack { filter: brightness(1.12); }
+.kmchart .wnums { padding-top: 0.3rem; color: var(--muted); font-size: 0.78rem; text-align: center; }
+.kmchart .wnums .now { color: var(--ink); font-weight: 600; }
+.kmchart .wphases { margin-top: 0.35rem; color: var(--muted); font-size: 0.78rem; }
+.kmchart .wphases span { border-top: 2px solid var(--rule); padding-top: 0.2rem; }
+.plan-week-title { margin: 1.5rem 0 0; font: 600 1.15rem/1.2 var(--display); }
+.plan-sessions { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.kdot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; background: var(--c); margin-right: 0.5rem; }
 .ps { border-top: 1px solid var(--rule); }
 .ps-row { display: grid; grid-template-columns: 7rem minmax(0, 1.4fr) 8.5rem 8.5rem minmax(0, 1.4fr); gap: 0.25rem 1rem; align-items: baseline; padding: 0.7rem 0; cursor: pointer; list-style: none; }
 div.ps-row { cursor: default; }
@@ -577,23 +660,14 @@ div.ps-row { cursor: default; }
 .ps-day, .ps-size, .ps-pace { color: var(--muted); font-size: 0.92rem; white-space: nowrap; }
 .ps-title { font-weight: 600; }
 .ps-status { font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; }
-.ps-done { color: var(--easy); font-weight: 600; white-space: nowrap; }
+.ps-done { color: var(--good); font-weight: 600; white-space: nowrap; }
 .ps-missed { color: var(--muted); }
 .is-missed .ps-title, .is-moved .ps-title { color: var(--muted); text-decoration: line-through; }
 .verdict { color: var(--muted); }
-.verdict.better { color: var(--easy); }
+.verdict.better { color: var(--good); }
 .verdict.worse { color: var(--fatigue); }
 .ps-steps { padding: 0.25rem 0 1.25rem; max-width: 46rem; }
 .ps-steps .wk-steps { margin-top: 1rem; }
-.pw { border-top: 1px solid var(--rule); }
-.pw > details > summary { display: grid; grid-template-columns: 2rem 4.5rem 9rem 7.5rem minmax(0, 1fr); gap: 0.25rem 1rem; align-items: baseline; padding: 0.65rem 0; cursor: pointer; list-style: none; }
-.pw > details > summary::-webkit-details-marker { display: none; }
-.pw-n { font: 600 1.15rem/1 var(--display); }
-.pw-date, .pw-phase, .pw-km { color: var(--muted); font-size: 0.92rem; white-space: nowrap; }
-.pw-key { font-size: 0.92rem; }
-.pw.past { opacity: 0.7; }
-.pw.now .pw-n, .pw.now .pw-phase { color: var(--fitness); }
-.pw .plan-sessions { margin: 0 0 0.75rem 3rem; }
 .plan-days { border: 0; margin: 0; padding: 0; }
 .plan-days legend { color: var(--muted); font-size: 0.9rem; padding: 0; margin-bottom: 0.4rem; }
 .plan-days div { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; }
@@ -602,8 +676,11 @@ div.ps-row { cursor: default; }
 @media (max-width: 760px) {
   .ps-row { grid-template-columns: 5.5rem minmax(0, 1fr); }
   .ps-size, .ps-pace, .ps-status { grid-column: 2; }
-  .pw > details > summary { grid-template-columns: 1.5rem 4rem minmax(0, 1fr); }
-  .pw-km { grid-column: 3; }
-  .pw-key { grid-column: 2 / -1; }
-  .pw .plan-sessions { margin-left: 0; }
+  .strip { gap: 0.25rem; }
+  .strip .day { min-height: 4.8rem; padding: 0.5rem 0.35rem; }
+  .strip .dt { font-size: 0.88rem; overflow-wrap: anywhere; }
+  .strip .dk { display: none; }
+  .strip .tag { position: static; align-self: flex-start; margin-top: auto; font-size: 0.6rem; padding: 0 0.3rem; }
+  .kmchart .bars, .kmchart .wnums, .kmchart .wphases { gap: 0.2rem; }
+  .wbar .km { font-size: 0.68rem; }
 }

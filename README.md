@@ -42,6 +42,8 @@ A menu on the left picks the page. On phones it hides behind the ☰ button in t
 
 The page is dark from 20:00 to 07:00 and otherwise follows the system setting. The **Auto / Light / Dark** switch at the bottom of the menu overrides that, per device.
 
+Colours: Midnat (#0E1116) and Kridt (#F2F4F1) for the ground and text on every page (Kridt ground in light, Midnat in dark). The Workout page has its own: Volt (#C6FF3D) for its buttons, selected options, links and easy running, Puls (#FF5A36) for hard sessions and slower-than-planned. The other pages keep their data colours (blue fitness, red fatigue, green easy, orange hard; on Health, sleep indigo, Body Battery blue and stress orchid), and heart rate zones, training status, load focus and sports keep Garmin's or their own. All are tokens at the top of `frontend/styles.css`.
+
 In bar charts, a period that isn't over yet (this week, this month, today) is drawn paler and marked "so far", so it doesn't read as a drop.
 
 ### Overview
@@ -60,7 +62,7 @@ In bar charts, a period that isn't over yet (this week, this month, today) is dr
 
 ### Workout
 
-A chat at the top, then today's session and, below it, the training plan it comes from (or **+ Training plan** to start one).
+With a training plan: the plan in one line, the next 7 days as a strip, the picked day's session (today to start with), the plan week by week, and the chat at the bottom. Without one: today's session, **+ Training plan**, and the chat.
 
 #### Chat
 
@@ -84,12 +86,12 @@ Today's suggested session for running and cycling (the one you do most first), i
 
 #### Training plan
 
-A running plan toward a race or general fitness, set up with **+ Training plan** under today's workout. You pick the race day (or end date), the distance, an optional target time, the run days, the long-run day and your current km a week (prefilled from the last 4 weeks). A race plan also sets the race goal; without a target time the projection is used.
+A running plan toward a race or general fitness, set up with **+ Training plan** above today's workout. You pick the race day (or end date), the distance, an optional target time, the run days, the long-run day and your current km a week (prefilled from the last 4 weeks). A race plan also sets the race goal; without a target time the projection is used.
 
-- **Header**: the projected time on race day as a range with its pace, the target, and the last change: a green ▲ when a run made the projection faster, a red ▼ when slower, with the run that moved it.
-- **This week**: each session with its distance, time and main pace. Click one to see its steps. Done sessions show the run's pace and whether it was faster, on plan or slower; missed ones are crossed out.
-- **All weeks**: phase, km done / planned and the key sessions, each week opening its sessions.
-- **Send week to watch**: puts the next 7 days in the Garmin calendar. If paces have adapted since, pressing it again replaces the changed sessions on Garmin. Nothing is ever sent unless you press it.
+- **The plan's line**: name, the projected time as a range with its pace, the last change (a Volt ▲ when a run made the projection faster, a Puls ▼ when slower, with the run that moved it), the target, and the week you're in. Only on the running view.
+- **Next 7 days**: a cell per day from today, each run tinted with its type's colour (dimmer Volt easy, Volt long, darker Puls threshold and race pace, Puls VO2 max), rest days dashed. Click a day to see its session in full below; only today's has its own **Send to watch**.
+- **Week by week**: a bar per week of planned km, split by session type, lighter weeks faded, a line at the km done, and the phases underneath. Click a bar to list that week's sessions: distance, time and main pace, each opening its steps. Done sessions show the run's pace and whether it was faster, on plan or slower; missed ones are crossed out.
+- **Send next 7 days**: puts the next 7 days in the Garmin calendar. If paces have adapted since, pressing it again replaces the changed sessions on Garmin. Nothing is ever sent unless you press it.
 - **Edit** keeps the plan's start and history; **End plan** removes it (the race goal stays).
 
 ### Health
@@ -121,7 +123,7 @@ Clicking an activity or personal best shows every stat Garmin has for it, groupe
 
 - **Training load** is Garmin's when available. Otherwise it's Banister TRIMP from `MAX_HR` and your median resting HR, scaled to Garmin's by the median ratio over activities that have both (once there are 10).
 - **Running bests** come from each run's second-by-second data, using elapsed time like Garmin's splits (so stops count). They match Garmin's fastest splits to a tenth of a second and add 400 m. Until a run has been processed, Garmin's own splits are used.
-- **The plan**: the weeks split into base, build, peak and a taper (1 week for 5–10 km, 2 for the half, 3 for the marathon; a fitness plan has none). Volume climbs at most 8% a week from your current km toward 1.3–1.7 times it (by distance), every 4th week is 25% lighter, and the taper drops to 75/60/45% of the peak. The long run is about 30% of the week; one hard session a week in base and taper, two in build and peak with 4 or more days (threshold, VO2 max, race pace for the half and longer), kept away from the long run. The last two plan days before the race are shakeouts.
+- **The plan**: the weeks split into base, build, peak and a taper (1 week for 5–10 km, 2 for the half, 3 for the marathon; a fitness plan has none). Volume climbs at most 8% a week from your current km until the taper, up to a ceiling by distance (35 km a week for 5 km, 45 for 10 km and fitness, 50 for the half, 70 for the marathon) and never past 2.5 times where you started. Every 4th week is 25% lighter, except the last before the taper, and the taper drops to 75/60/45% of the highest week. The long run has its own steady climb (0.5–1.5 km a week, from 30% of your starting week) to 12 km for 5 km, 16 for 10 km and fitness, 19 for the half and 32 for the marathon, reached 3 weeks before race week for the half and marathon (2 for shorter races; the last week of a fitness plan), then down to 75% and 55% of it (70% for shorter races) toward race day, with no lighter week from the peak on; it's never more than half its week, and at most 1 h 50 (10 km and shorter), 2 h 30 (half) or 3 h 30 (marathon). One hard session a week in base and taper, two in build and peak with 4 or more days (threshold, VO2 max, race pace for the half and longer), kept away from the long run. The second becomes an easy run when the long run, both hard sessions and 4 km easy runs would come to more than 5% over the week's km. The 5 days before a race hold only two runs: a race pace touch on the run day closest to 4 days out (3 at least; 15 min easy, 3 × 1 km at race pace) and a shakeout on the last run day; the other run days are rest.
 - **Plan paces** are Workout's paces from a threshold speed that starts at Garmin's lactate threshold and is planned to rise 0.5% a week (8% at most, plus 1.5% from the taper). How the runs go moves it: interval runs by the pace of their work laps against the target (when run as the plan's workout, so the laps match the steps; faster at a heart rate above zone 4 doesn't count), easy and long runs by pace at their heart rate against your easy runs in the 60 days before the plan. Each run moves it 30% of the way (15% for easy runs), less than 1% off counts as on plan, and it moves at most 1.5% a week. The projection is that threshold on race day as a 5 km time, scaled to the distance like the race goal, ±1% plus 0.15% per week to go.
 - **Missed sessions**: a run on the planned day or a day either side counts. A hard or long session missed this week moves to the next easy day from today, which is dropped; a missed easy run is just missed.
 - **Form bands** and the 0.8–1.3 load ratio are rules of thumb, not medical advice. HRV range, readiness and race predictions are Garmin's own numbers, shown as they come.
@@ -230,7 +232,7 @@ Open the address in Chrome or Samsung Internet on the phone and choose **Install
 │       ├── fonts/        # Barlow and Barlow Condensed (SIL OFL)
 │       └── leaflet/      # Leaflet
 ├── tests/
-├── assets/               # Shortcut icons: dashboard.ico and six icon-*.ico options
+├── assets/               # Shortcut icons: dashboard.ico (the desktop window's) and seven icon-*.ico options, icon-volt.ico matching the app icon
 └── data/                 # athlete.db, demo.db, desktop app data; not in git
 ```
 

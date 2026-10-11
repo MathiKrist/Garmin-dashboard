@@ -3,8 +3,10 @@
 import { data } from "./state.js";
 import { $, fmtDay, escapeHtml } from "./util.js";
 
-// Intensity colours, the same as training effect and load focus
-const COLOR = { easy: "var(--easy)", high: "var(--hard)", anaerobic: "var(--anaerobic)", rest: "var(--nohr)" };
+// Volt for easy running, Puls for hard (darker for threshold); a long run's easy steps take the long run's full Volt
+const COLOR = { easy: "var(--k-easy)", high: "var(--k-threshold)", anaerobic: "var(--k-vo2)", rest: "var(--k-jog)" };
+const color = (intensity, kind) => (intensity === "easy" && kind === "long" ? "var(--k-long)"
+  : intensity === "high" && kind === "vo2" ? "var(--k-vo2)" : COLOR[intensity]);
 const HEIGHT = { rest: 30, easy: 50, high: 80, anaerobic: 100 };
 
 let sport = null;
@@ -25,18 +27,19 @@ function target(step) {
   return parts.join(" · ") || (step.intensity === "rest" || step.kind === "cooldown" ? "Easy, by feel" : "");
 }
 
-const stepItem = (s) => `<li style="--c:${COLOR[s.intensity]}"><span class="len">${len(s.s)}</span>
+const stepItem = (s, kind) => `<li style="--c:${color(s.intensity, kind)}"><span class="len">${len(s.s)}</span>
   <span class="what">${escapeHtml(s.label)}</span><span class="target">${target(s)}</span></li>`;
 
 // The steps in order, with each repeat once per round, for the workout's shape
 const flat = (steps) => steps.flatMap((s) => (s.kind === "repeat" ? Array(s.n).fill(s.steps).flat() : [s]));
 
 // The workout's shape: each block as long as the step and as tall as it's hard
-export const barHtml = (steps) => flat(steps).map((s) => `<i style="flex:${s.s};height:${HEIGHT[s.intensity]}%;background:${COLOR[s.intensity]}"></i>`).join("");
+export const barHtml = (steps, kind) => flat(steps).map((s) =>
+  `<i style="flex:${s.s};height:${HEIGHT[s.intensity]}%;background:${color(s.intensity, kind)}"></i>`).join("");
 
-export const stepsHtml = (steps) => steps.map((s) => (s.kind === "repeat"
-  ? `<li class="reps" style="--c:${COLOR[s.steps[0].intensity]}"><span class="len">${s.n} ×</span><ol>${s.steps.map(stepItem).join("")}</ol></li>`
-  : stepItem(s))).join("");
+export const stepsHtml = (steps, kind) => steps.map((s) => (s.kind === "repeat"
+  ? `<li class="reps" style="--c:${color(s.steps[0].intensity, kind)}"><span class="len">${s.n} ×</span><ol>${s.steps.map((x) => stepItem(x, kind)).join("")}</ol></li>`
+  : stepItem(s, kind))).join("");
 
 // The pace the session is about: its first hard step's, else its first step's
 export function mainPace(steps) {
@@ -44,28 +47,36 @@ export function mainPace(steps) {
   return s?.target?.type === "pace" ? `${pace(s.target.fast)}–${pace(s.target.slow)} /km` : "";
 }
 
+export const currentSport = () => sport;
+
+export const todaysWorkout = () => (data.workouts || []).find((x) => x.sport === sport);
+
 export function renderWorkout() {
   const list = data.workouts || [];
   if (!list.some((w) => w.sport === sport)) sport = list[0]?.sport;
-  const w = list.find((x) => x.sport === sport);
+  const w = todaysWorkout();
   $("workoutSport").innerHTML = list.map((x) => `<button type="button" data-sport="${x.sport}" aria-pressed="${x.sport === sport}">${x.label}</button>`).join("");
   $("workout").hidden = !w;
-  if (!w) return;
+  if (w) showWorkout(w);
+}
 
-  $("wkWhen").textContent = `${fmtDay(data.generated)} · ${w.label}`;
+// One session in the detail: today's workout, or a later plan day picked in the strip (sent with the week, not on its own)
+export function showWorkout(w, day = null) {
+  const today = !day;
+  $("wkWhen").textContent = `${today ? "Today" : fmtDay(day)} · ${w.label || "Run"}`;
   $("wkTitle").textContent = w.title;
   $("wkTotal").textContent = w.kind === "rest" ? (w.next ? `Next: ${w.next.title}, ${fmtDay(w.next.date)}` : "")
     : (w.total_s ? total(w.total_s) : "") + (w.km ? ` · about ${w.km.toFixed(1)} km` : "");
   $("wkWhy").textContent = w.why.join(" · ");
   // Later days changed in the chat, outside a plan (the plan shows its own)
-  const ahead = (data.workouts_ahead || []).filter((x) => x.sport === w.sport);
+  const ahead = today ? (data.workouts_ahead || []).filter((x) => x.sport === w.sport) : [];
   $("wkAhead").hidden = !ahead.length;
   $("wkAhead").innerHTML = ahead.map((x) => `<li>${fmtDay(x.date)} · <b>${escapeHtml(x.title)}</b>${x.total_s ? ` · ${total(x.total_s)}` : ""}</li>`).join("");
-  $("wkBar").innerHTML = barHtml(w.steps);
+  $("wkBar").innerHTML = barHtml(w.steps, w.kind);
   $("wkBar").setAttribute("aria-label", `${w.title}, ${total(w.total_s)}`);
-  $("wkSteps").innerHTML = stepsHtml(w.steps);
+  $("wkSteps").innerHTML = stepsHtml(w.steps, w.kind);
   // A rest day or race day has nothing to send
-  $("wkSend").parentElement.hidden = !w.steps.length;
+  $("wkSend").parentElement.hidden = !today || !w.steps.length;
 
   const btn = $("wkSend"), note = $("wkSendNote");
   btn.disabled = w.sent;
@@ -80,6 +91,7 @@ $("workoutSport").addEventListener("click", (e) => {
   sport = b.dataset.sport;
   try { localStorage.setItem("workoutSport", sport); } catch {}
   renderWorkout();
+  dispatchEvent(new Event("sportchange"));
 });
 
 // Only this button sends anything to Garmin

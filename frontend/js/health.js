@@ -121,16 +121,16 @@ export function renderHealth() {
     options: opts({ ticks: { color: muted, precision: 0 } }, (c) => ` Resting HR: ${c.parsed.y} bpm`),
   });
   chart("sleepSection", "sleepChart", has("sleep_s") && {
-    data: { labels, datasets: [bars("Sleep", tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(2) : null)), alpha(css("--nohr"), 0.85))] },
+    data: { labels, datasets: [bars("Sleep", tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(2) : null)), alpha(css("--sleep"), 0.85))] },
     options: opts({ min: 0 }, (c) => ` ${fmtHours(c.parsed.y * 3600)}`),
   });
   // Floating bars from the day's lowest to its highest Body Battery
   chart("bbSection", "bbChart", has("bb_high") && {
-    data: { labels, datasets: [bars("Body Battery", tr.map((d) => (d.bb_high != null && d.bb_low != null ? [d.bb_low, d.bb_high] : null)), css("--easy"))] },
+    data: { labels, datasets: [bars("Body Battery", tr.map((d) => (d.bb_high != null && d.bb_low != null ? [d.bb_low, d.bb_high] : null)), css("--body-battery"))] },
     options: opts({ min: 0, max: 100 }, (c) => { const [lo, hi] = c.raw; return ` Body Battery: ${lo} to ${hi}`; }),
   });
   chart("stressSection", "stressChart", has("stress_avg") && {
-    data: { labels, datasets: [bars("Stress", tr.map((d) => d.stress_avg), css("--hard"))] },
+    data: { labels, datasets: [bars("Stress", tr.map((d) => d.stress_avg), css("--stress"))] },
     options: opts({ min: 0, max: 100 }, (c) => ` Average stress: ${c.parsed.y} (${stressLevel(c.parsed.y).toLowerCase()})`),
   });
   // The 7-day average of the days with a value, counted over the whole history so the first days of the view have one
