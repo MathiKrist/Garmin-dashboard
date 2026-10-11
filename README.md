@@ -146,7 +146,19 @@ Each sync runs in order of importance: new activities, race predictions and VO2 
 
 ## Login
 
-With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also asking for `DASHBOARD_USERNAME` if set). A device stays logged in for a year; **Log out** in the menu ends it. Wrong tries are answered after a second to slow guessing. The password travels unencrypted over plain HTTP on your wifi, so don't reuse an important one. Changing either setting logs everyone out.
+With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also asking for `DASHBOARD_USERNAME` if set). A device stays logged in for a year; **Log out** in the menu ends it. Wrong tries are answered after a second to slow guessing. The password travels unencrypted over plain HTTP on your wifi (not through `tailscale serve`, which encrypts it), so don't reuse an important one. Changing either setting logs everyone out.
+
+## On your phone, away from home
+
+[Tailscale](https://tailscale.com) connects the phone to the server PC from anywhere, encrypted. Install it on both and log in with the same account. On the PC, run once:
+
+```
+tailscale serve --bg 8000
+```
+
+This gives the dashboard an https address, `https://<pc-name>.<tailnet>.ts.net`, which `tailscale serve status` shows. The first time, it links to the Tailscale admin page where you turn on HTTPS certificates. The address keeps working after restarts.
+
+Open the address in Chrome or Samsung Internet on the phone and choose **Install app** (or **Add to home screen** → **Install**). It then opens as its own app, with its own icon and no address bar. Installing only works over https, so a plain `http://100.x.x.x:8000` address gives a browser shortcut instead.
 
 ## Configuration (`.env`)
 
@@ -193,6 +205,9 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 │   ├── index.html
 │   ├── login.html        # When DASHBOARD_PASSWORD is set
 │   ├── styles.css
+│   ├── manifest.json     # Name, icon and full screen when installed as a phone app
+│   ├── sw.js             # Service worker, served at /sw.js; what makes the app installable
+│   ├── icons/            # App icon: icon.svg, rendered to icon-192.png and icon-512.png
 │   ├── js/               # ES modules, loaded from main.js
 │   │   ├── main.js       # Loads and refreshes data, routes between pages
 │   │   ├── theme.js      # Light or dark (plain script, runs before the page draws)
@@ -235,5 +250,6 @@ Database tables of note: `daily` (health numbers and race predictions), `tracks`
 - **"Too many requests" / 429**: Garmin is rate-limiting. Wait and sync again; it resumes where it stopped.
 - **Logged out on every device**: `DASHBOARD_PASSWORD` or `DASHBOARD_USERNAME` changed; log in with the new details.
 - **Can't open it from a phone**: check `HOST=0.0.0.0`, that both devices are on the same network, and that the Windows firewall allows Python.
+- **Tailscale says "State store failed to initialize … TPM"**: its saved login can't be read anymore (often after a BIOS or Windows update). In an administrator PowerShell: `Stop-Service Tailscale; Rename-Item C:\ProgramData\Tailscale\server-state.conf server-state.conf.bak; Start-Service Tailscale; tailscale up`, then log in again.
 - **Desktop app says "Can't reach the dashboard"**: the server at `DASHBOARD_URL` isn't running, the address is wrong, or a firewall blocks it. For a server the app started itself, see `data/desktop.log`.
 - **Start over**: stop the server and delete `data/athlete.db`. The next sync backfills again.

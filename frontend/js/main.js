@@ -164,3 +164,6 @@ load().catch((e) => {
   $("notice").textContent = "Couldn't reach the dashboard server. Check that python backend/app.py is still running.";
   $("notice").hidden = false;
 });
+
+// Lets phones install the dashboard as an app (only over https, which `tailscale serve` gives)
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

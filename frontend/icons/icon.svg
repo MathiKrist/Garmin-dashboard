@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The app icon: the route maps' glowing orange line, as a pulse, on the dark theme's background. The drawing
+       stays inside the middle 60%, so it survives any launcher shape (maskable) -->
+  <defs>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter>
+  </defs>
+  <rect width="512" height="512" fill="#131A18"/>
+  <g fill="none" stroke="#FF6A00" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M140 270h56l28-62 44 118 34-96 22 40h48" stroke-width="26" opacity="0.55" filter="url(#glow)"/>
+    <path d="M140 270h56l28-62 44 118 34-96 22 40h48" stroke-width="20"/>
+  </g>
+</svg>

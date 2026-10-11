@@ -67,8 +67,9 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
 
 SESSION_COOKIE = "training_session"
 SESSION_DAYS = 365
-OPEN_PATHS = {"/login", "/static/styles.css", "/static/js/theme.js"}  # reachable before logging in, with the fonts
-OPEN_PREFIX = "/static/vendor/fonts/"
+# Reachable before logging in, with the fonts and the app icons. Phones fetch the app manifest without the login cookie
+OPEN_PATHS = {"/login", "/static/styles.css", "/static/js/theme.js", "/static/manifest.json", "/sw.js"}
+OPEN_PREFIX = ("/static/vendor/fonts/", "/static/icons/")
 
 
 def _session_token():
@@ -139,6 +140,12 @@ def logout():
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/sw.js")
+def service_worker():
+    """Served from the root rather than /static, so it covers the whole dashboard; it's what lets phones install it."""
+    return FileResponse(STATIC / "sw.js", media_type="text/javascript")
 
 
 # The dashboard's numbers, kept until the database changes or the day does: every open tab asks every 5 minutes
