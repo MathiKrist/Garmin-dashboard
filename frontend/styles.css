@@ -143,6 +143,31 @@ body {
 /* Light or dark, at the bottom of the menu (js/theme.js) */
 .theme-switch { margin-top: auto; gap: 0.3rem; }
 .theme-switch button { padding: 0.25rem 0.65rem; font-size: 0.82rem; }
+/* Workout: today's session on the left, its shape and steps on the right */
+.wk { display: grid; gap: 1.5rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
+@media (min-width: 60rem) { .wk { grid-template-columns: minmax(16rem, 2fr) 3fr; } }
+.wk .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.wk h2 { font: 700 clamp(1.9rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; }
+.wk-total { margin: 0.35rem 0 0; font: 600 1.5rem/1.1 var(--display); }
+.wk-why { margin: 0.9rem 0 0; color: var(--muted); font-size: 0.95rem; }
+.wk-send { margin-top: 1.25rem; display: flex; align-items: center; gap: 0.5rem 0.9rem; flex-wrap: wrap; }
+.wk-send button { border-color: var(--ink); padding: 0.45rem 1rem; }
+.wk-send button[disabled] { opacity: 0.6; cursor: default; }
+.wk-send span { color: var(--muted); font-size: 0.85rem; }
+.wk-send span.error { color: var(--fatigue); }
+/* Block widths follow each step's length, heights its intensity, like the workout preview on the watch */
+.wk-bar { display: flex; gap: 2px; height: 2.6rem; align-items: flex-end; }
+.wk-bar i { display: block; min-width: 2px; border-radius: 2px; }
+.wk-steps { list-style: none; margin: 1.25rem 0 0; padding: 0; display: grid; gap: 0.9rem; }
+.wk-steps li { display: grid; grid-template-columns: 0.3rem 5rem 1fr; gap: 0.15rem 0.9rem; align-items: baseline; }
+.wk-steps li::before { content: ""; align-self: stretch; border-radius: 2px; background: var(--c); grid-row: span 2; }
+.wk-steps .len { font: 600 1.45rem/1 var(--display); white-space: nowrap; }
+.wk-steps .what { font-weight: 600; }
+.wk-steps .target { grid-column: 3; color: var(--muted); font-size: 0.9rem; }
+.wk-steps .reps { grid-template-columns: 0.3rem 1fr; }
+.wk-steps .reps .len { grid-column: 2; }
+.wk-steps .reps ol { grid-column: 2; list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.7rem; }
+
 /* Race goal: what, when and how far off, with Garmin's prediction moving toward the target */
 .race { display: grid; gap: 1.25rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
 @media (min-width: 1000px) { .race { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; } }

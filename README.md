@@ -38,7 +38,7 @@ All use the Python in `.venv`. `Dashboard app.bat` and `Open dashboard.bat` conn
 
 ## What it shows
 
-A menu on the left (a sideways-scrolling row on phones) picks the page. The address keeps it (`#overview`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
+A menu on the left (a sideways-scrolling row on phones) picks the page. The address keeps it (`#overview`, `#workout`, `#health`, `#activities`, `#sport/run`), so pages can be bookmarked.
 
 The page is dark from 20:00 to 07:00 and otherwise follows the system setting. The **Auto / Light / Dark** switch at the bottom of the menu overrides that, per device.
 
@@ -57,6 +57,15 @@ In bar charts, a period that isn't over yet (this week, this month, today) is dr
 - **VO2 max**: Garmin's estimate per week, against three and twelve months ago.
 - **Training calendar**: 53 weeks, a square per day shaded by training load in four quartile steps; rest days grey. Hover for details, click to open the day's biggest activity. Above it: training days, days per week and longest streak.
 - **Latest activities**: the 15 newest, with the **This week / This year** panel for your main sport.
+
+### Workout
+
+Today's suggested session for running and cycling (the one you do most first), in steps like a Garmin workout: warm-up, the main set with its repeats and targets, cool-down. A bar shows its shape, each block as long as the step and as tall as it's hard. Under the title: total time, distance for runs, and what decided it.
+
+- **Which session**: readiness under 25 or Overreaching gives a recovery session; readiness under 50 or a hard session yesterday or today gives an easy one. Otherwise the load focus decides: short on high aerobic gives threshold intervals (VO2 max intervals if you've done threshold in the last week), short on anaerobic gives anaerobic repeats, short on low aerobic a long session. Balanced gives threshold every third day or so. In the 10 days before a race goal the volume drops by 30%, and the last 2 days are a shakeout.
+- **How long**: your median session for that sport over the last 60 days (45 min run, 75 min ride without any); long sessions are 1.4 times that.
+- **Targets**: run paces as a share of Garmin's lactate threshold pace (easy 74–82%, threshold 97–101%), intervals off Garmin's predicted 5 km pace. Without a threshold it's estimated from the 5 km prediction. Rides use Garmin's heart rate zones (from `MAX_HR` until they're synced).
+- **Send to watch**: puts the workout in today's Garmin Connect calendar; the watch has it after its next sync. Nothing is ever sent unless you press it. If the suggestion has changed since the page loaded, it asks you to look again first. The button then shows it's sent for the rest of the day.
 
 ### Health
 
@@ -102,6 +111,7 @@ Each sync runs in order of importance: new activities, race predictions and VO2 
   - daily health data back to `HEALTH_HISTORY_DAYS`, 45 days per sync;
   - calories for days synced before they were added, 45 days per sync;
   - race predictions a year back, and VO2 max back to `VO2MAX_BACKFILL_DAYS`, one request each.
+- **Lactate threshold and heart rate zones**, for the workout targets: once a day.
 - **Routes** for the 5 newest activities are fetched during the sync; any other activity's route and laps are fetched when first opened.
 - **Running bests** are processed 40 runs per sync, newest first.
 
@@ -141,6 +151,7 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 │   ├── app.py            # FastAPI server, background sync loop, login
 │   ├── sync.py           # Garmin Connect → SQLite (can also run on its own)
 │   ├── metrics.py        # Raw tables → dashboard numbers; Garmin activity types → sports
+│   ├── workouts.py       # Today's suggested workout, and Garmin's workout format for Send to watch
 │   ├── db.py             # SQLite schema and upserts
 │   ├── config.py         # Reads .env
 │   ├── login.py          # One-time Garmin login
@@ -160,6 +171,7 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 │   │   ├── map.js        # Route maps and replay
 │   │   ├── sports.js     # Sport groups, table columns, weekly volume, This week / This year
 │   │   ├── overview.js
+│   │   ├── workout.js    # Today's workout and Send to watch
 │   │   ├── race.js       # Race goal (overview)
 │   │   ├── calendar.js   # Training calendar (overview)
 │   │   ├── health.js
@@ -175,7 +187,7 @@ With `DASHBOARD_PASSWORD` set, the dashboard opens with a login page (also askin
 └── data/                 # athlete.db, demo.db, desktop app data; not in git
 ```
 
-Database tables of note: `daily` (health numbers and race predictions), `tracks` and `laps` (routes), `efforts` (running bests), `meta` (race goal and backfill progress).
+Database tables of note: `daily` (health numbers and race predictions), `tracks` and `laps` (routes), `efforts` (running bests), `meta` (race goal, training profile, workouts sent, backfill progress).
 
 ## Tests
 
@@ -183,7 +195,7 @@ Database tables of note: `daily` (health numbers and race predictions), `tracks`
 .venv\Scripts\python -m unittest discover tests
 ```
 
-`test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, sports, VO2 max). `test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and rate-limit handling).
+`test_metrics.py` checks the numbers (best efforts, race predictions, form, training load, sports, VO2 max). `test_workouts.py` checks which session is picked, its targets and Garmin's workout format. `test_sync.py` runs the sync against a stand-in for Garmin on a throwaway database (the daily recheck for edits and deletions, and rate-limit handling).
 
 ## Troubleshooting
 

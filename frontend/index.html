@@ -24,6 +24,7 @@
     <nav class="nav" id="nav" aria-label="Pages" hidden>
       <ul>
         <li><a href="#overview" data-page="overview">Overview</a></li>
+        <li><a href="#workout" data-page="workout">Workout</a></li>
         <li><a href="#health" data-page="health">Health</a></li>
         <li><a href="#activities" data-page="activities">Activities<span class="count" id="navActCount"></span></a></li>
       </ul>
@@ -41,6 +42,30 @@
   <div id="notice" class="notice" role="status" hidden></div>
 
   <main id="main" hidden>
+    <!-- Workout: today's suggested session per sport, which the Send to watch button puts in the Garmin calendar -->
+    <div class="page" id="page-workout" data-title="Workout" hidden>
+      <header class="page-head page-head-row">
+        <h1>Workout</h1>
+        <div class="range-switch" id="workoutSport" role="group" aria-label="Sport"></div>
+      </header>
+      <section class="wk" id="workout" aria-labelledby="wkTitle">
+        <div>
+          <p class="eyebrow" id="wkWhen"></p>
+          <h2 id="wkTitle"></h2>
+          <p class="wk-total" id="wkTotal"></p>
+          <p class="wk-why" id="wkWhy"></p>
+          <div class="wk-send">
+            <button type="button" id="wkSend">Send to watch</button>
+            <span id="wkSendNote" role="status"></span>
+          </div>
+        </div>
+        <div>
+          <div class="wk-bar" id="wkBar" role="img"></div>
+          <ol class="wk-steps" id="wkSteps"></ol>
+        </div>
+      </section>
+    </div>
+
     <!-- Overview: the athlete's story, with the big picture of fitness and training -->
     <div class="page" id="page-overview" data-title="Overview">
       <header class="page-head">

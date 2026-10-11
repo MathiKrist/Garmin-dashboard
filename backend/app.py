@@ -27,6 +27,7 @@ import config
 import db
 import metrics
 import sync
+import workouts
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("app")
@@ -147,12 +148,16 @@ def _db_version():
     return date.today(), *[(f.stat().st_mtime_ns, f.stat().st_size) if f.exists() else None for f in files]
 
 
-@app.get("/api/dashboard")
-def dashboard(request: Request):
+def _dashboard_data():
     key = _db_version()
     if _dashboard_cache["key"] != key:
         _dashboard_cache.update(key=key, data=metrics.build_dashboard(DB_PATH))
-    data = {**_dashboard_cache["data"], "demo": DEMO, "syncing": sync.is_running(),
+    return _dashboard_cache["data"]
+
+
+@app.get("/api/dashboard")
+def dashboard(request: Request):
+    data = {**_dashboard_data(), "demo": DEMO, "syncing": sync.is_running(),
             "login": bool(config.DASHBOARD_PASSWORD)}  # login shows the Log out button
     # An ETag, so a browser that already has this answer gets a short "not modified" instead
     body = json.dumps(data, separators=(",", ":")).encode()
@@ -210,6 +215,36 @@ def remove_race():
     finally:
         conn.close()
     return {"status": "removed"}
+
+
+@app.post("/api/workout/{sport}")
+async def send_workout(sport: str, request: Request):
+    """Put today's workout for the sport in the Garmin calendar, so the watch has it after its next sync. Only ever
+    called by the page's Send to watch button. The page sends the title it shows, so a workout that has changed
+    since (after a sync) isn't sent unseen."""
+    title = (await request.json()).get("title")
+    w = next((w for w in _dashboard_data()["workouts"] if w["sport"] == sport), None)
+    if not w or w["title"] != title:
+        return JSONResponse({"error": "Today's workout has changed. Look it over and press again."}, status_code=409)
+    if DEMO:
+        return JSONResponse({"error": "Demo mode doesn't send anything to Garmin."}, status_code=400)
+    today = date.today()
+    try:
+        client = sync._client()
+        created = client.upload_workout(workouts.to_garmin(w, today))
+        client.schedule_workout(created["workoutId"], today.isoformat())
+    except Exception as e:
+        log.error("Sending the workout failed: %s", e)
+        return JSONResponse({"error": f"Garmin didn't take the workout: {e}"}, status_code=502)
+    conn = db.connect(DB_PATH)
+    try:
+        sent = [x for x in json.loads(db.get_meta(conn, "workouts_sent") or "[]") if x.get("date") == today.isoformat()]
+        sent.append({"date": today.isoformat(), "sport": sport, "title": title, "id": created["workoutId"]})
+        db.set_meta(conn, "workouts_sent", json.dumps(sent))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"status": "sent"}
 
 
 @app.post("/api/sync")

@@ -1,5 +1,5 @@
 // Entry point: loads the data, keeps it fresh and shows the page picked in the menu
-// (kept in the address: #overview, #health, #activities, #sport/run)
+// (kept in the address: #overview, #workout, #health, #activities, #sport/run)
 
 import { data, setData } from "./state.js";
 import { $ } from "./util.js";
@@ -8,6 +8,7 @@ import { renderHealth } from "./health.js";
 import { renderOverview, lastMap } from "./overview.js";
 import { renderActivities } from "./activities.js";
 import { renderSport } from "./sport.js";
+import { renderWorkout } from "./workout.js";
 import { redrawModalMap } from "./modal.js";
 
 let pollTimer = null;
@@ -71,7 +72,7 @@ function render() {
   showPage();
 }
 
-const PAGES = { overview: renderOverview, health: renderHealth, activities: renderActivities };
+const PAGES = { overview: renderOverview, workout: renderWorkout, health: renderHealth, activities: renderActivities };
 
 function route() {
   const [page, key] = location.hash.slice(1).split("/");

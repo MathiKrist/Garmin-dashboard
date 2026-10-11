@@ -1,4 +1,5 @@
 """Generate believable fake training data so the dashboard can be tried without Garmin."""
+import json
 import math
 import random
 from datetime import date, datetime, timedelta
@@ -130,6 +131,8 @@ def seed(db_path, days=420):
     now = datetime.now().isoformat(timespec="seconds")
     db.set_meta(conn, "last_sync_at", now)
     db.set_meta(conn, "demo_date", today.isoformat())
+    # Lactate threshold (4:50 /km) and heart rate zones, for the workout targets
+    db.set_meta(conn, "training_profile", json.dumps({"lt_speed": 3.45, "lt_hr": 172, "zones": [98, 117, 137, 156, 175, 195]}))
     conn.commit()
     conn.close()
 

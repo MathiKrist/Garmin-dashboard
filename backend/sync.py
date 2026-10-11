@@ -2,6 +2,7 @@
 
 Run on its own with `python backend/sync.py`, or let app.py run it on a timer.
 """
+import json
 import logging
 import re
 import threading
@@ -105,6 +106,21 @@ def fetch_training_status(client, day):
         "load_anaerobic_max": lb.get("monthlyLoadAnaerobicTargetMax"),
         "load_focus": lb.get("trainingBalanceFeedbackPhrase"),
     }
+
+
+def fetch_profile(client):
+    """Lactate threshold and heart rate zones, for the workout targets: {lt_speed (m/s), lt_hr, zones: [zone 1-5 floors,
+    max HR]}, or None when Garmin has neither."""
+    lt = (_try(client.get_lactate_threshold) or {}).get("speed_and_heart_rate") or {}
+    speed = lt.get("speed")
+    # Garmin gives the threshold speed in tenths of m/s (0.30 for 3.0 m/s, 5:30 /km)
+    if speed and speed < 1:
+        speed *= 10
+    rows = [r for r in (_try(client.get_heart_rate_zones) or []) if isinstance(r, dict)]
+    z = next((r for r in rows if r.get("sport") == "RUNNING"), None) or next((r for r in rows if r.get("sport") == "DEFAULT"), None)
+    zones = [z.get(f"zone{i}Floor") for i in range(1, 6)] + [z.get("maxHeartRateUsed")] if z else None
+    profile = {"lt_speed": speed, "lt_hr": lt.get("heartRate"), "zones": zones if zones and all(zones) else None}
+    return profile if any(profile.values()) else None
 
 
 def fetch_track(client, activity_id):
@@ -324,6 +340,14 @@ def run_sync(db_path=None):
         if rows:
             db.set_meta(conn, "predictions_backfilled", "1")
         conn.commit()
+
+        # Lactate threshold and heart rate zones for the workout page, once a day
+        if db.get_meta(conn, "profile_date") != today.isoformat():
+            profile = fetch_profile(client)
+            if profile:  # a failed request keeps the last one
+                db.set_meta(conn, "training_profile", json.dumps(profile))
+                db.set_meta(conn, "profile_date", today.isoformat())
+                conn.commit()
 
         # VO2 max history for its chart: one request covers years, so fetch it once.
         if not db.get_meta(conn, "vo2max_backfilled"):

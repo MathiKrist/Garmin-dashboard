@@ -6,6 +6,7 @@ from statistics import median
 
 import config
 import db
+import workouts
 
 CTL_DAYS = 42  # fitness: long-term average load
 ATL_DAYS = 7   # fatigue: short-term average load
@@ -316,6 +317,8 @@ def build_dashboard(db_path=None):
         efforts = db.all_efforts(conn)
         days = [dict(r) for r in conn.execute("SELECT * FROM daily ORDER BY date")]
         goal = db.get_meta(conn, "race_goal")
+        profile = json.loads(db.get_meta(conn, "training_profile") or "{}")
+        sent = json.loads(db.get_meta(conn, "workouts_sent") or "[]")
         meta = {
             "last_sync_at": db.get_meta(conn, "last_sync_at"),
             "last_error": db.get_meta(conn, "last_error") or None,
@@ -377,6 +380,14 @@ def build_dashboard(db_path=None):
     # Every activity, newest first, so the page can filter by sport and total up this week and this year
     recent_acts = [_summary(a) for a in reversed(acts)]
 
+    status, focus = _training_status(days, today), _load_focus(days, today)
+    race = _race(json.loads(goal), days, acts, today) if goal else None
+    focus_phrase = next((d["load_focus"] for d in recent if d.get("load_focus")), None)
+    workout_list = workouts.recommend(
+        recent_acts, today, readiness=today_vals["readiness"], status=status and status["code"], focus=focus_phrase,
+        focus_title=focus and focus["title"], race=race, profile=profile,
+        pred_5k=next((d["pred_5k"] for d in recent if d.get("pred_5k")), None), sent=sent)
+
     return {
         "generated": today.isoformat(),
         "meta": meta,
@@ -384,10 +395,11 @@ def build_dashboard(db_path=None):
         "form": {"state": _form_state(now["form_pct"]), "ctl": now["ctl"], "pct": now["form_pct"]},
         "form_zones": [{"name": n, "min": low} for n, low in FORM_ZONES],
         "today": today_vals,
-        "training_status": _training_status(days, today),
-        "load_focus": _load_focus(days, today),
+        "training_status": status,
+        "load_focus": focus,
         "vo2max": _vo2max(days, today),
-        "race": _race(json.loads(goal), days, acts, today) if goal else None,
+        "race": race,
+        "workouts": workout_list,
         "fitness": fitness[-365:],  # the chart shows 120 days or the whole year
         "trends": trends,
         "activities": recent_acts,
