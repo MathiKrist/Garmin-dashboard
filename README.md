@@ -61,7 +61,7 @@ In bar charts, a period that isn't over yet (this week, this month, today) is dr
 ### Health
 
 - **Today**: HRV, sleep, resting HR, Body Battery peak and low, average stress, steps and calories burnt so far. (Readiness is a training number, so it's on the overview.)
-- **Charts** for the last 90 days or year, one measure each: HRV against Garmin's normal range, resting HR, sleep, Body Battery (daily low to high), stress, steps and calories burnt (active and resting split in the tooltip). Steps and calories show a 7-day average line and the best day. HRV, resting HR, sleep, steps and calories each get a sentence comparing the last 7 days with the 30 before.
+- **Charts** for the last 90 days or year, one measure each: HRV against Garmin's normal range, resting HR, sleep, sleep score, Body Battery (daily low to high), stress, steps and calories burnt (active and resting split in the tooltip). Sleep score, steps and calories show a 7-day average line; steps and calories also the best day. HRV, resting HR, sleep, sleep score, steps and calories each get a sentence comparing the last 7 days with the 30 before.
 
 ### Activities
 

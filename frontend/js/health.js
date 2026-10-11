@@ -55,6 +55,8 @@ export function healthReadings() {
   const sl7 = trendAvg("sleep_s", 7, 0), sl30 = trendAvg("sleep_s", 37, 7);
   $("sleepReading").textContent = sl7 == null ? "" : `You've slept ${fmtHours(sl7)} a night this week` +
     (sl30 != null ? `, against ${fmtHours(sl30)} over the 30 nights before.` : ".");
+  const sc7 = trendAvg("sleep_score", 7, 0), sc30 = trendAvg("sleep_score", 37, 7);
+  $("sleepScoreReading").textContent = sc7 == null ? "" : `Your sleep score has averaged ${Math.round(sc7)} this week` + vs(sc7, sc30, "points");
   // Today's steps are still counting, so the averages start yesterday
   const st7 = trendAvg("steps", 8, 1), st30 = trendAvg("steps", 38, 8);
   $("stepsReading").textContent = st7 == null ? "" : `${Math.round(st7).toLocaleString("en-GB")} steps a day over the last 7 days` +
@@ -120,11 +122,7 @@ export function renderHealth() {
   });
   chart("sleepSection", "sleepChart", has("sleep_s") && {
     data: { labels, datasets: [bars("Sleep", tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(2) : null)), alpha(css("--nohr"), 0.85))] },
-    options: (() => {
-      const o = opts({ min: 0 }, (c) => ` ${fmtHours(c.parsed.y * 3600)}`);
-      o.plugins.tooltip.callbacks.footer = (items) => { const sc = tr[items[0].dataIndex].sleep_score; return sc != null ? `Sleep score ${sc}` : ""; };
-      return o;
-    })(),
+    options: opts({ min: 0 }, (c) => ` ${fmtHours(c.parsed.y * 3600)}`),
   });
   // Floating bars from the day's lowest to its highest Body Battery
   chart("bbSection", "bbChart", has("bb_high") && {
@@ -140,13 +138,18 @@ export function renderHealth() {
     const week = all.slice(Math.max(0, i - 6), i + 1).filter((x) => x[f] != null);
     return d[f] != null && week.length ? Math.round(week.reduce((t, x) => t + x[f], 0) / week.length) : null;
   }).slice(all.length - tr.length);
+  const avgLine = (f) => ({ type: "line", label: "7-day average", data: avg7(f), borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true });
+  chart("sleepScoreSection", "sleepScoreChart", has("sleep_score") && {
+    data: { labels, datasets: [bars("Sleep score", tr.map((d) => d.sleep_score), alpha(fit, 0.55)), avgLine("sleep_score")] },
+    options: opts({ min: 0, max: 100 }, (c) => (c.dataset.label === "Sleep score" ? ` Sleep score: ${c.parsed.y}` : ` 7-day average: ${c.parsed.y}`)),
+  });
   const isToday = (i) => tr[i].date === data.generated;
   const steps = (v) => `${Math.round(v).toLocaleString("en-GB")} steps`;
   chart("stepsSection", "stepsChart", has("steps") && {
     data: { labels, datasets: [
       // Today's steps are still counting: paler, like the other unfinished periods
       bars("Steps", tr.map((d) => d.steps), tr.map((d) => alpha(fit, d.date === data.generated ? 0.55 * PARTIAL_ALPHA : 0.55))),
-      { type: "line", label: "7-day average", data: avg7("steps"), borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true },
+      avgLine("steps"),
     ] },
     options: opts({ min: 0 }, (c) => c.dataset.label === "Steps"
       ? ` ${steps(c.parsed.y)}${isToday(c.dataIndex) ? " so far" : ""}` : ` 7-day average: ${steps(c.parsed.y)}`),
@@ -160,7 +163,7 @@ export function renderHealth() {
   chart("caloriesSection", "caloriesChart", has("cal_total") && {
     data: { labels, datasets: [
       bars("Calories", tr.map((d) => d.cal_total), tr.map((d) => alpha(red, d.date === data.generated ? 0.6 * PARTIAL_ALPHA : 0.6))),
-      { type: "line", label: "7-day average", data: avg7("cal_total"), borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true },
+      avgLine("cal_total"),
     ] },
     options: (() => {
       const o = opts({ min: 0 }, (c) => c.dataset.label === "Calories"
