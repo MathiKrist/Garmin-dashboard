@@ -2,13 +2,14 @@
 // time it projects, and the button that sends the coming week to the watch
 
 import { data } from "./state.js";
-import { $, css, fmtDay, fmtDayYear, fmtShort, fmtDuration, fmtPace, fmtRange, statItems, escapeHtml, addDays } from "./util.js";
-import { baseOptions, draw } from "./charts.js";
+import { $, fmtDay, fmtDayYear, fmtShort, fmtDuration, fmtPace, fmtRange, statItems, escapeHtml, addDays } from "./util.js";
 import { raceDistance, isRaceDistance, parseTime } from "./race.js";
 import { total, barHtml, stepsHtml, mainPace } from "./workout.js";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// Faster is a green triangle up, slower a red one down
+const moved = (d) => `<span class="${d > 0 ? "over" : "under"}">${d > 0 ? "▼" : "▲"} ${fmtDuration(Math.abs(d))}</span>`;
 const signed = (gap) => `<span class="${gap > 0 ? "over" : "under"}">${gap > 0 ? "+" : "−"}${fmtDuration(Math.abs(gap))}</span>`;
 
 const VERDICT = { better: "Faster than planned", worse: "Slower than planned", "on plan": "On plan" };
@@ -57,12 +58,12 @@ export function renderPlan() {
   if (pr) {
     items.push([race ? "Projected on race day" : `Projected ${raceDistance(c.metres)}`, fmtRange(pr.low, pr.high), fmtPace(pr.s / c.metres * 1000)]);
     if (c.target_s) items.push(["Target", fmtDuration(c.target_s), pr.high <= c.target_s ? "Within reach" : `${signed(pr.s - c.target_s)} projected`]);
-    items.push(["Since the start", pr.s === pr.start_s ? "On plan" : signed(pr.s - pr.start_s), `from ${fmtDuration(pr.start_s)}`]);
+    const ch = pr.change;
+    items.push(["Last change", ch ? moved(pr.s - ch.from_s) : "–", ch ? `${ch.title}, ${fmtShort(ch.date)}` : "None yet"]);
   } else {
     items.push(["Projected", "–", "Needs Garmin's threshold or race prediction"]);
   }
   $("planStats").innerHTML = statItems(items);
-  drawTrend(p);
 
   // This week
   const w = p.weeks[p.week_index];
@@ -87,25 +88,6 @@ export function renderPlan() {
       <span class="pw-km">${past || i === p.week_index ? `${x.km_done} / ` : ""}${x.km_planned} km</span><span class="pw-key">${key}</span></summary>
       <ol class="plan-sessions">${x.sessions.map(sessionItem).join("")}</ol></details></li>`;
   }).join("");
-}
-
-function drawTrend(p) {
-  const h = p.history, target = p.config.target_s;
-  $("planTrend").hidden = h.length < 2;
-  if (h.length < 2) return;
-  const fit = css("--fitness"), ink = css("--ink"), all = h.map((x) => x.s).concat(target ? [target] : []);
-  $("planLegend").innerHTML = '<span><i class="line" style="background:var(--fitness)"></i>Projected</span>' +
-    (target ? '<span><i class="line dashed" style="color:var(--ink)"></i>Target</span>' : "");
-  const o = baseOptions({
-    // Faster is higher, as on the race goal chart
-    y: { reverse: true, grid: { color: css("--rule") }, ticks: { color: css("--muted"), callback: (v) => fmtDuration(v) }, border: { display: false },
-      suggestedMin: Math.min(...all) - 30, suggestedMax: Math.max(...all) + 30 },
-  });
-  o.plugins.tooltip.callbacks = { label: (c) => ` ${c.dataset.label}: ${fmtDuration(c.parsed.y)}` };
-  const datasets = [{ label: "Projected", data: h.map((x) => x.s), borderColor: fit, backgroundColor: fit, borderWidth: 2, tension: 0.3,
-    pointRadius: h.map((_, i) => (i === h.length - 1 ? 4 : 0)) }];
-  if (target) datasets.push({ label: "Target", data: h.map(() => target), borderColor: ink, borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0 });
-  draw("planChart", { type: "line", data: { labels: h.map((x) => fmtShort(x.date)), datasets }, options: o });
 }
 
 // Only this button sends the plan to Garmin

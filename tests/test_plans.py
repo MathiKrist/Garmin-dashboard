@@ -122,6 +122,9 @@ class Adaptation(unittest.TestCase):
         self.assertLess(self.threshold(plan, 1)["steps"][1]["steps"][0]["target"]["fast"],
                         self.threshold(base, 1)["steps"][1]["steps"][0]["target"]["fast"])
         self.assertLess(plan["projection"]["s"], base["projection"]["s"])
+        # The run that moved it, and the time before
+        change = plan["projection"]["change"]
+        self.assertEqual((change["date"], change["from_s"]), (s["date"], base["projection"]["s"]))
 
     def test_faster_at_too_high_heart_rate_counts_as_on_plan(self):
         base = build(acts=history())
@@ -166,6 +169,9 @@ class Projection(unittest.TestCase):
         self.assertGreater(early["high"] - early["low"], late["high"] - late["low"])
         self.assertLessEqual(early["low"], early["s"])
         self.assertGreaterEqual(early["high"], early["s"])
+
+    def test_no_runs_no_change(self):
+        self.assertIsNone(build(acts=history())["projection"]["change"])
 
     def test_whole_minutes_for_a_half(self):
         p = build()["projection"]

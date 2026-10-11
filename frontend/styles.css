@@ -197,6 +197,8 @@ body {
 /* Race goal: what, when and how far off, with Garmin's prediction moving toward the target */
 .race { display: grid; gap: 1.25rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
 @media (min-width: 1000px) { .race { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; } }
+#plan .race { grid-template-columns: minmax(0, 1fr); }
+#plan .race-stats { max-width: 42rem; }
 .race .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .race-title { display: flex; align-items: baseline; gap: 1rem; }
 .race h2 { font: 700 clamp(1.9rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; }

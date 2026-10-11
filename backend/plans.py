@@ -370,14 +370,12 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
         lt = lt0 * gain(train_weeks) * factor * (1 + TAPER_GAIN if race else 1)
         return round(race_time(lt, cfg["metres"]))
 
-    factor, history, out_weeks, this_week = 1.0, [], [], monday(today)
+    factor, change, out_weeks, this_week = 1.0, None, [], monday(today)
     for i, (wk, km) in enumerate(zip(weeks, kms)):
         lt = lt0 * gain(i) * factor if lt0 else None
         race_s = projection(factor)
         t = Paces(profile, lt, cfg["metres"] / race_s if race_s and race else None)
         week_start = wk[0]
-        if week_start <= today:
-            history.append({"date": max(week_start, start).isoformat(), "s": race_s})
         week_end = week_start + timedelta(days=6)
         sessions = week_sessions(cfg, i, wk, km, t, start)
         sessions = apply_changes(sessions, [c for c in changes if c["sport"] == "run" and max(week_start, start)
@@ -401,9 +399,12 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
                            "verdict": None if seen is None else "better" if seen > factor * (1 + DEADBAND)
                            else "worse" if seen < factor * (1 - DEADBAND) else "on plan"}
             if seen is not None and abs(seen - factor) > factor * DEADBAND:
+                before = projection(factor)
                 factor += SMOOTHING * (0.5 if s["kind"] in ("easy", "long") else 1) * (seen - factor)
                 factor = max(week_factor * (1 - WEEK_CAP), min(week_factor * (1 + WEEK_CAP), factor))
                 factor = max(FACTOR_LIMITS[0], min(FACTOR_LIMITS[1], factor))
+                if before and projection(factor) != before:
+                    change = {"date": s["date"], "title": s["title"], "from_s": before}
         for s in sessions:
             s["key"] = session_key(s)
             s["sent"] = (s["date"], s["key"]) in sent_keys
@@ -420,13 +421,13 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
     proj = None
     if s:
         low, high = time_range(s, weeks_left, cfg["metres"])
-        proj = {"s": s, "low": low, "high": high, "start_s": history[0]["s"] if history else s}
-        history.append({"date": min(today, end).isoformat(), "s": s})
+        # The last run that moved the projection, and what it was before
+        proj = {"s": s, "low": low, "high": high, "change": change}
     plan = {
         "config": cfg, "goal_label": GOALS[cfg["goal"]], "weeks": out_weeks, "factor": round(factor, 4),
         "week_index": next((i for i, w in enumerate(weeks) if w[0] == this_week), None),
         "weeks_left": math.ceil(weeks_left), "projection": proj,
-        "history": [h for h in history if h["s"]], "phases": PHASES, "over": today > end,
+        "phases": PHASES, "over": today > end,
     }
     coming = coming_week(plan, today)
     plan["send"] = {"key": week_key(coming), "count": len(coming), "sent": bool(coming) and all(s["sent"] for s in coming)}

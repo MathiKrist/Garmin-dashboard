@@ -68,7 +68,7 @@ Tell it what to change, as you would a coach: "I only have 40 minutes today", "m
 
 - **Which Claude**: Claude Code on the machine running the server, covered by its Claude subscription. Install it and log in once (run `claude` in a terminal); the server finds it on PATH or in `~/.local/bin`. A reply takes about 10 seconds and counts toward the subscription's usage limits. With `ANTHROPIC_API_KEY` in `.env` the chat uses the Anthropic API instead: a few seconds a reply, about a cent or two a message, billed to the API account.
 
-- **What it can do**: put a session on any day from today on (a standard one by kind and minutes, or its own steps), make a rest day, move a session to another day (leaving a rest day), and undo a change. With each message it gets today's numbers, the workouts, the plan's next three weeks and the last 14 days of activities.
+- **What it can do**: put a session on any day from today on (a standard one by kind and minutes, or its own steps), make a rest day, move a session to another day (leaving a rest day), and undo a change. With each message it gets today's numbers, the workouts, the plan's weekly km and next three weeks, run km per week for the last 8 weeks, and the last 14 days of activities.
 - **Paces stay yours**: a changed session names its targets (easy, threshold, zone 2…) and gets the same paces as everything else, so a changed plan day still adapts. A moved session keeps the paces it had.
 - **Where changes show**: today's run or ride, marked "Changed in chat" with the reason; plan days the same; later days outside a plan listed under today's workout. Changed plan days are left alone when a missed session moves. Nothing goes to the watch until you press Send.
 - **One chat a day**, kept on the server so every device sees it. **New chat** starts over (the changes stay); **Undo all changes** takes back every change from today on.
@@ -86,7 +86,7 @@ Today's suggested session for running and cycling (the one you do most first), i
 
 A running plan toward a race or general fitness, set up with **+ Training plan** under today's workout. You pick the race day (or end date), the distance, an optional target time, the run days, the long-run day and your current km a week (prefilled from the last 4 weeks). A race plan also sets the race goal; without a target time the projection is used.
 
-- **Header**: the projected time on race day as a range with its pace, the target, and how far the projection has moved since the start. Below it, a chart of the projection per week against the target.
+- **Header**: the projected time on race day as a range with its pace, the target, and the last change: a green ▲ when a run made the projection faster, a red ▼ when slower, with the run that moved it.
 - **This week**: each session with its distance, time and main pace. Click one to see its steps. Done sessions show the run's pace and whether it was faster, on plan or slower; missed ones are crossed out.
 - **All weeks**: phase, km done / planned and the key sessions, each week opening its sessions.
 - **Send week to watch**: puts the next 7 days in the Garmin calendar. If paces have adapted since, pressing it again replaces the changed sessions on Garmin. Nothing is ever sent unless you press it.

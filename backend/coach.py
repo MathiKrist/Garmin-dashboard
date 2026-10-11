@@ -206,7 +206,9 @@ def state(d, today):
         c = p["config"]
         days = ", ".join(("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")[i] for i in c["days"])
         out.append(f"\nTraining plan (runs only): {c['name']}, {p['goal_label']}, {c['metres'] / 1000:g} km on {c['date']}, "
-                   f"run days {days}, long run {('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')[c['long_day']]}. "
+                   f"run days {days}, long run {('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')[c['long_day']]}, "
+                   f"starting at {c['start_km']:g} km a week (planned km for each week: "
+                   f"{', '.join(f'{w['km_planned']:g}' for w in p['weeks'])}). "
                    + (f"Week {p['week_index'] + 1} of {len(p['weeks'])}." if p["week_index"] is not None else ""))
         if p.get("projection"):
             out.append(f"The plan projects {_time(p['projection']['s'])} on its end date.")
@@ -220,6 +222,14 @@ def state(d, today):
         out.append("Later days changed in chat (outside a plan):")
         for x in d["workouts_ahead"]:
             out.append(f"- {x['date']} {x['sport']}: {x['title']}" + (f", {_minutes(x['total_s'])}" if x["total_s"] else ""))
+
+    # Weekly run km over a longer stretch than the activity list, for the usual volume
+    monday = today - timedelta(days=today.weekday())
+    weeks = [monday - timedelta(weeks=i) for i in range(8, -1, -1)]
+    km = [sum(a.get("km") or 0 for a in d["activities"] if a["sport"] == "run"
+              and w.isoformat() <= a["date"] < (w + timedelta(days=7)).isoformat()) for w in weeks]
+    out.append("\nRun km per week (Monday to Sunday) over the last 8 weeks and this one so far: "
+               + ", ".join(f"{w.strftime('%d %b')} {k:.1f}" for w, k in zip(weeks, km)) + ".")
 
     since = (today - timedelta(days=14)).isoformat()
     acts = [a for a in d["activities"] if a["date"] >= since]
