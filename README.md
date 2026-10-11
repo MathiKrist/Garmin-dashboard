@@ -1,6 +1,6 @@
 # Training
 
-A personal training dashboard. It syncs your Garmin Connect data to a local database and shows it in the browser, on this PC or any device on your wifi.
+A personal training dashboard. It syncs your Garmin Connect data to a local SQLite database and shows it in the browser, on this PC or any device on your wifi. Built with FastAPI and Chart.js, with no build step. Everything is bundled, so it works offline apart from the map tiles.
 
 ## Setup
 
@@ -13,38 +13,58 @@ copy .env.example .env
 .venv\Scripts\python backend/login.py
 ```
 
-`login.py` asks for your Garmin login once and keeps a token. Your password is never stored.
+`login.py` asks for your Garmin login once and keeps a token in `TOKEN_DIR`. Your password is never stored.
 
 ## Starting it
 
-- **`Dashboard app.bat`** opens the dashboard in its own window. If no server is running, it starts one until the window closes. Add `--demo` for made-up data.
-- **`.venv\Scripts\python backend/app.py`** runs only the server. Open `http://localhost:8000`, or the wifi address it prints.
+- **`Dashboard app.bat`** opens the dashboard in its own window. It connects to `DASHBOARD_URL`, or this PC; if no server is running, it starts one until the window closes. Add `--demo` for made-up data. Its log is `data/desktop.log`.
+- **`.venv\Scripts\python backend/app.py`** runs only the server (`--demo` works here too). Open `http://localhost:8000`, or the wifi address it prints. Windows may ask to let Python through the firewall the first time.
 
-The server syncs with Garmin every hour; **Sync now** in the menu syncs at once.
+For a desktop shortcut, right-click the `.bat` → **Send to** → **Desktop (create shortcut)**, and pick an icon from `assets/` under **Properties** → **Change Icon…**.
 
 ## Pages
 
-**Overview**: race goal, today's recovery, Garmin's training status and load focus, last activity, fitness and form, weekly running, VO2 max and a training calendar.
+The menu on the left picks the page; on phones it hides behind ☰. The page is dark from 20:00 to 07:00 and otherwise follows the system; **Auto / Light / Dark** at the bottom of the menu overrides that.
+
+### Overview
 
 ![Overview](docs/screenshots/overview.png)
 
-**Workout**: today's session, a chat to change it, and the training plan. **Send to watch** puts a session in the Garmin calendar; hover **On the watch ✓** to remove it again.
+- **Race goal**: target time, Garmin's prediction and the gap, with a 6-month chart. Set with **+ Race goal**, or by a race plan.
+- **Today**: readiness, HRV, sleep, resting heart rate and calories burnt.
+- **Garmin's training status and load focus**, with what to train next.
+- **Last activity**, with its route.
+- **Fitness and form**: fitness (42-day load) against fatigue (7-day).
+- **Weekly running** split by training effect, **VO2 max**, and a **training calendar** of the last year.
+
+### Workout
 
 ![Workout](docs/screenshots/workout.png)
 
-**Health**: HRV, resting heart rate, sleep, Body Battery, stress, steps and calories.
+- **Today's session** for running and cycling, in steps like a Garmin workout. Without a plan it's picked from readiness and Garmin's load focus; with one, it's the plan's session.
+- **The plan**: a strip of the next 7 days (click a day to see it), and the plan week by week (click a week for its sessions).
+- **Send to watch** puts a session in the Garmin calendar, and **Send next 7 days** the plan's coming week. The watch gets them at its next sync with the Garmin Connect app. Once sent, the button reads **On the watch ✓**; hover it to **Remove from watch**.
+- **The chat**: tell it what to change ("only 40 minutes today", "move Thursday to Friday"), and the sessions change at once. Nothing reaches the watch until you send it. One chat a day; **Undo all changes** takes them back.
+
+### Health
 
 ![Health](docs/screenshots/health.png)
 
-**Activities**: every activity, with a page per sport and a popup with all the details.
+HRV against your normal range, resting heart rate, sleep and sleep score, Body Battery, stress, steps and calories, for 90 days or a year. Most have a line on this week against the 30 days before.
+
+### Activities
 
 ![Activities](docs/screenshots/activities.png)
+
+- **Every activity**, sortable and searchable, with this week and this year for the chosen sport.
+- **A page per sport** done at least 3 times: totals, weeks, months, this year against last, and personal bests.
+- **Click an activity** for every stat Garmin has, with the route and laps.
 
 The screenshots use demo data.
 
 ## Training plan
 
-Set one up with **+ Training plan** on the Workout page: race or general fitness, the date, your run days and your current km a week. Paces adapt to how your runs go, and the projected race time follows.
+Set one up with **+ Training plan** on the Workout page: race or general fitness, the date, the distance, an optional target time, your run days, the long-run day and your current km a week. A race plan also sets the race goal.
 
 | | 5 km | 10 km | Half | Marathon | Fitness |
 |---|---|---|---|---|---|
@@ -53,23 +73,35 @@ Set one up with **+ Training plan** on the Workout page: race or general fitness
 | Longest run, weeks before race week | 2 | 2 | 3 | 3 | — |
 | Taper | 1 week | 1 week | 2 weeks | 3 weeks | — |
 
-- Weekly km grow at most 8% a week, and at most to 2.5 times where you started. Every 4th week is lighter.
-- One or two hard sessions a week, kept away from the long run.
-- Race week is a short race pace session, a shakeout and the race.
+- **Weekly km** grow at most 8% a week, to at most 2.5 times where you started. Every 4th week is lighter.
+- **The long run** climbs on its own, up to half the week, and steps down after its peak.
+- **Hard sessions**: one or two a week (threshold, VO2 max, race pace), kept away from the long run. The second is dropped when the week has no room for it.
+- **Race week**: a short race pace session, a shakeout and the race.
+- **Paces adapt**: faster runs than planned make the next paces faster, slower ones slower. Intervals are judged on their laps, easy runs on pace at their heart rate.
+- **Projected time**: shown as a range that narrows toward race day. The header shows the last run that moved it.
+- **Missed sessions**: a missed hard or long run moves to the next easy day that week.
 
 ## The chat
 
-The chat on the Workout page uses Claude Code on this PC. Install it and log in once by running `claude`. With `ANTHROPIC_API_KEY` in `.env`, it uses the API instead.
+It uses Claude Code on this PC, covered by your Claude subscription: install it and log in once by running `claude`. With `ANTHROPIC_API_KEY` in `.env` it uses the Anthropic API instead, which is faster but costs about a cent or two a message.
+
+## Syncing
+
+The server syncs every `SYNC_INTERVAL_MINUTES`; **Sync now** in the menu syncs at once. `backend/sync.py` syncs without the server.
+
+- **First sync**: takes a few minutes. The rest of your history follows over the next syncs.
+- **Later syncs**: the last few days, and once a day the last 30 days of activities, so edits and deletions on Garmin carry over.
+- **Rate limits**: if Garmin says too many requests, the next sync carries on where it stopped.
 
 ## On your phone
 
-Install [Tailscale](https://tailscale.com) on the PC and the phone, and run this once on the PC:
+Install [Tailscale](https://tailscale.com) on the PC and the phone, with the same account, and run this once on the PC:
 
 ```
 tailscale serve --bg 8000
 ```
 
-Open the `https://….ts.net` address it gives in Chrome on the phone, and choose **Install app**.
+Open the `https://….ts.net` address it gives in Chrome on the phone, and choose **Install app**. It then opens like an app, with its own icon.
 
 ## Settings (`.env`)
 
@@ -83,20 +115,28 @@ Open the `https://….ts.net` address it gives in Chrome on the phone, and choos
 | `ANTHROPIC_API_KEY` | empty | The chat uses the API instead of Claude Code |
 | `AEROBIC_THRESHOLD` | 158 | Heart rate between easy and hard, for runs Garmin hasn't labelled |
 | `MAX_HR` | 195 | For training load when Garmin has none |
-| `ACTIVITY_BACKFILL_DAYS`, `DAILY_BACKFILL_DAYS`, `HEALTH_HISTORY_DAYS`, `VO2MAX_BACKFILL_DAYS` | 180, 60, 365, 1095 | How far back the first sync goes |
+| `ACTIVITY_BACKFILL_DAYS`, `DAILY_BACKFILL_DAYS`, `HEALTH_HISTORY_DAYS`, `VO2MAX_BACKFILL_DAYS` | 180, 60, 365, 1095 | How far back the first sync and the backfills go |
 | `TOKEN_DIR` | ~/.garminconnect | Where the Garmin token is kept |
 | `DB_PATH` | data/athlete.db | The database |
 
 ## Project layout
 
 ```
-backend/     server, Garmin sync, numbers, workouts, training plan, chat
-frontend/    the page (no build step)
-desktop/     the app window
+Dashboard app.bat   the app window
+backend/
+  app.py            server, background sync, login
+  sync.py           Garmin Connect → SQLite
+  metrics.py        the dashboard's numbers
+  workouts.py       today's session, and Garmin's workout format
+  plans.py          the training plan
+  coach.py          the chat, and changes.py for the sessions it changes
+  db.py, config.py, login.py, demo.py
+frontend/           the page: index.html, styles.css, js/ (a module per page)
+desktop/main.py     the app window
 tests/
-assets/      icons for desktop shortcuts
-docs/        the screenshots above
-data/        database and app data, not in git
+assets/             icons for desktop shortcuts
+docs/screenshots/   the screenshots above
+data/               database and app data, not in git
 ```
 
 ## Tests
@@ -105,10 +145,14 @@ data/        database and app data, not in git
 .venv\Scripts\python -m unittest discover tests
 ```
 
+They cover the numbers, the suggested workouts, the training plan, chat changes and the sync (against a stand-in for Garmin).
+
 ## Troubleshooting
 
 - **Not logged in to Garmin**: run `backend/login.py` again. The token expires now and then.
-- **Too many requests**: Garmin is limiting requests. The next sync carries on where it stopped.
-- **Can't open it from the phone**: check that `HOST=0.0.0.0` and that Windows' firewall allows Python.
 - **Sync fails after a Garmin change**: run `.venv\Scripts\pip install -U garminconnect`.
+- **Can't open it from the phone**: check that `HOST=0.0.0.0` and that Windows' firewall allows Python.
+- **The app window says it can't reach the dashboard**: the server at `DASHBOARD_URL` isn't running, or the address is wrong. See `data/desktop.log`.
+- **Tailscale says "State store failed to initialize … TPM"**: in an administrator PowerShell run `Stop-Service Tailscale; Rename-Item C:\ProgramData\Tailscale\server-state.conf server-state.conf.bak; Start-Service Tailscale; tailscale up`, then log in again.
+- **Logged out on every device**: the password or username in `.env` changed.
 - **Start over**: delete `data/athlete.db`. The next sync fetches everything again.
