@@ -32,9 +32,9 @@
   --hillshade-blend: multiply;
   --hillshade-opacity: 0.7;
   /* Garmin's load focus colors */
-  --low-aerobic: #3FA9DE;
-  --high-aerobic: #F08A24;
-  --anaerobic: #9B4FCF;
+  --low-aerobic: #33ADEA;
+  --high-aerobic: #FF8A15;
+  --anaerobic: #9D45D9;
   /* Garmin's training status colors */
   --st-peaking: #8E44C8;
   --st-productive: #2E9E4F;
@@ -91,9 +91,9 @@
   --satellite-brightness: 0.58;
   --hillshade-blend: screen;
   --hillshade-opacity: 0.55;
-  --low-aerobic: #5BBDEB;
-  --high-aerobic: #F59A40;
-  --anaerobic: #B373E3;
+  --low-aerobic: #50C1F6;
+  --high-aerobic: #FF9A36;
+  --anaerobic: #B46BEB;
   --st-peaking: #B57BE6;
   --st-productive: #4CC46C;
   --st-maintaining: #F0C419;
