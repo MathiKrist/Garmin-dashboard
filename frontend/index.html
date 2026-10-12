@@ -392,11 +392,13 @@
   <form id="planForm">
     <h2 id="planDialogTitle">Training plan</h2>
     <label>Goal
-      <select id="planInGoal"><option value="race">Race</option><option value="fitness">General fitness</option></select>
+      <select id="planInGoal"><option value="race">Race</option><option value="fitness">General fitness</option>
+        <option value="base">Base builder</option><option value="speed">Speed block</option>
+        <option value="comeback">Return to running</option><option value="maintain">Maintenance</option></select>
     </label>
     <label id="planInNameWrap">Race <input id="planInName" maxlength="80" placeholder="Odense Half"></label>
     <label><span id="planInDateLabel">Race day</span> <input id="planInDate" type="date" required></label>
-    <label><span id="planInDistLabel">Distance</span>
+    <label id="planInDistWrap"><span id="planInDistLabel">Distance</span>
       <select id="planInDist"></select>
     </label>
     <label id="planInKmWrap" hidden>Kilometres <input id="planInKm" type="number" min="1" max="100" step="0.01"></label>

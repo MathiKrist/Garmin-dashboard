@@ -6,7 +6,8 @@ import { $, fmtDay, escapeHtml } from "./util.js";
 // Volt for easy running, Puls for hard (darker for threshold); a long run's easy steps take the long run's full Volt
 const COLOR = { easy: "var(--k-easy)", high: "var(--k-threshold)", anaerobic: "var(--k-vo2)", rest: "var(--k-jog)" };
 const color = (intensity, kind) => (intensity === "easy" && kind === "long" ? "var(--k-long)"
-  : intensity === "high" && kind === "vo2" ? "var(--k-vo2)" : COLOR[intensity]);
+  : intensity === "high" && kind === "vo2" ? "var(--k-vo2)" : intensity === "anaerobic" && kind === "anaerobic" ? "var(--k-anaerobic)"
+  : COLOR[intensity]);
 const HEIGHT = { rest: 30, easy: 50, high: 80, anaerobic: 100 };
 
 let sport = null;

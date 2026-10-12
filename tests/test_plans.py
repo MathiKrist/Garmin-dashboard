@@ -160,7 +160,7 @@ class Adaptation(unittest.TestCase):
         base = build(acts=history())
         s = self.threshold(base, 0)
         day = date.fromisoformat(s["date"])
-        work = s["steps"][1]["steps"][0]
+        work = plans._work_step(s["steps"])
         mid = (work["target"]["slow"] + work["target"]["fast"]) / 2
         laps = {1: [{"speed": 1000 / mid, "duration_s": work["s"], "avg_hr": 165}] * 3}
         plan = build(acts=history() + [run(1, day, km=10, pace=mid)], laps=laps)
@@ -170,14 +170,14 @@ class Adaptation(unittest.TestCase):
     def test_faster_intervals_speed_up_capped_per_week(self):
         base = build(acts=history())
         s = self.threshold(base, 0)
-        work = s["steps"][1]["steps"][0]
+        work = plans._work_step(s["steps"])
         laps = {1: [{"speed": 1000 / (work["target"]["fast"] * 0.9), "duration_s": work["s"], "avg_hr": 165}] * 3}
         plan = build(acts=history() + [run(1, date.fromisoformat(s["date"]), km=10)], laps=laps)
         self.assertAlmostEqual(plan["factor"], 1 + plans.WEEK_CAP)
         self.assertEqual(self.threshold(plan, 0)["actual"]["verdict"], "better")
         # Next week's threshold paces are faster, and so is the projection
-        self.assertLess(self.threshold(plan, 1)["steps"][1]["steps"][0]["target"]["fast"],
-                        self.threshold(base, 1)["steps"][1]["steps"][0]["target"]["fast"])
+        self.assertLess(plans._work_step(self.threshold(plan, 2)["steps"])["target"]["fast"],
+                        plans._work_step(self.threshold(base, 2)["steps"])["target"]["fast"])
         self.assertLess(plan["projection"]["s"], base["projection"]["s"])
         # The run that moved it, and the time before
         change = plan["projection"]["change"]
@@ -186,7 +186,7 @@ class Adaptation(unittest.TestCase):
     def test_faster_at_too_high_heart_rate_counts_as_on_plan(self):
         base = build(acts=history())
         s = self.threshold(base, 0)
-        work = s["steps"][1]["steps"][0]
+        work = plans._work_step(s["steps"])
         laps = {1: [{"speed": 1000 / (work["target"]["fast"] * 0.9), "duration_s": work["s"], "avg_hr": 185}] * 3}
         plan = build(acts=history() + [run(1, date.fromisoformat(s["date"]), km=10)], laps=laps)
         self.assertEqual(plan["factor"], 1.0)
@@ -202,7 +202,7 @@ class Adaptation(unittest.TestCase):
 
 class Reshuffle(unittest.TestCase):
     def test_missed_key_session_moves_to_the_next_easy_day(self):
-        # Week 1: Tue easy, Thu threshold, Sat easy, Sun long. Thursday missed, today Friday.
+        # Week 1: Tue easy, Thu a hard session (speed, this week), Sat easy, Sun long. Thursday missed, today Friday.
         today = START + timedelta(weeks=1, days=4)
         plan = build(today=today)
         week = sessions(plan, 1)
@@ -210,7 +210,8 @@ class Reshuffle(unittest.TestCase):
         saturday = (START + timedelta(weeks=1, days=5)).isoformat()
         self.assertEqual(next(s for s in week if s["date"] == thursday)["status"], "moved")
         moved = next(s for s in week if s["date"] == saturday)
-        self.assertEqual((moved["kind"], moved["moved_from"]), ("threshold", thursday))
+        self.assertIn(moved["kind"], plans.HARD_KINDS)
+        self.assertEqual(moved["moved_from"], thursday)
 
     def test_missed_easy_run_stays_missed(self):
         today = START + timedelta(weeks=1, days=2)
@@ -254,10 +255,136 @@ class Today(unittest.TestCase):
     def test_send_key_changes_with_the_paces(self):
         a = build(acts=history())
         s = next(s for s in sessions(a, 0) if s["kind"] == "threshold")
-        work = s["steps"][1]["steps"][0]
+        work = plans._work_step(s["steps"])
         laps = {1: [{"speed": 1000 / (work["target"]["fast"] * 0.9), "duration_s": work["s"], "avg_hr": 165}] * 3}
         b = build(acts=history() + [run(1, date.fromisoformat(s["date"]), km=10)], laps=laps)
         self.assertNotEqual(a["send"]["key"], b["send"]["key"])
+
+
+class Variants(unittest.TestCase):
+    def titles(self, plan, kind):
+        return {s["title"] for w in plan["weeks"] for s in w["sessions"] if s["kind"] == kind}
+
+    def test_named_sessions_rotate(self):
+        plan = build()
+        self.assertTrue({"Tempo run", "Cruise intervals"} <= self.titles(plan, "threshold"))
+        self.assertGreater(len(self.titles(plan, "threshold")), 2)
+        self.assertGreater(len(self.titles(plan, "vo2") | self.titles(plan, "anaerobic")), 2)
+        # Each name has its own steps
+        t = plans.Paces(PROFILE, LT, None)
+        shapes = {v: tuple(s["label"] for s in plans._flat(plans._variant_steps(v, 50, t))) for v in plans.VARIANTS}
+        self.assertEqual(len(set(shapes.values())), len(plans.VARIANTS))
+
+    def test_over_unders_judged_per_rep(self):
+        t = plans.Paces(PROFILE, LT, None)
+        steps = plans._variant_steps("over_under", 50, t)
+        flat = list(plans._flat(steps))
+        # Every rep run right at its own target: on plan, though the overs and unders differ
+        laps = [{"speed": 2000 / (s["target"]["slow"] + s["target"]["fast"]) if (s["target"] or {}).get("type") == "pace"
+                 else 1000 / 400, "duration_s": s["s"], "avg_hr": 160} for s in flat]
+        session = {"kind": "threshold", "steps": steps}
+        seen, _ = plans.judge(session, {"speed": 3.0}, laps, None, 1, 1.0, t)
+        self.assertAlmostEqual(seen, 1.0, places=3)
+        # Laps that don't follow the steps: judged by duration against the first rep
+        seen, _ = plans.judge(session, {"speed": 3.0}, laps[1:4], None, 1, 1.0, t)
+        self.assertIsNotNone(seen)
+
+    def test_speed_reps_are_400_m_or_longer(self):
+        t = plans.Paces(PROFILE, LT, None)
+        for v in ("400", "600", "400_sets"):
+            reps = [s for s in plans._flat(plans._variant_steps(v, 50, t)) if s["intensity"] == "anaerobic"]
+            self.assertTrue(reps)
+            self.assertTrue(all(int(s["label"].split()[0]) >= 400 for s in reps))
+
+
+class Speed(unittest.TestCase):
+    def kinds(self, plan):
+        return [{s["kind"] for s in w["sessions"]} for w in plan["weeks"]]
+
+    def test_speed_only_in_build_and_peak_and_never_in_lighter_weeks(self):
+        for cfg in (config(), config(metres=5000), config(goal="fitness"), config(goal="maintain")):
+            plan = build(cfg)
+            weeks = [w for w, k in zip(plan["weeks"], self.kinds(plan)) if "anaerobic" in k]
+            self.assertTrue(weeks, cfg)
+            self.assertTrue(all(not w["deload"] and w["phase"] in ("build", "peak", "steady") for w in weeks), cfg)
+        # A half has one or two; a base builder none
+        self.assertIn(len([k for k in self.kinds(build()) if "anaerobic" in k]), (1, 2))
+        self.assertFalse(any("anaerobic" in k for k in self.kinds(build(config(goal="base")))))
+
+    def test_5k_alternates_speed_and_vo2(self):
+        plan = build(config(metres=5000))
+        build_weeks = [k for w, k in zip(plan["weeks"], self.kinds(plan)) if w["phase"] in ("build", "peak")]
+        self.assertTrue(any("anaerobic" in k for k in build_weeks) and any("vo2" in k for k in build_weeks))
+        self.assertFalse(any("anaerobic" in k for w, k in zip(plan["weeks"], self.kinds(plan)) if w["phase"] == "taper"))
+
+    def test_speed_sessions_dont_move_the_factor(self):
+        base = build(acts=history())
+        s = next(s for w in base["weeks"] for s in w["sessions"] if s["kind"] == "anaerobic")
+        work = plans._work_step(s["steps"])
+        laps = {1: [{"speed": 1000 / (work["target"]["fast"] * 0.85), "duration_s": work["s"], "avg_hr": 175}] * 8}
+        plan = build(acts=history() + [run(1, date.fromisoformat(s["date"]), km=8)], laps=laps)
+        done = next(x for w in plan["weeks"] for x in w["sessions"] if x["date"] == s["date"])
+        self.assertEqual(done["actual"]["verdict"], "better")
+        self.assertEqual(plan["factor"], 1.0)
+
+
+class PlanTypes(unittest.TestCase):
+    def plan(self, goal, weeks, **kw):
+        return build(config(goal=goal, date=(START + timedelta(weeks=weeks, days=5)).isoformat(), **kw))
+
+    def hard(self, w):
+        return [s for s in w["sessions"] if s["kind"] in plans.HARD_KINDS]
+
+    def test_base_builder_climbs_without_a_taper_or_projection(self):
+        cfg = config(goal="base", start_km=25, date=(START + timedelta(weeks=20, days=5)).isoformat())
+        weeks = plans.layout(cfg)
+        self.assertNotIn("taper", [w[1] for w in weeks])
+        self.assertAlmostEqual(max(plans.volumes(cfg, weeks)), 50)  # twice the start
+        plan = build(cfg)
+        self.assertIsNone(plan["projection"])
+        self.assertFalse(plan["projects"])
+        self.assertTrue(all(len(self.hard(w)) <= 1 for w in plan["weeks"]))
+
+    def test_speed_block_two_sessions_held_volume_short_taper(self):
+        cfg = config(goal="speed", metres=5000, start_km=30, date=(START + timedelta(weeks=8, days=5)).isoformat())
+        weeks = plans.layout(cfg)
+        self.assertEqual([w[1] for w in weeks].count("taper"), 1)
+        self.assertLessEqual(max(plans.volumes(cfg, weeks)), 30 * 1.1 + 1e-9)
+        plan = build(cfg)
+        self.assertTrue(all(len(self.hard(w)) == 2 for w in plan["weeks"][:-1] if not w["deload"]))
+        self.assertIsNotNone(plan["projection"])
+
+    def test_return_to_running_builds_from_run_walk(self):
+        plan = self.plan("comeback", 8)
+        self.assertFalse(any(self.hard(w) for w in plan["weeks"]))
+        first, last = plan["weeks"][0]["sessions"][0], plan["weeks"][-2]["sessions"][0]
+        self.assertIn("walk", first["title"].lower())
+        self.assertNotIn("walk", last["title"].lower())
+        self.assertIsNone(plan["projection"])
+
+    def test_maintenance_holds_volume(self):
+        cfg = config(goal="maintain", start_km=30, date=(START + timedelta(weeks=8, days=5)).isoformat())
+        kms = [km for km, w in zip(plans.volumes(cfg, plans.layout(cfg)), plans.layout(cfg)) if not w[2]]
+        self.assertEqual(set(kms), {30})
+        self.assertTrue({"steady"} == {w[1] for w in plans.layout(cfg)})
+
+
+class Setup(unittest.TestCase):
+    def check(self, goal, weeks, **kw):
+        import app
+        body = {"goal": goal, "name": "x", "metres": 10000, "days": [1, 3, 6], "long_day": 6, "start_km": 25,
+                "date": (START + timedelta(weeks=weeks)).isoformat(), **kw}
+        return app._plan_from(body, None, {}, None, START)
+
+    def test_new_plan_types_and_their_lengths(self):
+        self.assertEqual(self.check("comeback", 8, metres=21098)["metres"], 10000)  # no distance of its own
+        self.assertEqual(self.check("base", 20)["name"], "Base builder")
+        self.assertIsNone(self.check("maintain", 8, target_s=3000)["target_s"])  # only a race has a target
+        self.assertEqual(self.check("speed", 8, metres=5000)["metres"], 5000)
+        for goal, weeks, kw in (("speed", 20, {}), ("speed", 8, {"metres": 21098}), ("comeback", 30, {}),
+                                ("base", 2, {}), ("nope", 8, {})):
+            with self.assertRaises((AssertionError, KeyError)):
+                self.check(goal, weeks, **kw)
 
 
 class Dashboard(unittest.TestCase):

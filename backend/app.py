@@ -336,14 +336,17 @@ def remove_plan_week():
 
 def _plan_from(body, old, profile, pred_5k, today):
     """The plan setup from the form, checked. Editing a plan keeps its start and starting fitness, so its history and
-    adaptation carry on."""
+    adaptation carry on. A base builder and a return to running have no distance (10 km sets their limits); a speed
+    block is for 5 or 10 km; only a race has a name and a target time."""
     days = sorted({int(d) for d in body["days"]})
+    goal = body["goal"]
+    race = goal == "race"
     cfg = {
-        "goal": body["goal"],
-        "name": str(body.get("name") or "").strip()[:80] or ("Race" if body["goal"] == "race" else "General fitness"),
-        "metres": float(body["metres"]),
+        "goal": goal,
+        "name": (str(body.get("name") or "").strip()[:80] if race else "") or plans.GOALS[goal],
+        "metres": 10000.0 if goal in ("base", "comeback") else float(body["metres"]),
         "date": date.fromisoformat(body["date"]).isoformat(),
-        "target_s": int(body["target_s"]) if body.get("target_s") else None,
+        "target_s": int(body["target_s"]) if race and body.get("target_s") else None,
         "days": days,
         "long_day": int(body["long_day"]),
         "start_km": float(body["start_km"]),
@@ -351,7 +354,8 @@ def _plan_from(body, old, profile, pred_5k, today):
         "fitness0": old["fitness0"] if old else plans.fitness_now(profile, pred_5k),
     }
     weeks = (date.fromisoformat(cfg["date"]) - date.fromisoformat(cfg["start"])).days / 7
-    assert cfg["goal"] in plans.GOALS and 1000 <= cfg["metres"] <= 100_000 and 2 <= weeks <= 52
+    lo, hi = plans.WEEK_RANGE[goal]
+    assert 1000 <= cfg["metres"] <= 100_000 and lo <= weeks <= hi and (goal != "speed" or cfg["metres"] in (5000, 10000))
     assert cfg["date"] > today.isoformat() and 2 <= len(days) <= 7 and all(0 <= d <= 6 for d in days)
     assert cfg["long_day"] in days and 0 < cfg["start_km"] <= 300 and (cfg["target_s"] or 1) > 0
     return cfg
@@ -371,8 +375,10 @@ async def set_plan(request: Request):
         try:
             cfg = _plan_from(body, old, profile, row and row["pred_5k"], today)
         except (KeyError, TypeError, ValueError, AssertionError):
-            return JSONResponse({"error": "Give an end date 2 to 52 weeks from the plan's start, a distance, 2 to 7 run "
-                                          "days with the long run on one of them, and your weekly km."}, status_code=400)
+            return JSONResponse({"error": "Give an end date within the plan type's length (a speed block 6 to 12 weeks, a "
+                                          "return to running 4 to 16, a base builder 4 to 52, the others 2 to 52), a "
+                                          "distance where it asks for one, 2 to 7 run days with the long run on one of "
+                                          "them, and your weekly km."}, status_code=400)
         if cfg["goal"] == "race":
             target = cfg["target_s"] or (plans.build(cfg, [], {}, profile, today)["projection"] or {}).get("s")
             if not target:

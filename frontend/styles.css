@@ -21,6 +21,7 @@
   --k-long: #8ACB00;
   --k-threshold: #FF9B80;
   --k-vo2: #FF5A36;
+  --k-anaerobic: #C0262D;  /* speed: a deeper Puls */
   --k-jog: #D3D7D0;
   --route: #FF6A00;  /* the glowing route line on the maps */
   /* Sports with their own route color and map (ROUTE_STYLES in js/map.js); swim and disc golf sit on satellite
@@ -85,6 +86,7 @@
   --k-long: #C6FF3D;
   --k-threshold: #A8432C;
   --k-vo2: #FF5A36;
+  --k-anaerobic: #FF9478;
   --k-jog: #2A2F38;
   --route: #FF7A1A;
   --route-winter: #46C8FF;

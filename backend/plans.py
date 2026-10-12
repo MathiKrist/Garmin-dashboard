@@ -1,5 +1,5 @@
-"""A training plan: weeks of runs on the days the athlete picked, toward a race or general fitness, with the race-day
-time it projects. Paces follow how the runs go: a run better than planned makes the next paces (and the projection)
+"""A training plan: weeks of runs on the days the athlete picked, toward a goal (a race, general fitness, a bigger
+base, a speed block, a return to running or holding fitness), with the time it projects. Paces follow how the runs go: a run better than planned makes the next paces (and the projection)
 faster, a worse one slower, and a run on plan changes nothing.
 
 Everything is worked out again from the stored setup and the synced runs on every build, so nothing else is stored."""
@@ -10,10 +10,14 @@ from datetime import date, timedelta
 
 import changes as chat_changes
 import workouts
-from workouts import LT_FROM_5K, _flat, _repeat, _round5, _run_steps, _step, km_of
+from workouts import LT_FROM_5K, _clamp, _flat, _repeat, _round5, _run_steps, _step, km_of
 
-GOALS = {"race": "Race", "fitness": "General fitness"}
-PHASES = {"base": "Base", "build": "Build", "peak": "Peak", "taper": "Taper"}
+GOALS = {"race": "Race", "fitness": "General fitness", "base": "Base builder", "speed": "Speed block",
+         "comeback": "Return to running", "maintain": "Maintenance"}
+WEEK_RANGE = {"race": (2, 52), "fitness": (2, 52), "base": (4, 52), "speed": (6, 12), "comeback": (4, 16),
+              "maintain": (2, 52)}  # how long each plan type can be, in weeks
+PROJECTS = {"race", "fitness", "speed", "maintain"}  # the plan types that project a time over their distance
+PHASES = {"base": "Base", "build": "Build", "peak": "Peak", "taper": "Taper", "steady": "Steady"}
 DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 WEEKLY_GAIN = 0.005  # planned threshold speed gain per training week
@@ -39,26 +43,43 @@ FACTOR_LIMITS = (0.85, 1.15)
 WORK_LAP_SHARE = 0.9  # a work rep is a lap at least this share of the work target's slow speed,
 WORK_LAP_LENGTH = (0.8, 1.2)  # and about as long as the work step (laps as the watch records the plan's workout)
 HR_MODEL_DAYS = 60  # easy runs this long before the plan set the expected pace at each heart rate
-HARD_KINDS = ("threshold", "vo2", "race_pace")
+HARD_KINDS = ("threshold", "vo2", "anaerobic", "race_pace")
 KEY_KINDS = HARD_KINDS + ("long",)
-TITLES = {**workouts.TITLES, "race_pace": "Race pace", "race": "Race"}
+TITLES = {**workouts.TITLES, "race_pace": "Race pace intervals", "race": "Race"}
+# The named sessions of each hard kind, and what they're called
+VARIANTS = {"cruise": "Cruise intervals", "tempo": "Tempo run", "progression": "Progression run",
+            "over_under": "Over/unders", "1k": "1 km repeats", "800": "800 m repeats", "3min": "3-minute intervals",
+            "pyramid": "Pyramid", "400": "400 m repeats", "600": "600 m repeats", "400_sets": "400 m sets"}
 
 
 def taper_weeks(metres):
     return 1 if metres <= 10000 else 2 if metres <= 21098 else 3
 
 
-def ceiling_km(goal, metres):
-    """The weekly km a plan builds toward, by race distance (a fitness plan as for 10 km)."""
-    if goal == "fitness":
-        return 45
-    return 35 if metres <= 5000 else 45 if metres <= 10000 else 50 if metres <= 21098 else 70
+def taper_count(cfg):
+    """Taper weeks: by distance for a race, one for a speed block, none for the other plan types."""
+    return taper_weeks(cfg["metres"]) if cfg["goal"] == "race" else 1 if cfg["goal"] == "speed" else 0
+
+
+def ceiling_km(cfg):
+    """The weekly km a plan builds toward: by race distance (a fitness plan as for 10 km), never past MAX_GROWTH times
+    the start; a base builder to twice the start (60 km at most); a speed block holds about where it starts, and
+    maintenance and a return to running exactly."""
+    goal, m, start = cfg["goal"], cfg["metres"], cfg["start_km"]
+    if goal in ("race", "fitness"):
+        top = 45 if goal == "fitness" else 35 if m <= 5000 else 45 if m <= 10000 else 50 if m <= 21098 else 70
+        return max(start, min(top, start * MAX_GROWTH))
+    if goal == "base":
+        return max(start, min(60, start * 2))
+    return start * 1.1 if goal == "speed" else start
 
 
 def long_peak_km(goal, metres):
-    """The longest long run, by race distance."""
-    if goal == "fitness":
-        return 16
+    """The longest long run, by race distance; 0 for the plan types whose long run holds steady."""
+    if goal in ("fitness", "base"):
+        return 16 if goal == "fitness" else 18
+    if goal != "race":
+        return 0
     return 12 if metres <= 5000 else 16 if metres <= 10000 else 19 if metres <= 21098 else 32
 
 
@@ -91,15 +112,24 @@ def layout(cfg):
     """[(week start, phase, deload)] from the plan's first Monday to the week of its end date."""
     first, last = monday(date.fromisoformat(cfg["start"])), monday(date.fromisoformat(cfg["date"]))
     n = (last - first).days // 7 + 1
-    taper = min(taper_weeks(cfg["metres"]), max(0, n - 2)) if cfg["goal"] == "race" else 0
+    goal = cfg["goal"]
+    taper = min(taper_count(cfg), max(0, n - 2))
     train = n - taper
-    base = max(1, round(train * (0.4 if cfg["goal"] == "race" else 0.5)))
-    build = train - base if cfg["goal"] == "fitness" else max(0, round(train * 0.35))
+    if goal == "race":
+        base, build = max(1, round(train * 0.4)), max(0, round(train * 0.35))
+    elif goal == "speed":  # no base: build, then peak
+        base, build = 0, max(1, round(train * 0.5))
+    else:
+        base = max(1, round(train * 0.5))
+        build = train - base
     out = []
     for i in range(n):
         phase = "base" if i < base else "build" if i < base + build else "peak" if i < train else "taper"
-        # Every 4th week is lighter, up to the long run's peak week and the last before the taper (or the plan's end)
-        deload = phase != "taper" and (i + 1) % 4 == 0 and i < min(train - 1, long_peak_week(cfg, n))
+        phase = {"maintain": "steady", "comeback": "base"}.get(goal, phase)
+        # Every 4th week is lighter, up to the long run's peak week and the last before the taper (or the plan's end);
+        # a return to running builds steadily without
+        deload = (phase != "taper" and goal != "comeback" and (i + 1) % 4 == 0
+                  and i < min(train - 1, long_peak_week(cfg, n)))
         out.append((first + timedelta(weeks=i), phase, deload))
     return out
 
@@ -109,7 +139,7 @@ def volumes(cfg, weeks):
     ceiling (or MAX_GROWTH times the start, if lower); less in deload weeks (which don't count as a step up) and taper
     weeks, which take a share of the highest week."""
     start = cfg["start_km"]
-    ceiling = max(start, min(ceiling_km(cfg["goal"], cfg["metres"]), start * MAX_GROWTH))
+    ceiling = ceiling_km(cfg)
     out, level, tapers = [], start, [w for w in weeks if w[1] == "taper"]
     for i, (_, phase, deload) in enumerate(weeks):
         if phase == "taper":
@@ -140,7 +170,7 @@ def long_runs(cfg, weeks, kms):
     peak = long_peak_week(cfg, len(weeks))
     down = LONG_DOWN[cfg["metres"] > 10000]
     steps = sum(1 for i, w in enumerate(weeks) if 0 < i <= peak and not w[2])
-    step = min(LONG_STEP[1], max(LONG_STEP[0], (top - first) / steps)) if steps else 0
+    step = min(LONG_STEP[1], max(LONG_STEP[0], (top - first) / steps)) if steps and top > first else 0
     out, level, longest = [], first, first
     for i, (w, km) in enumerate(zip(weeks, kms)):
         if i > peak:
@@ -175,14 +205,35 @@ def session_days(days, long_day, hard):
 
 
 def hard_kinds(cfg, phase, n_days, week_index):
-    """The week's hard sessions: one in the base phase or with three days or fewer, two otherwise."""
-    long_race = cfg["goal"] == "race" and cfg["metres"] > 10000
+    """The week's hard sessions, first the one that stays when there's room for only one.
+
+    Race and general fitness: one in the base phase and the taper or with three days or fewer, two otherwise. Speed
+    (anaerobic) sessions come only where the goal calls for speed, never in the base phase or the taper: every 3rd
+    build or peak week toward a 5 or 10 km race (VO2 max the others), every 6th build week toward a half or marathon,
+    every 4th build week for general fitness. A base builder has one threshold session a week, a speed block two (VO2
+    max, then speed or threshold), maintenance one (threshold, speed, threshold, VO2 max in turn), and a return to
+    running none."""
+    goal, i = cfg["goal"], week_index
+    if goal == "comeback":
+        return []
+    if goal == "maintain":
+        return [("threshold", "anaerobic", "threshold", "vo2")[i % 4]]
+    if goal == "base":
+        return ["threshold"]
+    if goal == "speed":
+        kinds = ["vo2"] if phase == "taper" else ["vo2", "anaerobic" if i % 2 == 0 else "threshold"]
+        return kinds if n_days >= 3 else kinds[:1]
+    short = goal == "race" and cfg["metres"] <= 10000
+    # Which weeks get speed in place of VO2 max: away from the lighter 4th weeks
+    speed_week = i % 3 == 2 if short else i % 6 == 4 if goal == "race" else i % 4 == 1
     if phase in ("base", "taper"):
         kinds = ["threshold"]
-    elif phase in ("build", "taper"):
-        kinds = ["threshold", "vo2"] if week_index % 2 == 0 else ["vo2", "threshold"]
+    elif phase == "build":
+        second = "anaerobic" if speed_week else "vo2"
+        kinds = ["threshold", second] if i % 2 == 0 else [second, "threshold"]
     else:  # peak: race pace for the half and longer
-        kinds = ["race_pace", "threshold"] if long_race else ["vo2", "threshold"]
+        kinds = (["race_pace", "threshold"] if goal == "race" and not short
+                 else ["anaerobic" if short and speed_week else "vo2", "threshold"])
     return kinds[:1] if phase in ("base", "taper") or n_days <= 3 else kinds[:2]
 
 
@@ -216,6 +267,92 @@ def _touch_steps(t):
             _step("cooldown", "Cool-down", 300, "easy")]
 
 
+def _dist_s(metres, target, fallback):
+    """Seconds to run `metres` at the middle of a pace target, or `fallback` without one."""
+    if (target or {}).get("type") == "pace":
+        return round(metres / 1000 * (target["slow"] + target["fast"]) / 2)
+    return fallback
+
+
+def variant(kind, phase, week, light):
+    """Which named session a hard kind is this week: threshold sessions are tempo and progression runs in the base
+    phase, cruise intervals and over/unders after; VO2 max and speed sessions rotate. Lighter and taper weeks keep to
+    the plainest."""
+    if kind == "threshold":
+        return "cruise" if light else (("tempo", "progression") if phase == "base" else ("cruise", "over_under"))[week % 2]
+    if kind == "vo2":
+        return "3min" if light else ("1k", "800", "3min", "pyramid")[week % 4]
+    return ("400", "600", "400_sets")[week % 3]
+
+
+def _variant_steps(v, total, t):
+    """A named hard session's steps, about `total` minutes with the warm-up and cool-down."""
+    warm = _step("warmup", "Warm-up", 900, "easy", t.run("easy", 2))
+    cool = _step("cooldown", "Cool-down", 600, "easy")
+    main = total - 25
+    jog = lambda s: _step("recovery", "Easy jog", s, "rest")
+    if v == "cruise":
+        return _run_steps("threshold", total, t)
+    if v == "3min":
+        return _run_steps("vo2", total, t)
+    if v == "tempo":
+        return [warm, _step("interval", "Tempo", _clamp(main, 20, 30) * 60, "high", t.run("tempo", 3)), cool]
+    if v == "progression":
+        return [_step("interval", "Easy", max(10, total - 25) * 60, "easy", t.run("easy", 2)),
+                _step("interval", "Steady", 600, "high", t.run("tempo", 3)),
+                _step("interval", "Threshold", 600, "high", t.run("threshold", 4)),
+                _step("cooldown", "Cool-down", 300, "easy")]
+    if v == "over_under":
+        n = _clamp(round(main / 6), 3, 4)
+        return [warm, _repeat(n, _step("interval", "Over", 120, "high", t.run("over", 4)),
+                              _step("interval", "Under", 120, "high", t.run("under", 3)), jog(120)), cool]
+    vo2 = t.run("vo2", 5)
+    if v == "1k":
+        return [warm, _repeat(_clamp(round(main / 6.5), 4, 6), _step("interval", "1 km", _dist_s(1000, vo2, 240), "high", vo2),
+                              jog(150)), cool]
+    if v == "800":
+        return [warm, _repeat(_clamp(round(main / 5), 5, 8), _step("interval", "800 m", _dist_s(800, vo2, 190), "high", vo2),
+                              jog(120)), cool]
+    if v == "pyramid":
+        mins = (1, 2, 3, 4, 3, 2, 1)
+        steps = [warm]
+        for j, m in enumerate(mins):
+            steps.append(_step("interval", f"{m} min hard", m * 60, "high", vo2))
+            if j < len(mins) - 1:
+                steps.append(jog(m * 60))
+        return steps + [cool]
+    # Speed: 400 m and longer, so the heart rate gets up and stays there
+    fast = t.pace("anaerobic")
+    note = None if fast else "Fast but controlled, about mile pace"
+    rep = lambda m, fallback: _step("interval", f"{m} m", _dist_s(m, fast, fallback), "anaerobic", fast, note)
+    if v == "400":
+        return [warm, _repeat(_clamp(round(main / 3), 8, 10), rep(400, 85), jog(90)), cool]
+    if v == "600":
+        return [warm, _repeat(_clamp(round(main / 4.5), 5, 7), rep(600, 130), jog(120)), cool]
+    return [warm, _repeat(5, rep(400, 85), jog(60)), jog(180), _repeat(5, rep(400, 85), jog(60)), cool]  # 400 m sets
+
+
+def run_walk(day, kind, progress, t):
+    """A return-to-running session: run/walk, from 2 min run and 1 min walk to 10 min run by 80% of the plan, then
+    running all the way. Easy days grow from 20 to 30 min, the long day from 25 to 40."""
+    total = round((25 + 15 * progress) if kind == "long" else (20 + 10 * progress))
+    long = kind == "long"
+    if progress >= 0.8:
+        steps = _run_steps("long" if long else "easy", total, t)
+        title = "Long run" if long else "Easy run"
+    else:
+        run = round(2 + 8 * progress / 0.8)
+        steps = [_repeat(max(2, round(total / (run + 1))), _step("interval", "Run", run * 60, "easy", t.run("easy", 2)),
+                         _step("recovery", "Walk", 60, "rest"))]
+        title = "Long run/walk" if long else "Run/walk"
+    easy = t.pace("easy")
+    run_s = sum(s["s"] for s in _flat(steps) if s["intensity"] == "easy")
+    walk_s = sum(s["s"] for s in _flat(steps) if s["intensity"] == "rest")
+    km = round(run_s / ((easy["slow"] + easy["fast"]) / 2) + walk_s / 600, 1) if easy else None  # walking 10 min/km
+    return {"date": day.isoformat(), "kind": kind, "title": title, "steps": steps,
+            "total_s": run_s + walk_s, "km": km}
+
+
 def _long_steps(total, t, race_finish):
     if not race_finish:
         return _run_steps("long", total, t)
@@ -224,15 +361,16 @@ def _long_steps(total, t, race_finish):
             _step("interval", "Race pace finish", finish * 60, "high", t.race() or t.hr(4))]
 
 
-def make_session(kind, day, cfg, phase, deload, t, km=None, touch=False):
+def make_session(kind, day, cfg, phase, deload, t, km=None, touch=False, week=0):
     """One session: its steps, length and distance. `km` sets the length of easy and long runs; `touch` makes a race
-    pace session race week's short one."""
+    pace session race week's short one; `week` picks the named variant of a hard session."""
     easy = t.pace("easy")
     easy_pace = (easy["slow"] + easy["fast"]) / 120 if easy else 6.5  # min/km
     if kind == "race":
         s = round(cfg["metres"] / t.race_speed) if t.race_speed else None
         return {"date": day.isoformat(), "kind": "race", "title": cfg["name"], "steps": [], "total_s": s,
                 "km": round(cfg["metres"] / 1000, 1)}
+    race_finish = False
     if kind in ("easy", "long"):
         cap = long_cap_min(cfg["metres"]) if kind == "long" else 90
         total = _round5(min(km * easy_pace, cap))
@@ -241,9 +379,21 @@ def make_session(kind, day, cfg, phase, deload, t, km=None, touch=False):
     elif kind == "shakeout":
         steps = _run_steps("shakeout", 25, t)
     else:
-        total = 40 if deload or phase == "taper" else {"base": 45, "build": 50, "peak": 55}[phase]
-        steps = (_touch_steps(t) if touch else _race_pace_steps(total, t)) if kind == "race_pace" else _run_steps(kind, total, t)
-    title = "Race pace touch" if touch else f"{TITLES[kind]} run" if kind in ("easy", "long", "shakeout") else TITLES[kind]
+        light = deload or phase == "taper"
+        total = 40 if light else {"base": 45, "build": 50, "peak": 55, "steady": 50}[phase]
+        if kind == "race_pace":
+            steps = _touch_steps(t) if touch else _race_pace_steps(total, t)
+        else:
+            v = variant(kind, phase, week, light)
+            steps = _variant_steps(v, total, t)
+    if touch:
+        title = "Race pace touch"
+    elif kind in HARD_KINDS and kind != "race_pace":
+        title = VARIANTS[v]
+    elif kind == "long" and race_finish:
+        title = "Long run, race pace finish"
+    else:
+        title = f"{TITLES[kind]} run" if kind in ("easy", "long", "shakeout") else TITLES[kind]
     flat = list(_flat(steps))
     return {"date": day.isoformat(), "kind": kind, "title": title, "steps": steps,
             "total_s": sum(s["s"] for s in flat), "km": km_of(steps, t) or (round(km, 1) if km else None)}
@@ -291,8 +441,12 @@ def week_sessions(cfg, i, week, km, t, first_day, long_km):
         out.append([end, "race"])
         out.sort()
 
+    if cfg["goal"] == "comeback":
+        n = len(layout(cfg))
+        return [run_walk(day, kind, i / max(1, n - 1), t) for day, kind in out]
+
     def hard(day, kind):
-        return make_session(kind, day, cfg, phase, deload, t, touch=roles.get(day) == "race_pace")
+        return make_session(kind, day, cfg, phase, deload, t, touch=roles.get(day) == "race_pace", week=i)
 
     hard_runs = {d: hard(d, k) for d, k in out if k in HARD_KINDS}
     n_easy = sum(1 for _, k in out if k == "easy")
@@ -335,10 +489,28 @@ def hr_model(acts, start, zones):
     return lambda hr: per_beat * hr
 
 
+def _is_work(s):
+    return s["kind"] == "interval" and (s["target"] or {}).get("type") == "pace" and s["intensity"] in ("high", "anaerobic")
+
+
 def _work_step(steps):
     """The first paced work step."""
-    return next((s for s in _flat(steps)
-                 if s["kind"] == "interval" and (s["target"] or {}).get("type") == "pace" and s["intensity"] == "high"), None)
+    return next((s for s in _flat(steps) if _is_work(s)), None)
+
+
+def _work_laps(steps, laps):
+    """[(lap, its step)] for the work steps. A watch running the plan's workout records a lap per step, so with as many
+    laps as steps (or one more, for a lap after the end) they pair in order and each rep is judged against its own
+    target (over/unders, pyramids). Otherwise the laps about as long as the first work step and near its pace count."""
+    flat = list(_flat(steps))
+    if len(laps) in (len(flat), len(flat) + 1):
+        return [(l, s) for l, s in zip(laps, flat) if _is_work(s) and l.get("speed") and l.get("duration_s")]
+    step = _work_step(steps)
+    if not step:
+        return []
+    lo, hi = step["s"] * WORK_LAP_LENGTH[0], step["s"] * WORK_LAP_LENGTH[1]
+    return [(l, step) for l in laps if l.get("speed") and lo <= (l.get("duration_s") or 0) <= hi
+            and l["speed"] >= 1000 / step["target"]["slow"] * WORK_LAP_SHARE]
 
 
 def judge(session, run, laps, model, gain, factor, t):
@@ -352,19 +524,15 @@ def judge(session, run, laps, model, gain, factor, t):
             return None, pace
         return run["speed"] / (model(run["avg_hr"]) * gain), pace
     if kind in HARD_KINDS:
-        step = _work_step(session["steps"])
-        if not (step and laps):
-            return None, pace
-        target, lo, hi = step["target"], step["s"] * WORK_LAP_LENGTH[0], step["s"] * WORK_LAP_LENGTH[1]
-        work = [l for l in laps if l.get("speed") and lo <= (l.get("duration_s") or 0) <= hi
-                and l["speed"] >= 1000 / target["slow"] * WORK_LAP_SHARE]
+        work = _work_laps(session["steps"], laps or [])
         if not work:
             return None, pace
-        secs = sum(l["duration_s"] for l in work)
-        speed = sum(l["speed"] * l["duration_s"] for l in work) / secs
-        mid = 2000 / (target["slow"] + target["fast"])
-        seen = factor * speed / mid
-        hrs = [l["avg_hr"] for l in work if l.get("avg_hr")]
+        secs = sum(l["duration_s"] for l, _ in work)
+        speed = sum(l["speed"] * l["duration_s"] for l, _ in work) / secs
+        # Each rep against the middle of its own target, weighted by time
+        ratio = sum(l["speed"] * (s["target"]["slow"] + s["target"]["fast"]) / 2000 * l["duration_s"] for l, s in work) / secs
+        seen = factor * ratio
+        hrs = [l["avg_hr"] for l, _ in work if l.get("avg_hr")]
         ceiling = t.floors[4] if kind in ("threshold", "race_pace") else None  # zone 5's floor
         if ceiling and hrs and sum(hrs) / len(hrs) > ceiling:
             seen = min(seen, factor)  # faster, but only by working harder than the session asks
@@ -450,9 +618,9 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
         return 1 + min(MAX_GAIN, WEEKLY_GAIN * i)
 
     def projection(factor):
-        if not lt0:
+        if not lt0 or cfg["goal"] not in PROJECTS:
             return None
-        lt = lt0 * gain(train_weeks) * factor * (1 + TAPER_GAIN if race else 1)
+        lt = lt0 * gain(train_weeks) * factor * (1 + TAPER_GAIN if taper_count(cfg) else 1)
         return round(race_time(lt, cfg["metres"]))
 
     factor, change, out_weeks, this_week = 1.0, None, [], monday(today)
@@ -480,10 +648,13 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
             if s["status"] != "done":
                 continue
             seen, pace = judge(s, r, laps_by_id.get(r["id"]), model, gain(i), factor, t)
+            if cfg["goal"] == "comeback":
+                seen = None  # run/walk says nothing about threshold pace
             s["actual"] = {"id": r["id"], "km": r.get("km"), "pace": pace, "hr": r.get("avg_hr"),
                            "verdict": None if seen is None else "better" if seen > factor * (1 + DEADBAND)
                            else "worse" if seen < factor * (1 - DEADBAND) else "on plan"}
-            if seen is not None and abs(seen - factor) > factor * DEADBAND:
+            # A speed session gets its verdict, but its pace is sprint speed, not threshold: it doesn't move the factor
+            if seen is not None and s["kind"] != "anaerobic" and abs(seen - factor) > factor * DEADBAND:
                 before = projection(factor)
                 factor += SMOOTHING * (0.5 if s["kind"] in ("easy", "long") else 1) * (seen - factor)
                 factor = max(week_factor * (1 - WEEK_CAP), min(week_factor * (1 + WEEK_CAP), factor))
@@ -511,7 +682,7 @@ def build(cfg, acts, laps_by_id, profile, today, sent=(), changes=()):
     plan = {
         "config": cfg, "goal_label": GOALS[cfg["goal"]], "weeks": out_weeks, "factor": round(factor, 4),
         "week_index": next((i for i, w in enumerate(weeks) if w[0] == this_week), None),
-        "weeks_left": math.ceil(weeks_left), "projection": proj,
+        "weeks_left": math.ceil(weeks_left), "projection": proj, "projects": cfg["goal"] in PROJECTS,
         "phases": PHASES, "over": today > end,
     }
     coming = coming_week(plan, today)

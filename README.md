@@ -64,7 +64,16 @@ The screenshots use demo data.
 
 ## Training plan
 
-Set one up with **+ Training plan** on the Workout page: race or general fitness, the date, the distance, an optional target time, your run days, the long-run day and your current km a week. A race plan also sets the race goal.
+Set one up with **+ Training plan** on the Workout page: the plan type, the date, your run days, the long-run day and your current km a week (plus the distance and target time where the type asks). A race plan also sets the race goal.
+
+| Plan type | What it does |
+|---|---|
+| Race | Builds toward a 5 km, 10 km, half or marathon, with a taper |
+| General fitness | Builds steadily, projecting a time for a distance you pick |
+| Base builder | More weekly km and a longer long run (up to 18 km), one hard session a week |
+| Speed block | 6–12 weeks to get faster over 5 or 10 km: volume held, two hard sessions a week |
+| Return to running | Run/walk sessions that build to continuous running, nothing hard |
+| Maintenance | Holds your weekly km, one hard session a week |
 
 | | 5 km | 10 km | Half | Marathon | Fitness |
 |---|---|---|---|---|---|
@@ -75,10 +84,11 @@ Set one up with **+ Training plan** on the Workout page: race or general fitness
 
 - **Weekly km** grow at most 8% a week, to at most 2.5 times where you started. Every 4th week is lighter.
 - **The long run** climbs on its own, up to half the week, and steps down after its peak.
-- **Hard sessions**: one or two a week (threshold, VO2 max, race pace), kept away from the long run. The second is dropped when the week has no room for it.
+- **Hard sessions**: one or two a week, kept away from the long run, and named as runners know them: tempo and progression runs, cruise intervals, over/unders, 1 km and 800 m repeats, pyramids, race pace. The second is dropped when the week has no room for it.
+- **Speed sessions**: 400 m repeats, 600 m repeats and 400 m sets. Mostly in 5 and 10 km plans and the speed block, now and then in the build of the others; never in the base phase, the taper or a lighter week.
 - **Race week**: a short race pace session, a shakeout and the race.
 - **Paces adapt**: faster runs than planned make the next paces faster, slower ones slower. Intervals are judged on their laps, easy runs on pace at their heart rate.
-- **Projected time**: shown as a range that narrows toward race day. The header shows the last run that moved it.
+- **Projected time**: shown as a range that narrows toward race day, for the plan types that have a distance. The header shows the last run that moved it.
 - **Missed sessions**: a missed hard or long run moves to the next easy day that week.
 
 ## The chat

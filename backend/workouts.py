@@ -16,7 +16,8 @@ HARD = {"TEMPO", "LACTATE_THRESHOLD", "VO2MAX", "ANAEROBIC_CAPACITY", "SPRINT"} 
 THRESHOLD = {"TEMPO", "LACTATE_THRESHOLD"}
 
 # Run paces as a share of lactate threshold speed (slow end, fast end), close to Jack Daniels' training paces
-RUN_PACE = {"recovery": (0.68, 0.74), "easy": (0.74, 0.82), "threshold": (0.97, 1.01)}
+RUN_PACE = {"recovery": (0.68, 0.74), "easy": (0.74, 0.82), "threshold": (0.97, 1.01),
+            "tempo": (0.92, 0.96), "over": (1.02, 1.05), "under": (0.94, 0.97)}
 # Intervals off the 5 km race pace (Garmin's prediction): VO2 max at it, anaerobic repeats faster
 FIVE_K_PACE = {"vo2": (0.98, 1.02), "anaerobic": (1.06, 1.10)}
 LT_FROM_5K = 0.94  # threshold speed against 5 km race speed, when Garmin has no threshold

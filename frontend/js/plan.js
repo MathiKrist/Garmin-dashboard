@@ -3,7 +3,7 @@
 
 import { data } from "./state.js";
 import { $, fmtDay, fmtShort, fmtDuration, fmtPace, fmtRange, escapeHtml, addDays } from "./util.js";
-import { raceDistance, isRaceDistance, parseTime } from "./race.js";
+import { raceDistance, parseTime } from "./race.js";
 import { total, barHtml, stepsHtml, mainPace, currentSport, todaysWorkout, showWorkout, watchButton, watchRequest } from "./workout.js";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -15,9 +15,10 @@ const signed = (gap) => `<span class="${gap > 0 ? "over" : "under"}">${gap > 0 ?
 const VERDICT = { better: "Faster than planned", worse: "Slower than planned", "on plan": "On plan" };
 
 // Each session type's colour: Volt for easy running, Puls for hard
-const KIND = { easy: "easy", shakeout: "easy", recovery: "easy", long: "long", threshold: "threshold", race_pace: "threshold", vo2: "vo2", race: "vo2" };
+const KIND = { easy: "easy", shakeout: "easy", recovery: "easy", long: "long", threshold: "threshold", race_pace: "threshold", vo2: "vo2",
+  anaerobic: "anaerobic", race: "vo2" };
 const kindColor = (kind) => `var(--k-${KIND[kind] || "easy"})`;
-const LEGEND = [["easy", "Easy"], ["long", "Long run"], ["threshold", "Threshold"], ["vo2", "VO2 max"]];
+const LEGEND = [["easy", "Easy"], ["long", "Long run"], ["threshold", "Threshold"], ["vo2", "VO2 max"], ["anaerobic", "Speed"]];
 
 let day = null, week = null;  // the strip's picked day and the chart's picked week; null is today and this week
 
@@ -64,10 +65,11 @@ export function renderPlan() {
 
   // The plan in one line
   $("planName").textContent = c.name;
+  $("planProj").hidden = !p.projects;
   $("planProj").innerHTML = pr ? `<b>${fmtRange(pr.low, pr.high)}</b><span>${race ? "on race day" : raceDistance(c.metres).toLowerCase()} · ${fmtPace(pr.s / c.metres * 1000)}</span>`
     : "<span>No projection yet: needs Garmin's threshold or race prediction</span>";
   const ch = pr?.change;
-  $("planChange").hidden = !pr;
+  $("planChange").hidden = !pr || !p.projects;
   $("planChange").innerHTML = ch ? `${moved(pr.s - ch.from_s)}<span>${escapeHtml(ch.title)}, ${fmtShort(ch.date)}</span>` : "<span>No change yet</span>";
   $("planTarget").hidden = !(pr && c.target_s);
   if (pr && c.target_s) $("planTarget").innerHTML = `<span>Target ${fmtDuration(c.target_s)}</span>${pr.high <= c.target_s ? "<span>within reach</span>" : signed(pr.s - c.target_s)}`;
@@ -92,7 +94,7 @@ function renderStrip(p) {
   $("planStrip").innerHTML = dates.map((iso) => {
     const s = sessionOn(p, iso), name = DAYS[(new Date(iso + "T12:00:00").getDay() + 6) % 7], size = s ? sizeOf(s) : "";
     return `<button type="button" class="day${s ? "" : " rest"}" data-day="${iso}" aria-pressed="${iso === day}"${s ? ` style="--c:${kindColor(s.kind)}"` : ""}>
-      <span class="dn">${name} ${+iso.slice(8)}</span><span class="dt">${s ? escapeHtml(s.title.replace(/ intervals$/, "")) : "Rest"}</span>
+      <span class="dn">${name} ${+iso.slice(8)}</span><span class="dt">${s ? escapeHtml(s.title) : "Rest"}</span>
       ${size ? `<span class="dk">${size}</span>` : ""}${iso === today ? '<span class="tag">Today</span>' : s?.sent ? '<span class="tag sent">✓</span>' : ""}</button>`;
   }).join("");
   const w = todaysWorkout();
@@ -117,7 +119,7 @@ function renderWeeks(p) {
   const bars = p.weeks.map((w, i) => {
     const by = {};
     for (const s of w.sessions) if (s.km && s.kind !== "race") by[KIND[s.kind] || "easy"] = (by[KIND[s.kind] || "easy"] || 0) + s.km;
-    const parts = ["long", "easy", "threshold", "vo2"].filter((k) => by[k]).map((k) => `<i style="flex:${by[k]};background:var(--k-${k})"></i>`).join("");
+    const parts = ["long", "easy", "threshold", "vo2", "anaerobic"].filter((k) => by[k]).map((k) => `<i style="flex:${by[k]};background:var(--k-${k})"></i>`).join("");
     const done = i <= now && w.km_done ? `<b class="done" style="bottom:${Math.min(w.km_done / max, 1.1) * 82}%"></b>` : "";
     return `<button type="button" class="wbar${w.deload ? " light" : ""}" data-week="${i}" aria-pressed="${i === week}"
       aria-label="Week ${i + 1}, ${w.km_planned} km planned${i <= now ? `, ${w.km_done} done` : ""}">
@@ -169,12 +171,28 @@ $("planSend").addEventListener("click", () => {
 
 const dialog = $("planDialog");
 
-function showGoal() {
-  const race = $("planInGoal").value === "race";
-  $("planInNameWrap").hidden = !race;
-  $("planInTimeWrap").hidden = !race;
-  $("planInDateLabel").textContent = race ? "Race day" : "End date";
-  $("planInDistLabel").textContent = race ? "Distance" : "Project a time for";
+// What each plan type asks for: a race's name and target time, and a distance (any, or 5 and 10 km only)
+const GOAL_FIELDS = { race: { race: true, dist: "any" }, fitness: { dist: "any" }, maintain: { dist: "any" },
+  speed: { dist: "short" }, base: {}, comeback: {} };
+
+function fillDist(which, metres) {
+  const sel = $("planInDist");
+  const want = metres ?? (sel.value === "custom" ? Number($("planInKm").value) * 1000 : Number(sel.value));
+  const list = which === "short" ? [5000, 10000] : data.race_distances;
+  sel.innerHTML = list.map((m) => `<option value="${m}">${data.distances[m]}</option>`).join("") +
+    (which === "short" ? "" : '<option value="custom">Other</option>');
+  sel.value = list.includes(want) ? String(want) : which === "short" ? "5000" : "custom";
+  if (sel.value === "custom") $("planInKm").value = want ? +(want / 1000).toFixed(2) : "";
+  $("planInKmWrap").hidden = !which || sel.value !== "custom";
+}
+
+function showGoal(metres) {
+  const f = GOAL_FIELDS[$("planInGoal").value];
+  $("planInNameWrap").hidden = $("planInTimeWrap").hidden = !f.race;
+  $("planInDateLabel").textContent = f.race ? "Race day" : "End date";
+  $("planInDistLabel").textContent = f.race ? "Distance" : "Project a time for";
+  $("planInDistWrap").hidden = !f.dist;
+  fillDist(f.dist, metres);
 }
 
 function fillLongDays(keep) {
@@ -189,11 +207,6 @@ function openPlanForm() {
   $("planInGoal").value = c?.goal || "race";
   $("planInName").value = c?.goal === "race" ? c.name : r?.name || "";
   $("planInDate").value = c?.date || r?.date || addDays(data.generated, 12 * 7);
-  $("planInDist").innerHTML = data.race_distances.map((m) => `<option value="${m}">${data.distances[m]}</option>`).join("") +
-    '<option value="custom">Other</option>';
-  $("planInDist").value = isRaceDistance(metres) ? String(metres) : "custom";
-  $("planInKm").value = isRaceDistance(metres) ? "" : +(metres / 1000).toFixed(2);
-  $("planInKmWrap").hidden = isRaceDistance(metres);
   const target = c ? c.target_s : r?.target_s;
   $("planInTime").value = target ? fmtDuration(target) : "";
   const days = c?.days || [1, 3, 5, 6];
@@ -205,7 +218,7 @@ function openPlanForm() {
   $("planInVol").value = c?.start_km ?? (Math.round(km) || 20);
   $("planRemove").hidden = !c;
   $("planError").hidden = true;
-  showGoal();
+  showGoal(metres);
   dialog.showModal();
 }
 
@@ -225,7 +238,7 @@ $("planEdit").addEventListener("click", openPlanForm);
 
 $("planCancel").addEventListener("click", () => dialog.close());
 
-$("planInGoal").addEventListener("change", showGoal);
+$("planInGoal").addEventListener("change", () => showGoal());
 
 $("planInDist").addEventListener("change", () => { $("planInKmWrap").hidden = $("planInDist").value !== "custom"; });
 
@@ -237,15 +250,15 @@ $("planRemove").addEventListener("click", () => {
 
 $("planForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  const dist = $("planInDist").value, metres = dist === "custom" ? Number($("planInKm").value) * 1000 : Number(dist);
-  const race = $("planInGoal").value === "race";
+  const goal = $("planInGoal").value, needsDist = !!GOAL_FIELDS[goal].dist, race = goal === "race";
+  const dist = $("planInDist").value, metres = !needsDist ? 10000 : dist === "custom" ? Number($("planInKm").value) * 1000 : Number(dist);
   const time = $("planInTime").value.trim(), target = race && time ? parseTime(time) : null;
   const days = [...$("planInDays").querySelectorAll("input:checked")].map((x) => +x.value);
   if (!metres) return planFail(new Error("Enter the distance in kilometres."));
   if (race && time && !target) return planFail(new Error("Enter the target time as minutes:seconds or hours:minutes:seconds."));
   if (days.length < 2) return planFail(new Error("Pick at least two run days."));
   planRequest("POST", {
-    goal: $("planInGoal").value, name: race ? $("planInName").value : "", date: $("planInDate").value, metres,
+    goal, name: race ? $("planInName").value : "", date: $("planInDate").value, metres,
     target_s: target, days, long_day: +$("planInLong").value, start_km: Number($("planInVol").value),
   }).catch(planFail);
 });
