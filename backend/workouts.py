@@ -9,6 +9,7 @@ from statistics import median
 import config
 
 SPORTS = {"run": "Running", "bike": "Cycling"}  # the sports a workout can be made for, in this order when neither is main
+ALL_SPORTS = {**SPORTS, "swim": "Swimming"}  # and the ones a training plan can hold too
 TYPICAL_MIN = {"run": 45, "bike": 75}  # the usual session length when there are no recent ones to go by
 LONG_MAX_MIN = {"run": 120, "bike": 240}
 RECENT = 60  # days of activities that set the usual session length
@@ -16,10 +17,13 @@ HARD = {"TEMPO", "LACTATE_THRESHOLD", "VO2MAX", "ANAEROBIC_CAPACITY", "SPRINT"} 
 THRESHOLD = {"TEMPO", "LACTATE_THRESHOLD"}
 
 # Run paces as a share of lactate threshold speed (slow end, fast end), close to Jack Daniels' training paces
-RUN_PACE = {"recovery": (0.68, 0.74), "easy": (0.74, 0.82), "threshold": (0.97, 1.01),
+RUN_PACE = {"recovery": (0.68, 0.74), "easy": (0.74, 0.82), "steady": (0.86, 0.90), "threshold": (0.97, 1.01),
             "tempo": (0.92, 0.96), "over": (1.02, 1.05), "under": (0.94, 0.97)}
 # Intervals off the 5 km race pace (Garmin's prediction): VO2 max at it, anaerobic repeats faster
 FIVE_K_PACE = {"vo2": (0.98, 1.02), "anaerobic": (1.06, 1.10)}
+# Bike power as a share of FTP (low end, high end), and the heart rate zone in its place without an FTP
+BIKE_POWER = {"recovery": (0.45, 0.55, 1), "endurance": (0.56, 0.75, 2), "tempo": (0.76, 0.87, 3),
+              "sweet_spot": (0.88, 0.94, 3), "threshold": (0.95, 1.05, 4), "vo2": (1.06, 1.20, 5)}
 LT_FROM_5K = 0.94  # threshold speed against 5 km race speed, when Garmin has no threshold
 ZONE_FLOORS = (0.50, 0.60, 0.70, 0.80, 0.90)  # % of max HR, when Garmin's zones aren't synced
 
@@ -56,6 +60,7 @@ class Targets:
         self.five = five or (self.lt / LT_FROM_5K if self.lt else None)
         floors = profile.get("zones") or [round(config.MAX_HR * f) for f in ZONE_FLOORS] + [config.MAX_HR]
         self.floors = floors  # zone 1-5 floors, then max HR
+        self.ftp = profile.get("ftp")
 
     def pace(self, kind):
         """{type: pace, slow, fast} in seconds per km, or None without a threshold."""
@@ -74,6 +79,14 @@ class Targets:
     def run(self, kind, zone):
         """A run target: the pace when it's known, the heart rate zone otherwise."""
         return self.pace(kind) or self.hr(zone)
+
+    def bike(self, kind, share=None):
+        """A ride target: watts from the FTP when Garmin has one, the heart rate zone otherwise. `share` gives the
+        (low, high) share of FTP for a kind not in BIKE_POWER (race effort), with its zone."""
+        lo, hi, zone = share or BIKE_POWER[kind]
+        if self.ftp:
+            return {"type": "power", "lo": round(self.ftp * lo), "hi": round(self.ftp * hi)}
+        return self.hr(zone)
 
 
 def _run_steps(kind, total, t):
@@ -104,19 +117,19 @@ def _run_steps(kind, total, t):
 
 def _bike_steps(kind, total, t):
     if kind == "recovery":
-        return [_step("interval", "Recovery ride", total * 60, "easy", t.hr(1))]
+        return [_step("interval", "Recovery ride", total * 60, "easy", t.bike("recovery"))]
     if kind in ("easy", "long", "shakeout"):
-        return [_step("interval", f"{TITLES['easy' if kind == 'shakeout' else kind]} ride", total * 60, "easy", t.hr(2))]
+        return [_step("interval", f"{TITLES['easy' if kind == 'shakeout' else kind]} ride", total * 60, "easy", t.bike("endurance"))]
     warm, cool = 15, 10
     if kind == "threshold":
         n = _clamp(round((total - warm - cool) / 14), 2, 4)
-        main = _repeat(n, _step("interval", "Threshold", 600, "high", t.hr(4)), _step("recovery", "Easy spin", 240, "rest"))
+        main = _repeat(n, _step("interval", "Threshold", 600, "high", t.bike("threshold")), _step("recovery", "Easy spin", 240, "rest"))
     elif kind == "vo2":
         n = _clamp(round((total - warm - cool) / 8), 3, 6)
-        main = _repeat(n, _step("interval", "Hard", 240, "high", t.hr(5)), _step("recovery", "Easy spin", 240, "rest"))
-    else:  # anaerobic: heart rate lags behind 30 s sprints, so they go by feel
+        main = _repeat(n, _step("interval", "Hard", 240, "high", t.bike("vo2")), _step("recovery", "Easy spin", 240, "rest"))
+    else:  # anaerobic: heart rate and power lag behind 30 s sprints, so they go by feel
         main = _repeat(8, _step("interval", "Sprint", 30, "anaerobic", None, "All-out"), _step("recovery", "Easy spin", 150, "rest"))
-    return [_step("warmup", "Warm-up", warm * 60, "easy", t.hr(2)), main, _step("cooldown", "Cool-down", cool * 60, "easy")]
+    return [_step("warmup", "Warm-up", warm * 60, "easy", t.bike("endurance")), main, _step("cooldown", "Cool-down", cool * 60, "easy")]
 
 
 def _flat(steps):
@@ -214,16 +227,17 @@ def recommend(acts, today, *, readiness, status, focus, focus_title, race, profi
 # ---- Garmin's workout format, for sending a workout to the watch
 
 GARMIN_SPORT = {"run": {"sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1},
-                "bike": {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2}}
-STEP_TYPE = {"warmup": (1, 1), "cooldown": (2, 2), "interval": (3, 3), "recovery": (4, 4)}
+                "bike": {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2},
+                "swim": {"sportTypeId": 4, "sportTypeKey": "swimming", "displayOrder": 3}}
+STEP_TYPE = {"warmup": (1, 1), "cooldown": (2, 2), "interval": (3, 3), "recovery": (4, 4), "rest": (5, 5)}
 
 
-def _garmin_steps(steps, order):
+def _garmin_steps(steps, order, swim=False):
     out = []
     for s in steps:
         order += 1
         if s["kind"] == "repeat":
-            children, last = _garmin_steps(s["steps"], order)
+            children, last = _garmin_steps(s["steps"], order, swim)
             out.append({
                 "type": "RepeatGroupDTO", "stepOrder": order,
                 "stepType": {"stepTypeId": 6, "stepTypeKey": "repeat", "displayOrder": 6},
@@ -233,17 +247,25 @@ def _garmin_steps(steps, order):
             })
             order = last
             continue
-        type_id, display = STEP_TYPE[s["kind"]]
+        # In the pool a pause between reps is a rest (the watch waits on the wall), and a swim goes by distance
+        kind = "rest" if swim and s["kind"] == "recovery" else s["kind"]
+        type_id, display = STEP_TYPE[kind]
         step = {
             "type": "ExecutableStepDTO", "stepOrder": order,
-            "stepType": {"stepTypeId": type_id, "stepTypeKey": s["kind"], "displayOrder": display},
+            "stepType": {"stepTypeId": type_id, "stepTypeKey": kind, "displayOrder": display},
             "endCondition": {"conditionTypeId": 2, "conditionTypeKey": "time", "displayOrder": 2, "displayable": True},
             "endConditionValue": float(s["s"]),
         }
+        if s.get("m"):
+            step.update(endCondition={"conditionTypeId": 3, "conditionTypeKey": "distance", "displayOrder": 3, "displayable": True},
+                        endConditionValue=float(s["m"]))
         t = s["target"]
         if t and t["type"] == "pace":  # in m/s, the slow end first
             step.update(targetType={"workoutTargetTypeId": 6, "workoutTargetTypeKey": "pace.zone", "displayOrder": 6},
                         targetValueOne=round(1000 / t["slow"], 4), targetValueTwo=round(1000 / t["fast"], 4))
+        elif t and t["type"] == "power":  # in watts
+            step.update(targetType={"workoutTargetTypeId": 2, "workoutTargetTypeKey": "power.zone", "displayOrder": 2},
+                        targetValueOne=float(t["lo"]), targetValueTwo=float(t["hi"]))
         elif t and t["type"] == "hr":  # the watch's own zone, so it follows the zones set on the watch
             step.update(targetType={"workoutTargetTypeId": 4, "workoutTargetTypeKey": "heart.rate.zone", "displayOrder": 4},
                         zoneNumber=t["zone"])
@@ -257,12 +279,14 @@ def _garmin_steps(steps, order):
 
 def to_garmin(w, day):
     sport = GARMIN_SPORT[w["sport"]]
-    steps, _ = _garmin_steps(w["steps"], 0)
+    steps, _ = _garmin_steps(w["steps"], 0, w["sport"] == "swim")
     workout = {
         "workoutName": w["title"],
         "sportType": sport, "estimatedDurationInSecs": w["total_s"],
         "workoutSegments": [{"segmentOrder": 1, "sportType": sport, "workoutSteps": steps}],
     }
+    if w["sport"] == "swim":
+        workout.update(poolLength=float(w.get("pool") or 25), poolLengthUnit={"unitId": 1, "unitKey": "meter", "factor": 100.0})
     if w["why"]:
         workout["description"] = " · ".join(w["why"])
     return workout

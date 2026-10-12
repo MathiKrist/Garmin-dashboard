@@ -21,6 +21,7 @@ import anthropic
 import changes as chat_changes
 import config
 import db
+import workouts
 
 log = logging.getLogger("coach")
 
@@ -33,8 +34,8 @@ LOG_KEY = "coach_chat"
 _lock = threading.Lock()  # one message at a time: the conversation and the changes are shared by every device
 
 SYSTEM = """You are the coach in a personal training dashboard. The athlete talks to you from the Workout page, which \
-shows today's suggested session per sport (running and cycling) and, if they have one, a running training plan toward \
-a race or general fitness. The sessions come from Garmin's numbers: readiness, training status, load focus, lactate \
+shows today's suggested session per sport (running and cycling) and, if they have one, a training plan toward a race, \
+a triathlon or general fitness: runs, and rides and swims if they picked those. The sessions come from Garmin's numbers: readiness, training status, load focus, lactate \
 threshold and race predictions.
 
 Your job is to change sessions when the athlete asks: shorten one, swap it for another kind, move a plan session to \
@@ -45,8 +46,9 @@ note holding the current schedule and numbers; trust it over anything said earli
 How to change things well:
 - Prefer standard sessions (kind + minutes): their paces come from the athlete's threshold and adapt with the plan. \
 Use custom steps only for something a standard session can't express.
-- Keep the week's intent. If a key session (intervals, long run) can't happen today, move it to a free day rather than \
-drop it, and avoid two hard days in a row or a hard day right before the long run. When shortening, keep the warm-up \
+- Keep the week's intent. If a key session (intervals, long run, long ride) can't happen today, move it to a free day \
+rather than drop it, and avoid two hard days in a row or a hard day right before the long run or ride. Swims are \
+best changed with minutes; their steps can't set a pace. When shortening, keep the warm-up \
 and cool-down and cut the main set.
 - If the athlete says they lack time today, shorten today's session; if the work matters for the week, put the rest on \
 a later easy or free day.
@@ -74,7 +76,7 @@ STEP_SCHEMA = {
 }
 
 DAY = {"type": "string", "description": "YYYY-MM-DD"}
-SPORT = {"type": "string", "enum": ["run", "bike"]}
+SPORT = {"type": "string", "enum": list(workouts.ALL_SPORTS)}
 REASON = {"type": "string", "description": "A few words the page shows with the change, e.g. 'Short on time'."}
 
 TOOLS = [
@@ -173,7 +175,7 @@ def _session_line(s):
     day = date.fromisoformat(s["date"]).strftime("%a %d %b")
     extra = f" [{s['status']}" + (", changed in chat" if s.get("changed") else "") + \
             (f", moved from {s['moved_from']}" if s.get("moved_from") else "") + "]"
-    return f"- {day} ({s['date']}): {s['title']} ({s['kind']}, {size}){extra}" + \
+    return f"- {day} ({s['date']}) {s.get('sport', 'run')}: {s['title']} ({s['kind']}, {size}){extra}" + \
         (f": {steps_text(s['steps'])}" if s["steps"] and s["status"] in ("today", "upcoming") else "")
 
 
@@ -204,12 +206,17 @@ def state(d, today):
     p = d.get("plan")
     if p and not p["over"]:
         c = p["config"]
-        days = ", ".join(("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")[i] for i in c["days"])
-        out.append(f"\nTraining plan (runs only): {c['name']}, {p['goal_label']}, {c['metres'] / 1000:g} km on {c['date']}, "
-                   f"run days {days}, long run {('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')[c['long_day']]}, "
-                   f"starting at {c['start_km']:g} km a week (planned km for each week: "
-                   f"{', '.join(f'{w['km_planned']:g}' for w in p['weeks'])}). "
-                   + (f"Week {p['week_index'] + 1} of {len(p['weeks'])}." if p["week_index"] is not None else ""))
+        names = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+        days = lambda x: ", ".join(names[i] for i in x["days"]) + (f" (long on {names[x['long_day']]})"
+                                                                    if x.get("long_day") is not None else "")
+        sports = "; ".join(f"{k} on {days(x)}" for k, x in c["sports"].items())
+        what = f"{p['tri_label']} triathlon" if p.get("tri_label") else f"{c['metres'] / 1000:g} km"
+        out.append(f"\nTraining plan: {c['name']}, {p['goal_label']}, {what} on {c['date']}. Sports: {sports}."
+                   + (f" Planned run km for each week: {', '.join(f'{w['km_planned']:g}' for w in p['weeks'])}."
+                      if "run" in c["sports"] else "")
+                   + (f" Planned hours for each week, all sports: {', '.join(f'{w['hours_planned']:g}' for w in p['weeks'])}."
+                      if p.get("multi") else "")
+                   + (f" Week {p['week_index'] + 1} of {len(p['weeks'])}." if p["week_index"] is not None else ""))
         if p.get("projection"):
             out.append(f"The plan projects {_time(p['projection']['s'])} on its end date.")
         since, until = (today - timedelta(days=today.weekday())).isoformat(), (today + timedelta(days=21)).isoformat()
@@ -253,8 +260,9 @@ def _scheduled(d, sport, day, stored):
     c = next((c for c in stored if c["date"] == day and c["sport"] == sport), None)
     if c:
         return {"rest": True} if c["rest"] else c
-    if sport == "run" and d.get("plan"):
-        return next((s for w in d["plan"]["weeks"] for s in w["sessions"] if s["date"] == day and s["steps"]), None)
+    if d.get("plan") and sport in d["plan"]["sports"]:
+        return next((s for w in d["plan"]["weeks"] for s in w["sessions"]
+                     if s["date"] == day and s["sport"] == sport and s["steps"]), None)
     return None
 
 
@@ -304,7 +312,7 @@ def _day(iso):
 
 def _change_line(c):
     if c["rest"]:
-        return f"{_day(c['date'])}: rest day" + (" (ride)" if c["sport"] == "bike" else "")
+        return f"{_day(c['date'])}: rest day" + ("" if c["sport"] == "run" else f" ({workouts.ALL_SPORTS[c['sport']].lower()})")
     return f"{_day(c['date'])}: {chat_changes.title_of(c)}" + (f", {c['minutes']} min" if c.get("minutes") else "")
 
 

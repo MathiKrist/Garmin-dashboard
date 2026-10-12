@@ -397,18 +397,23 @@ def build_dashboard(db_path=None):
         recent_acts, today, readiness=today_vals["readiness"], status=status and status["code"], focus=focus_phrase,
         focus_title=focus and focus["title"], race=race, profile=profile, pred_5k=pred_5k, sent=sent)
 
-    # The training plan; on its days its run replaces the suggested one, on the days between it's a rest day
+    # The training plan; on its days its session replaces the suggested one for its sport, on the days between it's a
+    # rest day; its swims come after the suggested sports
     plan = plans.build(plan_cfg, recent_acts, plan_laps, profile, today, plan_sent, changes) if plan_cfg else None
-    plan_run = plans.todays(plan, today) if plan else None
-    if plan_run:
-        if (today_vals["readiness"] is not None and today_vals["readiness"] < 25) or (status and status["code"] == "OVERREACHING"):
-            plan_run["why"].append("Low readiness: consider an easy run instead")
-        workout_list = [plan_run if w["sport"] == "run" else w for w in workout_list]
-        if not any(w["sport"] == "run" for w in workout_list):
-            workout_list.insert(0, plan_run)
-    # Changes made in the chat, outside the plan's runs (the plan has those): today's replaces the suggestion, later
+    low = (today_vals["readiness"] is not None and today_vals["readiness"] < 25) or (status and status["code"] == "OVERREACHING")
+    for pw in plans.todays(plan, today) if plan else []:
+        if low:
+            pw["why"].append(f"Low readiness: consider an easy {'run' if pw['sport'] == 'run' else 'session'} instead")
+        if any(w["sport"] == pw["sport"] for w in workout_list):
+            workout_list = [pw if w["sport"] == pw["sport"] else w for w in workout_list]
+        elif pw["sport"] == "run":
+            workout_list.insert(0, pw)
+        else:
+            workout_list.append(pw)
+    # Changes made in the chat, outside the plan's sessions (the plan has those): today's replaces the suggestion, later
     # ones are listed under it
-    in_plan = lambda c: plan and not plan["over"] and c["sport"] == "run" and plan_cfg["start"] <= c["date"] <= plan_cfg["date"]
+    in_plan = lambda c: (plan and not plan["over"] and c["sport"] in plan["sports"]
+                         and plan_cfg["start"] <= c["date"] <= plan_cfg["date"])
     targets = workouts.Targets(profile, pred_5k)
     upcoming = []
     for c in changes:

@@ -54,8 +54,8 @@
 
   <main id="main" hidden>
     <!-- Workout: a chat with Claude that changes the sessions, today's session per sport, which the Send to watch
-         button puts in the Garmin calendar, and the training plan it comes from: weeks of runs toward a race or
-         general fitness, with the time it projects -->
+         button puts in the Garmin calendar, and the training plan it comes from: weeks of runs (and rides and swims if
+         picked) toward a race, a triathlon or general fitness, with the time it projects -->
     <div class="page" id="page-workout" data-title="Workout" hidden>
       <header class="page-head page-head-row">
         <h1>Workout</h1>
@@ -392,23 +392,39 @@
   <form id="planForm">
     <h2 id="planDialogTitle">Training plan</h2>
     <label>Goal
-      <select id="planInGoal"><option value="race">Race</option><option value="fitness">General fitness</option>
+      <select id="planInGoal"><option value="race">Race</option><option value="triathlon">Triathlon</option>
+        <option value="fitness">General fitness</option>
         <option value="base">Base builder</option><option value="speed">Speed block</option>
         <option value="comeback">Return to running</option><option value="maintain">Maintenance</option></select>
     </label>
     <label id="planInNameWrap">Race <input id="planInName" maxlength="80" placeholder="Odense Half"></label>
+    <label id="planInTriWrap" hidden>Distance
+      <select id="planInTri"><option value="sprint">Sprint</option><option value="olympic">Olympic</option>
+        <option value="half">70.3</option><option value="full">Ironman</option></select>
+    </label>
     <label><span id="planInDateLabel">Race day</span> <input id="planInDate" type="date" required></label>
     <label id="planInDistWrap"><span id="planInDistLabel">Distance</span>
       <select id="planInDist"></select>
     </label>
     <label id="planInKmWrap" hidden>Kilometres <input id="planInKm" type="number" min="1" max="100" step="0.01"></label>
     <label id="planInTimeWrap">Target time (optional) <input id="planInTime" placeholder="50:00 or 1:45:00"></label>
-    <fieldset class="plan-days">
-      <legend>Run days</legend>
-      <div id="planInDays"></div>
+    <fieldset class="plan-grid">
+      <legend>Training days</legend>
+      <table id="planInGrid"></table>
     </fieldset>
-    <label>Long run on <select id="planInLong"></select></label>
-    <label>Running now, km a week <input id="planInVol" type="number" min="1" max="300" step="1" required></label>
+    <label class="plan-check"><input type="checkbox" id="planInMulti"> Rides and swims too</label>
+    <div class="plan-sport" id="planInRun">
+      <label>Long run on <select id="planInLong"></select></label>
+      <label>Running now, km a week <input id="planInVol" type="number" min="1" max="300" step="1"></label>
+    </div>
+    <div class="plan-sport" id="planInBike" hidden>
+      <label>Long ride on <select id="planInLongRide"></select></label>
+      <label>Cycling now, hours a week <input id="planInBikeH" type="number" min="0.5" max="40" step="0.5"></label>
+    </div>
+    <div class="plan-sport" id="planInSwim" hidden>
+      <label>Swimming now, km a week <input id="planInSwimKm" type="number" min="0.5" max="60" step="0.5"></label>
+      <label>Pool <select id="planInPool"><option value="25">25 m</option><option value="50">50 m</option></select></label>
+    </div>
     <p class="form-error" id="planError" role="alert" hidden></p>
     <div class="form-actions">
       <button type="submit" class="primary">Save</button>

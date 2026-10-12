@@ -120,8 +120,16 @@ def fetch_profile(client):
     rows = [r for r in (_try(client.get_heart_rate_zones) or []) if isinstance(r, dict)]
     z = next((r for r in rows if r.get("sport") == "RUNNING"), None) or next((r for r in rows if r.get("sport") == "DEFAULT"), None)
     zones = [z.get(f"zone{i}Floor") for i in range(1, 6)] + [z.get("maxHeartRateUsed")] if z else None
-    profile = {"lt_speed": speed, "lt_hr": lt.get("heartRate"), "zones": zones if zones and all(zones) else None}
+    profile = {"lt_speed": speed, "lt_hr": lt.get("heartRate"), "zones": zones if zones and all(zones) else None,
+               "ftp": _ftp(_try(client.get_cycling_ftp))}
     return profile if any(profile.values()) else None
+
+
+def _ftp(answer):
+    """Cycling FTP in watts from Garmin's answer (one entry, or a list of them), or None."""
+    entry = (answer[0] if answer else None) if isinstance(answer, list) else answer
+    ftp = entry.get("functionalThresholdPower") if isinstance(entry, dict) else None
+    return round(ftp) if isinstance(ftp, (int, float)) and 50 <= ftp <= 600 else None
 
 
 def fetch_track(client, activity_id):

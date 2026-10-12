@@ -23,12 +23,14 @@ const len = (s) => (s < 60 ? `${s} s` : s % 60 ? `${Math.floor(s / 60)}:${String
 function target(step) {
   const t = step.target, parts = [];
   if (t?.type === "pace") parts.push(`${pace(t.fast)}–${pace(t.slow)} /km`);
+  if (t?.type === "power") parts.push(`${t.lo}–${t.hi} W`);
   if (t?.type === "hr") parts.push(`Zone ${t.zone} · ${t.lo}–${t.hi} bpm`);
   if (step.note) parts.push(step.note);
   return parts.join(" · ") || (step.intensity === "rest" || step.kind === "cooldown" ? "Easy, by feel" : "");
 }
 
-const stepItem = (s, kind) => `<li style="--c:${color(s.intensity, kind)}"><span class="len">${len(s.s)}</span>
+// A swim's steps go by distance
+const stepItem = (s, kind) => `<li style="--c:${color(s.intensity, kind)}"><span class="len">${s.m ? `${s.m} m` : len(s.s)}</span>
   <span class="what">${escapeHtml(s.label)}</span><span class="target">${target(s)}</span></li>`;
 
 // The steps in order, with each repeat once per round, for the workout's shape
@@ -42,15 +44,24 @@ export const stepsHtml = (steps, kind) => steps.map((s) => (s.kind === "repeat"
   ? `<li class="reps" style="--c:${color(s.steps[0].intensity, kind)}"><span class="len">${s.n} ×</span><ol>${s.steps.map((x) => stepItem(x, kind)).join("")}</ol></li>`
   : stepItem(s, kind))).join("");
 
-// The pace the session is about: its first hard step's, else its first step's
+// The pace (or power) the session is about: its first hard step's, else its first step's
 export function mainPace(steps) {
-  const all = flat(steps), s = all.find((x) => x.intensity === "high") || all[0];
-  return s?.target?.type === "pace" ? `${pace(s.target.fast)}–${pace(s.target.slow)} /km` : "";
+  const all = flat(steps), s = all.find((x) => x.intensity === "high") || all[0], t = s?.target;
+  return t?.type === "pace" ? `${pace(t.fast)}–${pace(t.slow)} /km` : t?.type === "power" ? `${t.lo}–${t.hi} W` : "";
 }
 
 export const currentSport = () => sport;
 
 export const todaysWorkout = () => (data.workouts || []).find((x) => x.sport === sport);
+
+// Switch the sport shown (a plan session of another sport picked for today)
+export function setSport(s) {
+  if (s === sport || !(data.workouts || []).some((w) => w.sport === s)) return;
+  sport = s;
+  try { localStorage.setItem("workoutSport", sport); } catch {}
+  renderWorkout();
+  dispatchEvent(new Event("sportchange"));
+}
 
 export function renderWorkout() {
   const list = data.workouts || [];
@@ -87,11 +98,7 @@ export function showWorkout(w, day = null) {
 
 $("workoutSport").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-sport]");
-  if (!b) return;
-  sport = b.dataset.sport;
-  try { localStorage.setItem("workoutSport", sport); } catch {}
-  renderWorkout();
-  dispatchEvent(new Event("sportchange"));
+  if (b) setSport(b.dataset.sport);
 });
 
 // A send button: "Send …" until sent, then "On the watch ✓", which turns into "Remove from watch" on hover or focus

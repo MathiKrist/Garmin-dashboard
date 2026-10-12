@@ -104,8 +104,8 @@ class Plan(unittest.TestCase):
         self.assertEqual((plan_day(plan, day(0))["total_s"], plan_day(plan, day(0))["status"]), (1200, "today"))
         self.assertEqual(plan_day(plan, day(1))["total_s"], 1500)
         self.assertIsNone(plan_day(plan, day(2)))
-        self.assertEqual(plans.todays(plan, TODAY)["total_s"], 1200)
-        self.assertIn("Changed in chat", plans.todays(plan, TODAY)["why"])
+        self.assertEqual(plans.todays(plan, TODAY)[0]["total_s"], 1200)
+        self.assertIn("Changed in chat", plans.todays(plan, TODAY)[0]["why"])
 
     def test_changes_outside_the_plan_are_left_out(self):
         late = (date.fromisoformat(CFG["date"]) + timedelta(days=3)).isoformat()
@@ -129,7 +129,7 @@ class Tools(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.conn = db.connect(Path(self.tmp.name) / "t.db")
         plan = build()
-        self.d = {"generated": TODAY.isoformat(), "plan": plan, "workouts": [plans.todays(plan, TODAY)]}
+        self.d = {"generated": TODAY.isoformat(), "plan": plan, "workouts": plans.todays(plan, TODAY)}
 
     def tearDown(self):
         self.conn.close()

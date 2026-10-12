@@ -255,7 +255,7 @@ async def send_workout(sport: str, request: Request):
         db.set_meta(conn, "workouts_sent", json.dumps(sent))
         if w.get("plan"):  # the plan page shows it as sent too
             plan_sent = json.loads(db.get_meta(conn, "plan_sent") or "[]")
-            plan_sent.append({"date": today.isoformat(), "key": w["key"], "id": created["workoutId"]})
+            plan_sent.append({"date": today.isoformat(), "sport": sport, "key": w["key"], "id": created["workoutId"]})
             db.set_meta(conn, "plan_sent", json.dumps(plan_sent))
         conn.commit()
     finally:
@@ -295,7 +295,7 @@ def remove_workout(sport: str):
         ids = {x["id"] for x in json.loads(db.get_meta(conn, "workouts_sent") or "[]")
                if x["date"] == today and x.get("sport") == sport}
         ids |= {x["id"] for x in json.loads(db.get_meta(conn, "plan_sent") or "[]")
-                if x["date"] == today and sport == "run"}
+                if x["date"] == today and x.get("sport", "run") == sport}
         if not ids:
             return JSONResponse({"error": "Today's workout isn't on the watch."}, status_code=400)
         try:
@@ -334,30 +334,58 @@ def remove_plan_week():
     return {"status": "removed", "count": gone}
 
 
+def _plan_sports(body):
+    """The plan's sports from the form, checked: {sport: setup}. Runs on 2 days or more, with the long run on one of
+    them; a long ride day, when given, on a ride day. A page from before plans had other sports sends runs only."""
+    given = body.get("sports") or {"run": {k: body[k] for k in ("days", "long_day", "start_km")}}
+    out = {}
+    for sport, x in given.items():
+        days = sorted({int(d) for d in x["days"]})
+        assert sport in workouts.ALL_SPORTS and days and all(0 <= d <= 6 for d in days)
+        if sport == "run":
+            out[sport] = {"days": days, "long_day": int(x["long_day"]), "start_km": float(x["start_km"])}
+            assert len(days) >= 2 and out[sport]["long_day"] in days and 0 < out[sport]["start_km"] <= 300
+        elif sport == "bike":
+            long_day = None if x.get("long_day") in (None, "") else int(x["long_day"])
+            out[sport] = {"days": days, "long_day": long_day, "start_h": float(x["start_h"])}
+            assert (long_day is None or long_day in days) and 0 < out[sport]["start_h"] <= 40
+        else:
+            out[sport] = {"days": days, "start_km": float(x["start_km"]), "pool": int(x.get("pool") or 25)}
+            assert out[sport]["pool"] in (25, 50) and 0 < out[sport]["start_km"] <= 60
+    return out
+
+
 def _plan_from(body, old, profile, pred_5k, today):
     """The plan setup from the form, checked. Editing a plan keeps its start and starting fitness, so its history and
-    adaptation carry on. A base builder and a return to running have no distance (10 km sets their limits); a speed
-    block is for 5 or 10 km; only a race has a name and a target time."""
-    days = sorted({int(d) for d in body["days"]})
+    adaptation carry on. A base builder, a return to running and a plan without runs have no distance (10 km sets
+    their limits); a speed block is for 5 or 10 km; a triathlon's distance sets its run leg; only a race and a
+    triathlon have a name, and only a race a target time."""
     goal = body["goal"]
-    race = goal == "race"
+    race, tri = goal == "race", body.get("tri") if goal == "triathlon" else None
+    sports = _plan_sports(body)
+    run = sports.get("run")
+    named = str(body.get("name") or "").strip()[:80] if race or tri else ""
     cfg = {
         "goal": goal,
-        "name": (str(body.get("name") or "").strip()[:80] if race else "") or plans.GOALS[goal],
-        "metres": 10000.0 if goal in ("base", "comeback") else float(body["metres"]),
+        "name": named or (f"{plans.TRI[tri]} triathlon" if tri else plans.GOALS[goal]),
+        "metres": float(plans.TRI_RUN_M[tri]) if tri else 10000.0 if goal in ("base", "comeback") or not run else float(body["metres"]),
         "date": date.fromisoformat(body["date"]).isoformat(),
         "target_s": int(body["target_s"]) if race and body.get("target_s") else None,
-        "days": days,
-        "long_day": int(body["long_day"]),
-        "start_km": float(body["start_km"]),
+        "sports": sports,
+        # The run's, where the run's sessions are worked out from
+        "days": run["days"] if run else [],
+        "long_day": run["long_day"] if run else None,
+        "start_km": run["start_km"] if run else 0,
         "start": old["start"] if old else today.isoformat(),
         "fitness0": old["fitness0"] if old else plans.fitness_now(profile, pred_5k),
     }
+    if tri:
+        cfg["tri"] = tri
     weeks = (date.fromisoformat(cfg["date"]) - date.fromisoformat(cfg["start"])).days / 7
     lo, hi = plans.WEEK_RANGE[goal]
     assert 1000 <= cfg["metres"] <= 100_000 and lo <= weeks <= hi and (goal != "speed" or cfg["metres"] in (5000, 10000))
-    assert cfg["date"] > today.isoformat() and 2 <= len(days) <= 7 and all(0 <= d <= 6 for d in days)
-    assert cfg["long_day"] in days and 0 < cfg["start_km"] <= 300 and (cfg["target_s"] or 1) > 0
+    assert cfg["date"] > today.isoformat() and (cfg["target_s"] or 1) > 0
+    assert plans.NEEDS.get(goal, set()) <= set(sports) and (goal != "triathlon" or tri in plans.TRI)
     return cfg
 
 
@@ -376,9 +404,11 @@ async def set_plan(request: Request):
             cfg = _plan_from(body, old, profile, row and row["pred_5k"], today)
         except (KeyError, TypeError, ValueError, AssertionError):
             return JSONResponse({"error": "Give an end date within the plan type's length (a speed block 6 to 12 weeks, a "
-                                          "return to running 4 to 16, a base builder 4 to 52, the others 2 to 52), a "
-                                          "distance where it asks for one, 2 to 7 run days with the long run on one of "
-                                          "them, and your weekly km."}, status_code=400)
+                                          "return to running 4 to 16, a base builder 4 to 52, a triathlon 6 to 52, the "
+                                          "others 2 to 52), a distance where it asks for one, and for each sport its "
+                                          "days and how much you do now: at least 2 run days with the long run on one "
+                                          "of them. A race, speed block and return to running need runs; a triathlon "
+                                          "needs swims, rides and runs."}, status_code=400)
         if cfg["goal"] == "race":
             target = cfg["target_s"] or (plans.build(cfg, [], {}, profile, today)["projection"] or {}).get("s")
             if not target:
@@ -422,21 +452,22 @@ async def send_plan_week(request: Request):
     try:
         sent = json.loads(db.get_meta(conn, "plan_sent") or "[]")
         client = sync._client()
+        swim = plan["config"]["sports"].get("swim") or {}
         for s in week:
             if any(x["date"] == s["date"] and x["key"] == s["key"] for x in sent):
                 continue
-            for old in [x for x in sent if x["date"] == s["date"]]:
+            for old in [x for x in sent if x["date"] == s["date"] and x.get("sport", "run") == s["sport"]]:
                 try:
                     client.delete_workout(old["id"])
                 except Exception as e:  # already deleted on Garmin, most likely
                     log.info("Couldn't delete the old workout %s: %s", old["id"], e)
                 sent.remove(old)
-            w = {"sport": "run", "title": s["title"], "steps": s["steps"], "total_s": s["total_s"],
-                 "why": [plan["config"]["name"]]}
+            w = {"sport": s["sport"], "title": s["title"], "steps": s["steps"], "total_s": s["total_s"],
+                 "why": [plan["config"]["name"]], "pool": swim.get("pool")}
             day = date.fromisoformat(s["date"])
             created = client.upload_workout(workouts.to_garmin(w, day))
             client.schedule_workout(created["workoutId"], s["date"])
-            sent.append({"date": s["date"], "key": s["key"], "id": created["workoutId"]})
+            sent.append({"date": s["date"], "sport": s["sport"], "key": s["key"], "id": created["workoutId"]})
             db.set_meta(conn, "plan_sent", json.dumps(sent))  # saved per session, so a failure halfway keeps what went
             conn.commit()
     except Exception as e:

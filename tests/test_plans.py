@@ -246,9 +246,9 @@ class Projection(unittest.TestCase):
 class Today(unittest.TestCase):
     def test_plan_day_and_rest_day(self):
         tue = START + timedelta(days=1)
-        self.assertEqual(plans.todays(build(today=tue), tue)["kind"], "easy")
+        self.assertEqual(plans.todays(build(today=tue), tue)[0]["kind"], "easy")
         wed = START + timedelta(days=2)
-        rest = plans.todays(build(today=wed), wed)
+        rest = plans.todays(build(today=wed), wed)[0]
         self.assertEqual(rest["kind"], "rest")
         self.assertEqual(rest["next"]["date"], (START + timedelta(days=3)).isoformat())
 
@@ -385,6 +385,123 @@ class Setup(unittest.TestCase):
                                 ("base", 2, {}), ("nope", 8, {})):
             with self.assertRaises((AssertionError, KeyError)):
                 self.check(goal, weeks, **kw)
+
+
+class LongRuns(unittest.TestCase):
+    def longs(self, cfg):
+        return [(w["phase"], w["deload"], next((s for s in w["sessions"] if s["kind"] == "long"), None))
+                for w in build(cfg, today=START)["weeks"]]
+
+    def test_plain_in_base_lighter_weeks_and_taper(self):
+        for phase, deload, s in self.longs(config()):
+            if s and (deload or phase in ("base", "taper")):
+                self.assertEqual(s["title"], "Long run")
+
+    def test_build_weeks_rotate_through_the_kinds(self):
+        titles = {s["title"] for phase, deload, s in self.longs(config(metres=10000)) if s and phase == "build"}
+        self.assertTrue({"Long run with surges", "Progressive long run"} <= titles)
+
+    def test_peak_is_race_specific(self):
+        half = {s["title"] for phase, deload, s in self.longs(config()) if s and phase == "peak" and not deload}
+        self.assertEqual(half, {"Race-pace finish long run"})
+        marathon = config(metres=42195, start_km=45, date=(START + timedelta(weeks=16, days=6)).isoformat())
+        self.assertIn("Marathon-pace long run", {s["title"] for phase, deload, s in self.longs(marathon) if s and phase == "peak"})
+
+    def test_progressive_long_run_is_judged_on_its_faster_laps(self):
+        plan = build(config(metres=10000), today=START)
+        s = next(s for w in plan["weeks"] for s in w["sessions"] if s["title"] == "Progressive long run")
+        self.assertIsNotNone(plans._work_step(s["steps"]))
+        self.assertEqual(s["kind"], "long")
+
+
+def multi(goal="race", **sports):
+    """A plan setup with sports beyond runs (runs as config() has them unless given)."""
+    run = sports.pop("run", {"days": [1, 3, 5, 6], "long_day": 6, "start_km": 30})
+    return config(goal=goal, sports={**({"run": run} if run else {}), **sports})
+
+
+def tri(distance="half", weeks=16):
+    return config(goal="triathlon", tri=distance, metres=plans.TRI_RUN_M[distance],
+                  date=(START + timedelta(weeks=weeks, days=6)).isoformat(),
+                  sports={"swim": {"days": [0, 2, 4], "start_km": 5, "pool": 25},
+                          "bike": {"days": [1, 3, 5], "long_day": 5, "start_h": 4},
+                          "run": {"days": [1, 3, 4, 6], "long_day": 6, "start_km": 25}})
+
+
+def by_sport(plan, sport):
+    return [s for w in plan["weeks"] for s in w["sessions"] if s["sport"] == sport]
+
+
+class MultiSport(unittest.TestCase):
+    def test_old_plan_is_runs_only(self):
+        cfg = plans.normalize(config())
+        self.assertEqual(set(cfg["sports"]), {"run"})
+        plan = build(config())
+        self.assertFalse(plan["multi"])
+        self.assertTrue(all(s["sport"] == "run" for w in plan["weeks"] for s in w["sessions"]))
+
+    def test_rides_go_by_heart_rate_without_ftp_and_watts_with_it(self):
+        cfg = multi(goal="base", run=None, bike={"days": [1, 3, 6], "long_day": 6, "start_h": 4})
+        hard = lambda plan: next(s for s in by_sport(plan, "bike") if s["kind"] == "sweet_spot")
+        work = lambda s: next(x for x in s["steps"] if x["kind"] == "repeat")["steps"][0]["target"]
+        self.assertEqual(work(hard(build(cfg)))["type"], "hr")
+        watts = work(hard(plans.build(cfg, [], {}, {**PROFILE, "ftp": 250}, START)))
+        self.assertEqual((watts["type"], watts["lo"], watts["hi"]), ("power", 220, 235))
+
+    def test_bike_only_plan_has_no_runs_and_no_projection(self):
+        plan = build(multi(goal="base", run=None, bike={"days": [1, 3, 6], "long_day": 6, "start_h": 4}))
+        self.assertFalse(by_sport(plan, "run"))
+        self.assertFalse(plan["projects"])
+        self.assertTrue(plan["weeks"][-1]["hours_planned"] > plan["weeks"][0]["hours_planned"])
+
+    def test_triathlon_tapers_bricks_and_opens(self):
+        plan = build(tri(), today=START)
+        phases = [w["phase"] for w in plan["weeks"]]
+        self.assertEqual(phases.count("taper"), 2)  # as for a half marathon, the 70.3's run leg
+        self.assertIsNone(plan["projection"])
+        bricks = [s for s in by_sport(plan, "run") if s["kind"] == "brick"]
+        self.assertTrue(bricks)
+        rides = {s["date"]: s for s in by_sport(plan, "bike")}
+        self.assertTrue(all(rides[b["date"]]["kind"] != "easy" for b in bricks))
+        self.assertIn("Race-effort long ride", {s["title"] for s in by_sport(plan, "bike")})
+        last, end = plan["weeks"][-1]["sessions"], date.fromisoformat(plan["config"]["date"])
+        self.assertEqual(last[-1]["sport"], "tri")
+        race_week = [s for s in last if s["sport"] in ("bike", "swim") and (end - date.fromisoformat(s["date"])).days <= 5]
+        self.assertEqual(sorted(s["sport"] for s in race_week), ["bike", "swim"])
+        self.assertEqual({s["kind"] for s in race_week}, {"opener"})
+
+    def test_swims_go_by_distance(self):
+        plan = build(tri(), today=START)
+        s = by_sport(plan, "swim")[0]
+        self.assertTrue(all(x.get("m") for x in plans._flat(s["steps"]) if x["intensity"] != "rest"))
+        self.assertAlmostEqual(s["km"], plans.multisport.swim_metres(s["steps"]) / 1000)
+
+    def test_each_sport_matches_its_own_activities(self):
+        cfg = multi(goal="fitness", bike={"days": [2], "long_day": None, "start_h": 2})
+        ride_day = START + timedelta(days=2)
+        ride = {"id": 7, "sport": "bike", "type": "road_biking", "date": ride_day.isoformat(), "km": 30,
+                "duration_s": 3600, "speed": 8.3, "avg_hr": 130}
+        plan = build(cfg, acts=[ride], today=START + timedelta(days=3))
+        s = next(s for s in by_sport(plan, "bike") if s["date"] == ride_day.isoformat())
+        self.assertEqual(s["status"], "done")
+        self.assertIsNone(s["actual"]["verdict"])
+        self.assertEqual(plan["weeks"][0]["km_done"], 0)  # a ride isn't run km
+        self.assertEqual(plan["weeks"][0]["hours_done"], 1)
+
+    def test_setup_checks_the_sports_each_goal_needs(self):
+        import app
+        body = lambda goal, **sports: {"goal": goal, "name": "", "tri": "olympic", "metres": 10000, "sports": sports,
+                                       "date": (START + timedelta(weeks=12)).isoformat()}
+        run = {"days": [1, 3, 6], "long_day": 6, "start_km": 25}
+        bike, swim = {"days": [2, 5], "long_day": 5, "start_h": 4}, {"days": [0, 4], "start_km": 4, "pool": 50}
+        cfg = app._plan_from(body("triathlon", run=run, bike=bike, swim=swim), None, {}, None, START)
+        self.assertEqual((cfg["name"], cfg["metres"], cfg["days"]), ("Olympic triathlon", 10000, [1, 3, 6]))
+        self.assertEqual(app._plan_from(body("base", bike=bike), None, {}, None, START)["days"], [])
+        for goal, sports in (("triathlon", {"run": run, "bike": bike}), ("race", {"bike": bike}),
+                             ("base", {"strength": {"days": [1]}}),
+                             ("base", {"bike": {**bike, "long_day": 1}})):
+            with self.assertRaises((AssertionError, KeyError)):
+                app._plan_from(body(goal, **sports), None, {}, None, START)
 
 
 class Dashboard(unittest.TestCase):

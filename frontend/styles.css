@@ -614,8 +614,10 @@ button.more { margin-top: 1rem; }
 .plan-stat .over { color: var(--fatigue); }
 .plan-when { color: var(--muted); font-size: 0.92rem; }
 
-/* The next 7 days: each run tinted with its type's colour, rest days dashed */
+/* The next 7 days: each session tinted with its type's (or sport's) colour, rest days dashed; a day with two sports
+   holds two shorter buttons */
 .strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.45rem; margin: 1.25rem 0 0; }
+.strip .col { display: grid; gap: 0.3rem; }
 .strip .day {
   all: unset; box-sizing: border-box; cursor: pointer; position: relative; display: flex; flex-direction: column; gap: 0.15rem;
   min-height: 6.2rem; padding: 0.6rem 0.65rem 0.65rem; border-radius: 8px; overflow: hidden;
@@ -634,6 +636,8 @@ button.more { margin-top: 1rem; }
 .strip .tag { position: absolute; top: 0.5rem; right: 0.5rem; padding: 0 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 600;
   letter-spacing: 0.05em; text-transform: uppercase; background: var(--volt); color: var(--on-volt); }
 .strip .tag.sent { background: none; color: var(--good); font-size: 0.8rem; }
+.strip .two .day { min-height: 3rem; }
+.strip .two .dt { font-size: 0.95rem; }
 
 /* Week by week: planned km per week split by session type, the km done as a line, phases underneath */
 .plan-weeks { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
@@ -675,10 +679,18 @@ div.ps-row { cursor: default; }
 .verdict.worse { color: var(--fatigue); }
 .ps-steps { padding: 0.25rem 0 1.25rem; max-width: 46rem; }
 .ps-steps .wk-steps { margin-top: 1rem; }
-.plan-days { border: 0; margin: 0; padding: 0; }
-.plan-days legend { color: var(--muted); font-size: 0.9rem; padding: 0; margin-bottom: 0.4rem; }
-.plan-days div { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; }
-.plan-days label { display: flex; align-items: center; gap: 0.3rem; color: var(--ink); font-size: 0.95rem; }
+/* The plan form's days: a row per sport, a column per weekday, and each sport's fields two to a row */
+.plan-grid { border: 0; margin: 0; padding: 0; min-width: 0; }
+.plan-grid legend { color: var(--muted); font-size: 0.9rem; padding: 0; margin-bottom: 0.3rem; }
+.plan-grid table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
+.plan-grid th, .plan-grid td { border-bottom: 0; white-space: normal; }
+.plan-grid th { color: var(--muted); font-size: 0.85rem; font-weight: 500; text-align: center; padding: 0 0 0.25rem; }
+.plan-grid th[scope="row"], .plan-grid tr:first-child th:first-child { width: 3.2rem; text-align: left; color: var(--ink); padding: 0; }
+.plan-grid td { text-align: center; padding: 0.2rem 0; }
+.race-dialog .plan-grid input, .race-dialog .plan-check input { width: 1.1rem; height: 1.1rem; margin: 0; padding: 0; }
+.race-dialog .plan-check { display: flex; align-items: center; gap: 0.5rem; color: var(--ink); font-size: 0.95rem; }
+.plan-sport { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
+.plan-sport input, .plan-sport select { width: 100%; min-width: 0; box-sizing: border-box; }
 .race-stats .note a { color: var(--fitness); }
 @media (max-width: 760px) {
   .ps-row { grid-template-columns: 5.5rem minmax(0, 1fr); }

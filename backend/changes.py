@@ -73,10 +73,14 @@ def _check_steps(steps, depth=0):
     return out
 
 
+def _check_sport(sport):
+    if sport not in workouts.ALL_SPORTS:
+        raise ValueError(f"sport must be one of {', '.join(workouts.ALL_SPORTS)}.")
+
+
 def make(day, sport, *, kind, minutes=None, title=None, steps=None, reason="", today):
     """A change putting a session on a day, checked; ValueError says what's wrong, for the chat to fix."""
-    if sport not in workouts.SPORTS:
-        raise ValueError("sport must be run or bike.")
+    _check_sport(sport)
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {', '.join(KINDS)}.")
     change = {"date": check_day(day, today), "sport": sport, "rest": False, "kind": kind,
@@ -91,8 +95,7 @@ def make(day, sport, *, kind, minutes=None, title=None, steps=None, reason="", t
 
 
 def rest(day, sport, reason, today):
-    if sport not in workouts.SPORTS:
-        raise ValueError("sport must be run or bike.")
+    _check_sport(sport)
     return {"date": check_day(day, today), "sport": sport, "rest": True, "reason": str(reason or "")[:120]}
 
 
@@ -105,7 +108,7 @@ def copy(session, day, sport, reason):
 # ---- Turning a change into a session
 
 def _target(name, sport, t):
-    if name == "none":
+    if name == "none" or sport == "swim":  # swims go by feel
         return None
     if name.startswith("zone"):
         return t.hr(int(name[4:]))
@@ -140,6 +143,8 @@ def title_of(change):
     kind = change["kind"]
     if change.get("title"):
         return change["title"]
+    if change["sport"] == "swim":
+        return "Swim"
     if kind in ("recovery", "easy", "long", "shakeout"):
         return f"{TITLES[kind]} {NOUN[change['sport']]}"
     return {"race_pace": "Race pace", "custom": "Workout"}.get(kind) or TITLES[kind]
@@ -154,6 +159,8 @@ def session(change, t):
         steps = change["fixed_steps"]
     elif change.get("steps"):
         steps = _steps(change["steps"], sport, t)
+    elif sport == "swim":  # one timed block
+        steps = [_step("interval", title_of(change), _round5(change["minutes"]) * 60, "easy")]
     else:
         steps = (_run_steps if sport == "run" else _bike_steps)(kind, _round5(change["minutes"]), t)
     title = title_of(change)
@@ -167,7 +174,7 @@ def workout(change, t, sent):
     sport = change["sport"]
     why = ["Changed in chat"] + ([change["reason"]] if change.get("reason") else [])
     s = session(change, t)
-    base = {"sport": sport, "label": workouts.SPORTS[sport], "why": why, "changed": True}
+    base = {"sport": sport, "label": workouts.ALL_SPORTS[sport], "why": why, "changed": True}
     if not s:
         return {**base, "kind": "rest", "title": "Rest day", "total_s": 0, "km": None, "steps": [], "paces": False,
                 "sent": False, "next": None}

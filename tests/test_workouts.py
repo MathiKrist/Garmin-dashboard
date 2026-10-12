@@ -82,5 +82,24 @@ class GarminFormat(unittest.TestCase):
         self.assertEqual(g["estimatedDurationInSecs"], w["total_s"])
 
 
+class OtherSports(unittest.TestCase):
+    def test_swim_goes_by_distance_in_its_pool(self):
+        import multisport
+        title, steps = multisport.swim("threshold", 2000, 120)
+        g = workouts.to_garmin({"sport": "swim", "title": title, "steps": steps, "total_s": 2400, "why": [], "pool": 50}, TODAY)
+        self.assertEqual((g["sportType"]["sportTypeKey"], g["poolLength"]), ("swimming", 50.0))
+        first, reps = g["workoutSegments"][0]["workoutSteps"][:2]
+        self.assertEqual((first["endCondition"]["conditionTypeKey"], first["endConditionValue"]), ("distance", 300.0))
+        self.assertEqual([s["stepType"]["stepTypeKey"] for s in reps["workoutSteps"]], ["interval", "rest"])
+
+    def test_power_targets_in_watts(self):
+        t = workouts.Targets({**PROFILE, "ftp": 200}, None)
+        steps = workouts._bike_steps("threshold", 60, t)
+        g = workouts.to_garmin({"sport": "bike", "title": "Threshold", "steps": steps, "total_s": 3600, "why": []}, TODAY)
+        work = g["workoutSegments"][0]["workoutSteps"][1]["workoutSteps"][0]
+        self.assertEqual((work["targetType"]["workoutTargetTypeKey"], work["targetValueOne"], work["targetValueTwo"]),
+                         ("power.zone", 190.0, 210.0))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -41,7 +41,7 @@ The menu on the left picks the page; on phones it hides behind ☰. The page is 
 
 ![Workout](docs/screenshots/workout.png)
 
-- **Today's session** for running and cycling, in steps like a Garmin workout. Without a plan it's picked from readiness and Garmin's load focus; with one, it's the plan's session.
+- **Today's session** for running and cycling (and swimming with a plan that has swims), in steps like a Garmin workout. Without a plan it's picked from readiness and Garmin's load focus; with one, it's the plan's session.
 - **The plan**: a strip of the next 7 days (click a day to see it), and the plan week by week (click a week for its sessions).
 - **Send to watch** puts a session in the Garmin calendar, and **Send next 7 days** the plan's coming week. The watch gets them at its next sync with the Garmin Connect app. Once sent, the button reads **On the watch ✓**; hover it to **Remove from watch**.
 - **The chat**: tell it what to change ("only 40 minutes today", "move Thursday to Friday"), and the sessions change at once. Nothing reaches the watch until you send it. One chat a day; **Undo all changes** takes them back.
@@ -64,11 +64,12 @@ The screenshots use demo data.
 
 ## Training plan
 
-Set one up with **+ Training plan** on the Workout page: the plan type, the date, your run days, the long-run day and your current km a week (plus the distance and target time where the type asks). A race plan also sets the race goal.
+Set one up with **+ Training plan** on the Workout page: the plan type, the date, your run days (tick **Rides and swims too** for a multi-sport plan), the long run day and how much you run now (plus the distance and target time where the type asks). A race plan also sets the race goal.
 
 | Plan type | What it does |
 |---|---|
 | Race | Builds toward a 5 km, 10 km, half or marathon, with a taper |
+| Triathlon | Sprint, olympic, 70.3 or Ironman: swims, rides and runs, with bricks and a taper |
 | General fitness | Builds steadily, projecting a time for a distance you pick |
 | Base builder | More weekly km and a longer long run (up to 18 km), one hard session a week |
 | Speed block | 6–12 weeks to get faster over 5 or 10 km: volume held, two hard sessions a week |
@@ -83,10 +84,11 @@ Set one up with **+ Training plan** on the Workout page: the plan type, the date
 | Taper | 1 week | 1 week | 2 weeks | 3 weeks | — |
 
 - **Weekly km** grow at most 8% a week, to at most 2.5 times where you started. Every 4th week is lighter.
-- **The long run** climbs on its own, up to half the week, and steps down after its peak.
-- **Hard sessions**: one or two a week, kept away from the long run, and named as runners know them: tempo and progression runs, cruise intervals, over/unders, 1 km and 800 m repeats, pyramids, race pace. The second is dropped when the week has no room for it.
+- **The long run** climbs on its own, up to half the week, and steps down after its peak. It's plain in the base phase and lighter weeks, then takes turns as a progressive, fast-finish or surges long run, and in the peak weeks has a race pace finish (half) or marathon pace blocks.
+- **Hard sessions**: one or two a week, kept away from the long run, and named as runners know them: tempo runs, threshold progressions, cruise intervals, over/unders, 1 km and 800 m repeats, pyramids, race pace. The second is dropped when the week has no room for it.
 - **Speed sessions**: 400 m repeats, 600 m repeats and 400 m sets. Mostly in 5 and 10 km plans and the speed block, now and then in the build of the others; never in the base phase, the taper or a lighter week.
-- **Race week**: a short race pace session, a shakeout and the race.
+- **Race week**: a short race pace session, a shakeout and the race; one short opener ride and swim.
+- **Other sports**: rides ramp in hours with a long ride and one hard ride (watts from Garmin's FTP, heart rate without), swims go by distance (technique, threshold, speed, race pace). With more than runs, the chart shows hours by sport.
 - **Paces adapt**: faster runs than planned make the next paces faster, slower ones slower. Intervals are judged on their laps, easy runs on pace at their heart rate.
 - **Projected time**: shown as a range that narrows toward race day, for the plan types that have a distance. The header shows the last run that moved it.
 - **Missed sessions**: a missed hard or long run moves to the next easy day that week.
@@ -138,7 +140,7 @@ backend/
   sync.py           Garmin Connect → SQLite
   metrics.py        the dashboard's numbers
   workouts.py       today's session, and Garmin's workout format
-  plans.py          the training plan
+  plans.py          the training plan, and multisport.py for its rides and swims
   coach.py          the chat, and changes.py for the sessions it changes
   db.py, config.py, login.py, demo.py
 frontend/           the page: index.html, styles.css, js/ (a module per page)
