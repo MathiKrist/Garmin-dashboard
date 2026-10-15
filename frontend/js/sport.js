@@ -141,40 +141,52 @@ export function renderMonthly(key, list, m) {
   });
 }
 
-// The sport's bests: longest, fastest, highest; each opens its activity
+// The sport's bests: longest, fastest, highest; each opens its top five, and each of those its activity
+const TOP_N = 5;
+
 export function renderRecords(key, list) {
-  const top = (as, f, pick = Math.max) => {
-    const vs = as.filter((a) => a[f] != null && a[f] > 0);
-    if (!vs.length) return null;
-    const best = pick(...vs.map((a) => a[f]));
-    return vs.find((a) => a[f] === best);
-  };
-  const recs = [];  // [label, value, activity, or a note when there's no activity]
-  const add = (label, a, value) => { if (a) recs.push([label, value(a), a]); };
+  // The top five activities by f, highest first (lowest with asc)
+  const rank = (f, asc = false) => list.filter((a) => f(a) > 0)
+    .sort((x, y) => (asc ? f(x) - f(y) : f(y) - f(x))).slice(0, TOP_N);
+  const recs = [];  // [label, ranked activities, value], or [label, a note] when there are none
+  const add = (label, as, value) => { if (as.length) recs.push([label, as, value]); };
   if (key === "run") {
     // The fastest time over each distance within any run, 400 m to marathon
     const longest = Math.max(...list.map((a) => a.km)) * 1000;
     Object.entries(data.distances).forEach(([mtr, name]) => {
-      const as = list.filter((a) => a.best?.[mtr]);
+      const as = rank((a) => a.best?.[mtr], true);
       if (!as.length) {
-        recs.push([`Fastest ${name}`, "–", longest >= mtr ? "Coming with the next syncs" : "No run this long yet"]);
+        recs.push([`Fastest ${name}`, longest >= mtr ? "Coming with the next syncs" : "No run this long yet"]);
         return;
       }
-      const a = as.reduce((b, x) => (x.best[mtr] < b.best[mtr] ? x : b));
-      recs.push([`Fastest ${name}`, `${fmtDuration(a.best[mtr])}<small> · ${fmtPace(a.best[mtr] / mtr * 1000)}</small>`, a]);
+      recs.push([`Fastest ${name}`, as, (a) => `${fmtDuration(a.best[mtr])}<small> · ${fmtPace(a.best[mtr] / mtr * 1000)}</small>`]);
     });
   }
-  add("Longest distance", top(list, "km"), (a) => `${a.km.toFixed(2)} km`);
-  add("Longest time", top(list, "duration_s"), (a) => fmtDuration(a.duration_s));
-  if (KMH_SPORTS.includes(key)) add("Top speed", top(list, "max_speed"), (a) => `${(a.max_speed * 3.6).toFixed(1)} km/h`);
-  if (key === "winter") add("Most descent", top(list, "descent_m"), (a) => `${Math.round(a.descent_m).toLocaleString("en-GB")} m`);
+  add("Longest distance", rank((a) => a.km), (a) => `${a.km.toFixed(2)} km`);
+  add("Longest time", rank((a) => a.duration_s), (a) => fmtDuration(a.duration_s));
+  if (KMH_SPORTS.includes(key)) add("Top speed", rank((a) => a.max_speed), (a) => `${(a.max_speed * 3.6).toFixed(1)} km/h`);
+  if (key === "winter") add("Most descent", rank((a) => a.descent_m), (a) => `${Math.round(a.descent_m).toLocaleString("en-GB")} m`);
 
+  const when = (a) => `${COLUMNS.date[2](a)} · ${escapeHtml(a.name || a.type.replace(/_/g, " "))}`;
   $("sportRecordsSection").hidden = !recs.length;
-  $("sportRecords").innerHTML = recs.map(([lbl, val, a]) => (typeof a === "string"
-    ? `<div class="empty-rec"><span class="rl">${lbl}</span><span class="rv">${val}</span><small>${a}</small></div>`
-    : `<button type="button" data-act="${a.id}"><span class="rl">${lbl}</span><span class="rv">${val}</span>
-    <small>${COLUMNS.date[2](a)} · ${escapeHtml(a.name || a.type.replace(/_/g, " "))}</small></button>`)).join("");
+  $("sportRecords").innerHTML = recs.map(([lbl, as, value]) => (typeof as === "string"
+    ? `<div class="empty-rec"><span class="rl">${lbl}</span><span class="rv">–</span><small>${as}</small></div>`
+    : `<div class="rec"><button type="button" class="rec-head" aria-expanded="false"><span class="rl">${lbl}</span>
+    <span class="rv">${value(as[0])}</span><small>${when(as[0])}</small></button>
+    <ol class="rec-top" hidden>${as.map((a, i) => `<li><button type="button" data-act="${a.id}"><span class="rn">${i + 1}</span>
+    <small>${when(a)}</small><span class="rv">${value(a)}</span></button></li>`).join("")}</ol></div>`)).join("");
 }
+
+// A best opens its top five, closing any other
+$("sportRecords").addEventListener("click", (e) => {
+  const head = e.target.closest(".rec-head");
+  if (!head) return;
+  const open = head.getAttribute("aria-expanded") !== "true";
+  $("sportRecords").querySelectorAll(".rec-head").forEach((b) => {
+    b.setAttribute("aria-expanded", b === head && open);
+    b.nextElementSibling.hidden = !(b === head && open);
+  });
+});
 
 $("sportMore").addEventListener("click", () => { sportShown += PAGE; renderSport(sportShownKey); });
 

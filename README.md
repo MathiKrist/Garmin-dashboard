@@ -57,7 +57,7 @@ HRV against your normal range, resting heart rate, sleep and sleep score, Body B
 ![Activities](docs/screenshots/activities.png)
 
 - **Every activity**, sortable and searchable, with this week and this year for the chosen sport.
-- **A page per sport** done at least 3 times: totals, weeks, months, this year against last, and personal bests.
+- **A page per sport** done at least 3 times: totals, weeks, months, this year against last, and personal bests (click one for its top 5).
 - **Click an activity** for every stat Garmin has, with the route and laps.
 
 The screenshots use demo data.

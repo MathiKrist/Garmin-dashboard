@@ -276,18 +276,27 @@ button.primary { background: var(--ink); color: var(--paper); }
 .tiles .up { color: var(--good); }
 .tiles .down { color: var(--fatigue); }
 
-/* Personal bests: label, value and date, each opening its activity */
-.records { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 0 2.5rem; }
+/* Personal bests: label, value and date; each opens its top five, and each of those its activity */
+.records { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 0 2.5rem; align-items: start; }
+.records .rec, .records .empty-rec { border-bottom: 1px solid var(--rule); }
 .records .empty-rec { opacity: 0.6; }
 .records button, .records .empty-rec {
-  all: unset; box-sizing: border-box; cursor: pointer; width: 100%;
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.1rem 1rem; padding: 0.6rem 0.25rem; border-bottom: 1px solid var(--rule);
+  all: unset; box-sizing: border-box; width: 100%;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.1rem 1rem; padding: 0.6rem 0.25rem;
 }
-.records button:hover:not(.empty-rec) { background: var(--panel); }
+.records button { cursor: pointer; }
+.records button:hover:not(:disabled) { background: var(--panel); color: var(--ink); }
 .records button:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
 .records .rl { color: var(--muted); }
+.rec-head .rl::after { content: " ▾"; font-size: 0.75em; }
+.rec-head[aria-expanded="true"] .rl::after { content: " ▴"; }
 .records .rv { font-weight: 600; text-align: right; }
-.records small { grid-column: 1 / -1; color: var(--muted); font-size: 0.82rem; }
+.records small { color: var(--muted); font-size: 0.82rem; }
+.rec-head small, .empty-rec small { grid-column: 1 / -1; }
+.rec-top { list-style: none; margin: 0 0 0.4rem; padding: 0; }
+.rec-top button { grid-template-columns: 1.25rem minmax(0, 1fr) auto; align-items: baseline; padding: 0.35rem 0.25rem; }
+.rec-top .rn { color: var(--muted); font-size: 0.82rem; }
+.rec-top .rn + small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button {
   font: 500 0.95rem var(--body); color: var(--ink); background: transparent;
   border: 1px solid var(--ink); border-radius: 999px; padding: 0.4rem 1rem; cursor: pointer;
