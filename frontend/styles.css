@@ -353,6 +353,11 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .last { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.75rem 0 1.5rem; min-width: 0; }
 .last .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .last h2 { font: 700 clamp(2rem, 6vw, 3rem)/1.05 var(--display); margin: 0.15rem 0 0; overflow-wrap: anywhere; }
+.last .last-open { cursor: pointer; }
+.last h2 button, .last h2 button:hover:not(:disabled) { all: unset; cursor: pointer; }
+.last h2 button::after { content: " ›"; color: var(--muted); }
+.last .last-open:hover h2 button, .last h2 button:focus-visible { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.12em; }
+.last h2 button:focus-visible { outline: 2px solid var(--fitness); outline-offset: 3px; }
 .last-effect { margin: 0.4rem 0 0; }
 .last-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: 1.25rem; margin: 0; }
 .last-stats dd { margin: 0; font: 600 2rem/1 var(--display); white-space: nowrap; }

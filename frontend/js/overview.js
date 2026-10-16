@@ -210,6 +210,8 @@ export function renderLastActivity() {
   $("lastEffect").innerHTML = effectCell(a);
   $("lastEffect").hidden = !$("lastEffect").innerHTML;
   $("lastStats").innerHTML = headlineStats(a);
+  // The name, date and stats open the activity; the map stays free to pan and zoom
+  document.querySelectorAll("#lastAct .last-open").forEach((el) => { el.dataset.act = a.id; });
   lastMap.show(a.track, a.name || "last activity", a.sport);
 }
 

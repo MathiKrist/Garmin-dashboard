@@ -33,7 +33,7 @@ The menu on the left picks the page; on phones it hides behind ☰. The page is 
 - **Race goal**: target time, Garmin's prediction and the gap, with a 6-month chart. Set with **+ Race goal**, or by a race plan.
 - **Today**: readiness, HRV, sleep, resting heart rate and calories burnt.
 - **Garmin's training status and load focus**, with what to train next.
-- **Last activity**, with its route.
+- **Last activity**, with its route. Click it for the details.
 - **Fitness and form**: fitness (42-day load) against fatigue (7-day).
 - **Weekly running** split by training effect, **VO2 max**, and a **training calendar** of the last year.
 
