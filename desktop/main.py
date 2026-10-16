@@ -96,8 +96,29 @@ def set_icon(window):
             send(hwnd, 0x80, which, icon)
 
 
+def already_open():
+    """True when the dashboard's window is already open; it's brought to the front instead of opening another.
+    A named mutex marks the open app, and lives until this process ends."""
+    global _instance
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    _instance = kernel32.CreateMutexW(None, False, "Training.Dashboard")
+    if ctypes.get_last_error() != 183:  # ERROR_ALREADY_EXISTS
+        return False
+    user32 = ctypes.windll.user32
+    hwnd = user32.FindWindowW(None, "Training")
+    if hwnd:  # none yet while the other one is still starting its server; its window comes up by itself
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        user32.SetForegroundWindow(hwnd)
+    return True
+
+
 def main():
-    if sys.platform == "win32":  # its own taskbar button, not grouped with other Python windows
+    if sys.platform == "win32":
+        if already_open():
+            return
+        # Its own taskbar button, not grouped with other Python windows
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Training.Dashboard")
 
     up = reachable(URL)

@@ -17,7 +17,7 @@ copy .env.example .env
 
 ## Starting it
 
-- **`Dashboard app.bat`** opens the dashboard in its own window. It connects to `DASHBOARD_URL`, or this PC; if no server is running, it starts one until the window closes. Add `--demo` for made-up data. Its log is `data/desktop.log`.
+- **`Dashboard app.bat`** opens the dashboard in its own window. It connects to `DASHBOARD_URL`, or this PC; if no server is running, it starts one until the window closes. If the window is already open, it brings that one to the front. Add `--demo` for made-up data. Its log is `data/desktop.log`.
 - **`.venv\Scripts\python backend/app.py`** runs only the server (`--demo` works here too). Open `http://localhost:8000`, or the wifi address it prints. Windows may ask to let Python through the firewall the first time.
 
 For a desktop shortcut, right-click the `.bat` → **Send to** → **Desktop (create shortcut)**, and pick an icon from `assets/` under **Properties** → **Change Icon…**.
