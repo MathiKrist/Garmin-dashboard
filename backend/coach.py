@@ -156,6 +156,8 @@ def _target(t):
         return ""
     if t["type"] == "pace":
         return f" @ {_mmss(t['fast'])}-{_mmss(t['slow'])}/km"
+    if t["type"] == "power":
+        return f" @ {t['lo']}-{t['hi']} W"
     return f" @ zone {t['zone']} ({t['lo']}-{t['hi']} bpm)"
 
 
