@@ -363,8 +363,8 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .last-stats dd { margin: 0; font: 600 2rem/1 var(--display); white-space: nowrap; }
 .last-stats dd span { font: 500 0.95rem var(--body); color: var(--muted); margin-left: 0.15rem; }
 .last-stats dt { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
-/* Grows to line up with the bottom of the status column */
-.last-map { flex: 1; min-height: 280px; border-radius: 6px; overflow: hidden; }
+/* Grows to line up with the bottom of the status column; isolated so Leaflet's 400+ z-indexes stay under the mobile menu */
+.last-map { flex: 1; min-height: 280px; border-radius: 6px; overflow: hidden; isolation: isolate; }
 .last-map.leaflet-container { background: var(--panel); font: 400 0.72rem var(--body); }
 .last-map .leaflet-bar { border: 1px solid var(--rule); box-shadow: none; }
 .last-map .leaflet-bar a { background: var(--panel); color: var(--ink); border-bottom-color: var(--rule); }
