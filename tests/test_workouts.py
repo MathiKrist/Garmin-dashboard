@@ -16,14 +16,45 @@ def run(days_ago, label="AEROBIC_BASE", minutes=50):
             "focus": None, "duration_s": minutes * 60}
 
 
-def recommend(acts=(), readiness=80, status="PRODUCTIVE", focus="BALANCED", race=None, sent=()):
+def recommend(acts=(), readiness=80, status="PRODUCTIVE", focus="BALANCED", race=None, sent=(), **body):
     return workouts.recommend(list(acts), TODAY, readiness=readiness, status=status, focus=focus, focus_title="Focus",
-                              race=race, profile=PROFILE, pred_5k=1500, sent=list(sent))
+                              race=race, profile=PROFILE, pred_5k=1500, sent=list(sent), **body)
 
 
 class Session(unittest.TestCase):
-    def test_low_readiness_is_easy(self):
-        self.assertEqual(recommend(readiness=40)[0]["kind"], "easy")
+    def test_low_readiness_is_short_and_easy(self):
+        w = recommend([run(3, minutes=60)], readiness=45)[0]
+        self.assertEqual(w["kind"], "easy")
+        self.assertEqual(w["total_s"], 35 * 60)  # 0.6 of the usual hour
+
+    def test_short_easy_is_capped(self):
+        self.assertEqual(recommend([run(3, minutes=90)], recovery_h=15)[0]["total_s"], 40 * 60)
+
+    def test_long_recovery_low_readiness_and_poor_sleep_is_a_recovery_run(self):
+        # Readiness 42, 25 h of recovery left and a poor night: half an hour of recovery, as Garmin suggests
+        w = recommend([run(3, minutes=60)], readiness=42, recovery_h=25, sleep_score=48)[0]
+        self.assertEqual((w["kind"], w["total_s"]), ("recovery", 30 * 60))
+        self.assertEqual(w["why"], ["Readiness 42", "Recovery 25 h", "Sleep score 48"])
+
+    def test_two_mild_signs_make_a_recovery_run(self):
+        self.assertEqual(recommend(readiness=45, hrv_status="UNBALANCED")[0]["kind"], "recovery")
+
+    def test_very_long_recovery_is_a_rest_day(self):
+        for w in recommend([{**run(5), "sport": "bike"}], recovery_h=50):
+            self.assertEqual((w["kind"], w["title"], w["steps"], w["total_s"]), ("rest", "Rest day", [], 0))
+
+    def test_no_hard_session_while_recovering(self):
+        self.assertEqual(recommend(focus="AEROBIC_HIGH_SHORTAGE", recovery_h=15)[0]["kind"], "easy")
+        self.assertEqual(recommend(focus="AEROBIC_HIGH_SHORTAGE", recovery_h=5)[0]["kind"], "threshold")
+
+    def test_rest_before_a_race_when_worn_out(self):
+        self.assertEqual(recommend(race={"days_to_go": 2}, readiness=15)[0]["kind"], "rest")
+
+    def test_strain_levels(self):
+        self.assertEqual(workouts.strain(80, "PRODUCTIVE"), 0)
+        self.assertEqual(workouts.strain(80, "PRODUCTIVE", sleep_score=55), 1)
+        self.assertEqual(workouts.strain(30, "PRODUCTIVE"), 2)
+        self.assertEqual(workouts.strain(40, "OVERREACHING"), 3)
 
     def test_very_low_readiness_or_overreaching_is_recovery(self):
         self.assertEqual(recommend(readiness=20)[0]["kind"], "recovery")

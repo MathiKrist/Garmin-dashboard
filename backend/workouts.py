@@ -1,7 +1,8 @@
 """Today's workout per sport: what to train, worked out from Garmin's own numbers, as steps the page shows and the
 watch can run.
 
-The session comes from readiness, training status, load focus, the last hard session and the race goal. Run paces come
+The session comes from readiness, recovery time, sleep, HRV, training status, load focus, the last hard session and the
+race goal; a rest day when the body says so. Run paces come
 from Garmin's lactate threshold pace (or the race predictor), bike targets from the heart rate zones."""
 from datetime import date, timedelta
 from statistics import median
@@ -12,6 +13,9 @@ SPORTS = {"run": "Running", "bike": "Cycling"}  # the sports a workout can be ma
 ALL_SPORTS = {**SPORTS, "swim": "Swimming"}  # and the ones a training plan can hold too
 TYPICAL_MIN = {"run": 45, "bike": 75}  # the usual session length when there are no recent ones to go by
 LONG_MAX_MIN = {"run": 120, "bike": 240}
+SHORT = 0.6  # share of the usual length on a day to hold back a little
+SHORT_MAX_MIN = {"run": 40, "bike": 60}
+HRV_OFF = {"LOW", "UNBALANCED", "POOR"}  # Garmin HRV statuses that count against training hard
 RECENT = 60  # days of activities that set the usual session length
 HARD = {"TEMPO", "LACTATE_THRESHOLD", "VO2MAX", "ANAEROBIC_CAPACITY", "SPRINT"}  # Garmin training effects that count as hard
 THRESHOLD = {"TEMPO", "LACTATE_THRESHOLD"}
@@ -154,23 +158,49 @@ def _ago(n):
     return "today" if n == 0 else "yesterday" if n == 1 else f"{n} days ago"
 
 
-def _session(today, readiness, status, focus, focus_title, last_hard, last_threshold, days_to_go):
+def strain(readiness, status, recovery_h=None, sleep_score=None, hrv_status=None):
+    """How much to hold back today, from Garmin's morning numbers: 0 train as usual, 1 short and easy, 2 recovery
+    session, 3 rest. One mild sign shortens the session; two of them, or one strong sign, make it a recovery one."""
+    low = lambda v, limit: v is not None and v < limit
+    recovery_h = recovery_h or 0
+    over = status == "OVERREACHING"
+    if low(readiness, 20) or recovery_h >= 48 or (over and low(readiness, 50)):
+        return 3
+    mild = sum((low(readiness, 50), recovery_h >= 12, low(sleep_score, 60), hrv_status in HRV_OFF))
+    if low(readiness, 35) or recovery_h >= 24 or over or mild >= 2:
+        return 2
+    return 1 if mild else 0
+
+
+def _session(today, readiness, status, focus, focus_title, last_hard, last_threshold, days_to_go,
+             recovery_h=None, sleep_score=None, hrv_status=None):
     """(kind, why, volume factor) for today, the same for every sport."""
     why = []
     if days_to_go is not None and 0 <= days_to_go <= 10:
         why.append("Race day" if days_to_go == 0 else f"Race in {days_to_go} day{'s' * (days_to_go != 1)}")
+    if status == "OVERREACHING":
+        why.append("Overreaching")
     if readiness is not None:
         why.append(f"Readiness {round(readiness)}")
+    if recovery_h:
+        why.append(f"Recovery {round(recovery_h)} h")
+    if sleep_score is not None and sleep_score < 60:
+        why.append(f"Sleep score {round(sleep_score)}")
+    if hrv_status in HRV_OFF:
+        why.append(f"HRV {hrv_status.lower()}")
     since_hard = (today - last_hard).days if last_hard else None
     if since_hard is not None and since_hard <= 7:
         why.append(f"Last hard session {_ago(since_hard)}")
+    level = strain(readiness, status, recovery_h, sleep_score, hrv_status)
+    if level == 3:
+        return "rest", why, 0
     if days_to_go is not None and 0 <= days_to_go <= 2:
         return "shakeout", why, 1
-    if (readiness is not None and readiness < 25) or status == "OVERREACHING":
-        if status == "OVERREACHING":
-            why.insert(0, "Overreaching")
+    if level == 2:
         return "recovery", why, 1
-    if (readiness is not None and readiness < 50) or (since_hard is not None and since_hard < 2):
+    if level == 1:
+        return "easy", why, SHORT
+    if since_hard is not None and since_hard < 2:
         return "easy", why, 1
     taper = 0.7 if days_to_go is not None and days_to_go <= 10 else 1
     focus = focus or ""
@@ -188,8 +218,10 @@ def _session(today, readiness, status, focus, focus_title, last_hard, last_thres
     return kind, why, taper
 
 
-def recommend(acts, today, *, readiness, status, focus, focus_title, race, profile, pred_5k, sent):
-    """One workout per sport, main sport first. `acts` are the activity summaries, newest first."""
+def recommend(acts, today, *, readiness, status, focus, focus_title, race, profile, pred_5k, sent,
+              recovery_h=None, sleep_score=None, hrv_status=None):
+    """One workout per sport, main sport first. `acts` are the activity summaries, newest first. Recovery time, sleep
+    score and HRV status are this morning's, or None."""
     since = (today - timedelta(days=RECENT)).isoformat()
     recent = [a for a in acts if a["date"] >= since]
 
@@ -200,18 +232,25 @@ def recommend(acts, today, *, readiness, status, focus, focus_title, race, profi
     last_hard = last(HARD, ("high", "anaerobic"))
     last_threshold = last(THRESHOLD, ())
     days_to_go = race.get("days_to_go") if race else None
-    kind, why, volume = _session(today, readiness, status, focus, focus_title, last_hard, last_threshold, days_to_go)
+    kind, why, volume = _session(today, readiness, status, focus, focus_title, last_hard, last_threshold, days_to_go,
+                                 recovery_h, sleep_score, hrv_status)
     t = Targets(profile, pred_5k)
 
     counts = {s: sum(a["sport"] == s for a in recent) for s in SPORTS}
     order = sorted(SPORTS, key=lambda s: -counts[s])
     out = []
     for sport in order:
+        if kind == "rest":
+            out.append({"sport": sport, "label": SPORTS[sport], "kind": "rest", "title": "Rest day", "total_s": 0,
+                        "km": None, "why": why, "steps": [], "paces": False, "sent": False})
+            continue
         durations = [a["duration_s"] / 60 for a in recent if a["sport"] == sport and a.get("duration_s")]
         typical = median(durations) if durations else TYPICAL_MIN[sport]
         total = {"recovery": min(30 if sport == "run" else 45, typical), "long": min(typical * 1.4, LONG_MAX_MIN[sport]),
                  "shakeout": 25 if sport == "run" else 40}.get(kind, typical)
         total = _round5(total * (1 if kind in ("recovery", "shakeout") else volume))
+        if volume == SHORT:
+            total = min(total, SHORT_MAX_MIN[sport])
         steps = (_run_steps if sport == "run" else _bike_steps)(kind, total, t)
         total_s = sum(s["s"] for s in _flat(steps))
         km = km_of(steps, t) if sport == "run" else None

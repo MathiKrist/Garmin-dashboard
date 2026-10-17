@@ -393,17 +393,26 @@ def build_dashboard(db_path=None):
     race = _race(json.loads(goal), days, acts, today) if goal else None
     focus_phrase = next((d["load_focus"] for d in recent if d.get("load_focus")), None)
     pred_5k = next((d["pred_5k"] for d in recent if d.get("pred_5k")), None)
+    # This morning's recovery time, sleep and HRV (an older value says nothing about today)
+    morning = next((d for d in recent if d["date"] == today.isoformat()), {})
+    body = {k: morning.get(k) for k in ("recovery_h", "sleep_score", "hrv_status")}
+    today_vals["recovery_h"] = body["recovery_h"]
     workout_list = workouts.recommend(
         recent_acts, today, readiness=today_vals["readiness"], status=status and status["code"], focus=focus_phrase,
-        focus_title=focus and focus["title"], race=race, profile=profile, pred_5k=pred_5k, sent=sent)
+        focus_title=focus and focus["title"], race=race, profile=profile, pred_5k=pred_5k, sent=sent, **body)
 
     # The training plan; on its days its session replaces the suggested one for its sport, on the days between it's a
     # rest day; its swims come after the suggested sports
     plan = plans.build(plan_cfg, recent_acts, plan_laps, profile, today, plan_sent, changes) if plan_cfg else None
-    low = (today_vals["readiness"] is not None and today_vals["readiness"] < 25) or (status and status["code"] == "OVERREACHING")
+    level = workouts.strain(today_vals["readiness"], status and status["code"], **body)
     for pw in plans.todays(plan, today) if plan else []:
-        if low:
-            pw["why"].append(f"Low readiness: consider an easy {'run' if pw['sport'] == 'run' else 'session'} instead")
+        if level >= 2 and pw["kind"] != "rest":
+            if today_vals["readiness"] is not None:
+                pw["why"].append(f"Readiness {round(today_vals['readiness'])}")
+            if body["recovery_h"]:
+                pw["why"].append(f"Recovery {round(body['recovery_h'])} h")
+            pw["why"].append("Consider rest instead" if level == 3 else
+                             f"Consider a recovery {'run' if pw['sport'] == 'run' else 'session'} or rest instead")
         if any(w["sport"] == pw["sport"] for w in workout_list):
             workout_list = [pw if w["sport"] == pw["sport"] else w for w in workout_list]
         elif pw["sport"] == "run":

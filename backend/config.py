@@ -28,5 +28,6 @@ if DASHBOARD_URL and "://" not in DASHBOARD_URL:  # "100.93.167.63:8000" means h
     DASHBOARD_URL = "http://" + DASHBOARD_URL
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
 DASHBOARD_USERNAME = os.getenv("DASHBOARD_USERNAME", "")  # optional; asked for on the login page only when set
-TOKEN_DIR = str(Path(os.getenv("TOKEN_DIR", "~/.garminconnect")).expanduser())
+CHAT_MODEL = os.getenv("CHAT_MODEL", "haiku").strip().lower()  # the chat's model on the API: haiku or sonnet
+TOKEN_DIR =str(Path(os.getenv("TOKEN_DIR", "~/.garminconnect")).expanduser())
 DB_PATH = BASE_DIR / os.getenv("DB_PATH", "data/athlete.db")

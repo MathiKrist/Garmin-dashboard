@@ -6,12 +6,21 @@ import { $, escapeHtml } from "./util.js";
 let log = [], busy = false;
 
 const paragraphs = (text) => text.split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`).join("");
+const dollars = (c) => `$${c < 0.01 ? c.toFixed(4) : c.toFixed(2)}`;
+const tokens = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
+const MODEL_NAME = { "claude-haiku-5-5": "Haiku", "claude-sonnet-5-5": "Sonnet" };
 
 function item(m) {
   if (m.role === "user") return `<li class="user">${escapeHtml(m.text)}</li>`;
   const changes = m.changes?.length ? `<ul class="chat-changes">${m.changes.map((c) => `<li>✓ ${escapeHtml(c)}</li>`).join("")}</ul>` : "";
   const body = m.error ? `<p class="error">${escapeHtml(m.error)}</p>` : m.pending ? '<p class="pending">Thinking…</p>' : paragraphs(m.text || "");
-  return `<li class="assistant">${body}${changes}</li>`;
+  const usage = m.usage ? `<p class="chat-usage">${tokens(m.usage.tokens)} tokens · ${dollars(m.usage.cost)}</p>` : "";
+  return `<li class="assistant">${body}${changes}${usage}</li>`;
+}
+
+// What the chat costs on the API this month (nothing with Claude Code: the subscription pays)
+function cost(out) {
+  $("chatCost").textContent = out.model ? `${MODEL_NAME[out.model] || out.model} · ${dollars(out.month_cost || 0)} this month` : "";
 }
 
 function render() {
@@ -40,6 +49,7 @@ async function start() {
   try {
     const out = await request("GET", "/api/chat");
     log = out.log;
+    cost(out);
     if (!out.enabled) {
       $("chatInput").disabled = $("chatSend").disabled = true;
       note("The chat needs Claude Code installed on the machine running the server, or ANTHROPIC_API_KEY in .env.");
@@ -69,6 +79,7 @@ async function send() {
   try {
     const out = await request("POST", "/api/chat", { text });
     log = out.log;
+    cost(out);
     if (out.changed) dispatchEvent(new Event("reload"));  // redraw the workout and the plan with the changes
   } catch (e) {
     log[log.length - 1] = { role: "assistant", error: e.message };

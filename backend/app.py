@@ -481,8 +481,8 @@ async def send_plan_week(request: Request):
 @app.get("/api/chat")
 def chat_log():
     """Today's chat on the Workout page, and whether it can run (it needs Claude Code on this machine or
-    ANTHROPIC_API_KEY)."""
-    return {"enabled": coach.backend() is not None, "log": coach.history(DB_PATH)}
+    ANTHROPIC_API_KEY), with what the API has cost this month."""
+    return {"enabled": coach.backend() is not None, "log": coach.history(DB_PATH), **coach.usage()}
 
 
 @app.post("/api/chat")

@@ -41,7 +41,7 @@ The menu on the left picks the page; on phones it hides behind ☰. The page is 
 
 ![Workout](docs/screenshots/workout.png)
 
-- **Today's session** for running and cycling (and swimming with a plan that has swims), in steps like a Garmin workout. Without a plan it's picked from readiness and Garmin's load focus; with one, it's the plan's session.
+- **Today's session** for running and cycling (and swimming with a plan that has swims), in steps like a Garmin workout. Without a plan it's picked from readiness, recovery time, sleep, HRV and Garmin's load focus, and can be a short easy session, a recovery session or a rest day; with one, it's the plan's session, with a note to take it easy on a poor day.
 - **The plan**: a strip of the next 7 days (click a day to see it), and the plan week by week (click a week for its sessions).
 - **Send to watch** puts a session in the Garmin calendar, and **Send next 7 days** the plan's coming week. The watch gets them at its next sync with the Garmin Connect app. Once sent, the button reads **On the watch ✓**; hover it to **Remove from watch**.
 - **The chat**: tell it what to change ("only 40 minutes today", "move Thursday to Friday"), and the sessions change at once. Nothing reaches the watch until you send it. One chat a day; **Undo all changes** takes them back.
@@ -95,7 +95,7 @@ Set one up with **+ Training plan** on the Workout page: the plan type, the date
 
 ## The chat
 
-It uses Claude Code on this PC, covered by your Claude subscription: install it and log in once by running `claude`. With `ANTHROPIC_API_KEY` in `.env` it uses the Anthropic API instead, which is faster but costs about a cent or two a message.
+It uses Claude Code on this PC, covered by your Claude subscription: install it and log in once by running `claude`. With `ANTHROPIC_API_KEY` in `.env` it uses the Anthropic API instead, which is faster but billed per message: about $0.001 on Haiku (the default) or $0.02–0.03 on Sonnet (`CHAT_MODEL=sonnet`). Each reply shows its tokens and price, the chat shows this month's total, and every message is logged in `data/chat_usage.csv`.
 
 ## Syncing
 
@@ -125,6 +125,7 @@ Open the `https://….ts.net` address it gives in Chrome on the phone, and choos
 | `HOST` / `PORT` | 0.0.0.0 / 8000 | `127.0.0.1` keeps it to this PC |
 | `SYNC_INTERVAL_MINUTES` | 60 | How often it syncs |
 | `ANTHROPIC_API_KEY` | empty | The chat uses the API instead of Claude Code |
+| `CHAT_MODEL` | haiku | The chat's model on the API: `haiku` or `sonnet` |
 | `AEROBIC_THRESHOLD` | 158 | Heart rate between easy and hard, for runs Garmin hasn't labelled |
 | `MAX_HR` | 195 | For training load when Garmin has none |
 | `ACTIVITY_BACKFILL_DAYS`, `DAILY_BACKFILL_DAYS`, `HEALTH_HISTORY_DAYS`, `VO2MAX_BACKFILL_DAYS` | 180, 60, 365, 1095 | How far back the first sync and the backfills go |

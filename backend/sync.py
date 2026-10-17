@@ -282,6 +282,12 @@ def fetch_day(client, day):
         ready = [ready]
     scored = [r for r in ready or [] if isinstance(r, dict) and r.get("score") is not None]
     readiness = max(scored, key=lambda r: r.get("timestamp") or "")["score"] if scored else None
+    # Recovery time (minutes) counts down through the day and jumps after a workout: the day is planned from the
+    # wake-up value, or the newest one before it
+    timed = sorted((r for r in ready or [] if isinstance(r, dict) and r.get("recoveryTime") is not None),
+                   key=lambda r: r.get("timestamp") or "")
+    woke = [r for r in timed if r.get("inputContext") == "AFTER_WAKEUP_RESET"]
+    recovery = (woke or timed)[-1]["recoveryTime"] if timed else None
 
     hs = hrv.get("hrvSummary") or {}
     sleep_dto = sleep.get("dailySleepDTO") or {}
@@ -301,6 +307,7 @@ def fetch_day(client, day):
         "sleep_s": sleep_dto.get("sleepTimeSeconds"),
         "sleep_score": _get(sleep_dto, "sleepScores", "overall", "value"),
         "readiness": readiness,
+        "recovery_h": round(recovery / 60, 1) if recovery is not None else None,
         **fetch_training_status(client, day),
     }
 

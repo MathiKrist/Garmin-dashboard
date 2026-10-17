@@ -127,6 +127,8 @@ def seed(db_path, days=420):
             # Calories: resting (BMR) plus active, which follows the day's training
             "cal_resting": 1750, "cal_active": active, "cal_total": 1750 + active,
             "readiness": max(5, min(100, round(85 - fatigue * 0.5 + rng.gauss(0, 8)))),
+            # Recovery time on waking, from the day before's training
+            "recovery_h": round(max(0, (loads[-2] if len(loads) > 1 else 0) * 0.2 + rng.gauss(0, 3)), 1),
             "training_status": status, "training_status_since": since,
             "acute_load": round(sum(loads[-7:])), "acute_load_min": 300, "acute_load_max": 560,
             "acwr_status": "LOW" if sum(loads[-7:]) < 300 else "OPTIMAL", "vo2max": round(vo2, 1),
