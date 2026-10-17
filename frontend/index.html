@@ -191,14 +191,20 @@
         </section>
 
         <section id="weeklySection">
-          <h2 id="weeklyTitle"></h2>
+          <div class="section-head">
+            <h2 id="weeklyTitle"></h2>
+            <span class="period">Last 12 weeks</span>
+          </div>
           <p class="reading" id="weeklySub"></p>
           <div class="chart"><canvas id="weeklyChart" role="img"></canvas></div>
           <div class="legend" id="weeklyLegend"></div>
         </section>
 
         <section class="wide" id="vo2Section" hidden>
-          <h2>VO2 max</h2>
+          <div class="section-head">
+            <h2>VO2 max</h2>
+            <span class="period">Last year</span>
+          </div>
           <p class="reading" id="vo2Reading"></p>
           <div class="chart"><canvas id="vo2Chart" aria-label="VO2 max per week, last 12 months" role="img"></canvas></div>
         </section>
@@ -313,7 +319,10 @@
       <dl class="tiles" id="sportTiles"></dl>
       <div class="grid">
         <section class="wide">
-          <h2 id="sportWeeklyTitle"></h2>
+          <div class="section-head">
+            <h2 id="sportWeeklyTitle"></h2>
+            <span class="period">26 weeks</span>
+          </div>
           <p class="reading" id="sportWeeklySub"></p>
           <div class="chart"><canvas id="sportWeeklyChart" role="img"></canvas></div>
           <div class="legend" id="sportWeeklyLegend"></div>

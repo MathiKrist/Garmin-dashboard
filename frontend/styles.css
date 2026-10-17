@@ -264,6 +264,8 @@ button.link-btn:focus-visible { outline: 2px solid var(--fitness); outline-offse
 .form-actions .link-btn { margin-left: auto; color: var(--fatigue); }
 button.primary { background: var(--ink); color: var(--paper); }
 .section-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem 1rem; }
+/* A chart's fixed period, where the Fitness chart has its switch */
+.section-head .period { color: var(--muted); font-size: 0.85rem; }
 .more-link { color: var(--fitness); font-weight: 500; text-underline-offset: 3px; }
 
 /* A sport's headline totals */

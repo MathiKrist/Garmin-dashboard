@@ -34,8 +34,8 @@ The menu on the left picks the page; on phones it hides behind ☰. The page is 
 - **Today**: readiness, HRV, sleep, resting heart rate and calories burnt.
 - **Garmin's training status and load focus**, with what to train next.
 - **Last activity**, with its route. Click it for the details.
-- **Fitness and form**: fitness (42-day load) against fatigue (7-day).
-- **Weekly running** split by training effect, **VO2 max**, and a **training calendar** of the last year.
+- **Fitness and form**: fitness (42-day load) against fatigue (7-day), over 120 days or a year.
+- **Weekly running** over 12 weeks, split by training effect, and **VO2 max** and a **training calendar** over the last year.
 
 ### Workout
 
