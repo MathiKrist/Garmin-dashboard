@@ -95,7 +95,7 @@ Set one up with **+ Training plan** on the Workout page: the plan type, the date
 
 ## The chat
 
-It uses Claude Code on this PC, covered by your Claude subscription: install it and log in once by running `claude`. With `ANTHROPIC_API_KEY` in `.env` it uses the Anthropic API instead, which is faster but billed per message: about $0.001 on Haiku (the default) or $0.02–0.03 on Sonnet (`CHAT_MODEL=sonnet`). Each reply shows its tokens and price, the chat shows this month's total, and every message is logged in `data/chat_usage.csv`.
+It uses Claude Code on this PC, covered by your Claude subscription: install it and log in once by running `claude`. With `ANTHROPIC_API_KEY` in `.env` it uses the Anthropic API instead, which is faster but billed per message: about $0.001 on Haiku (the default) or $0.02–0.03 on Sonnet (`CHAT_MODEL=sonnet`). Each reply shows its tokens and price, the chat shows this month's total, and every message is logged in `data/chat_usage.csv`. On Claude Code it shows what the same chats would cost on the API with Haiku and with Sonnet, to compare before switching.
 
 ## Syncing
 

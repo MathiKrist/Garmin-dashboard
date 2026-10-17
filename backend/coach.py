@@ -1,8 +1,9 @@
 """The chat on the Workout page: Claude, with tools that change the suggested or planned sessions.
 
 Claude is reached one of two ways: through the Anthropic API when ANTHROPIC_API_KEY is set (billed per message, on
-Haiku unless CHAT_MODEL says sonnet; each message's tokens and price go to data/chat_usage.csv), otherwise through the
-Claude Code program on this machine, run in the background for each message (covered by its Claude subscription).
+Haiku unless CHAT_MODEL says sonnet), otherwise through the Claude Code program on this machine, run in the background
+for each message (covered by its Claude subscription). Either way each message's tokens go to data/chat_usage.csv,
+priced as the API would charge them on Haiku and on Sonnet, to compare the two before switching.
 
 Each message gets the current numbers (today's workout, the plan's coming weeks, recent runs) as a note, so the chat
 always talks about what the page shows. There's one conversation a day: kept on the server for the API (it only ever
@@ -37,7 +38,10 @@ PRICES = {
 }
 LONG_PROMPT = {"claude-haiku-5-5": (100_000, 5)}  # prompt tokens past which the prices go up, and by how much
 USAGE_LOG = config.BASE_DIR / "data" / "chat_usage.csv"
-USAGE_FIELDS = ["time", "model", "rounds", "input", "cache_write", "cache_read", "output", "cost_usd"]
+# cost_usd is what the API charged (empty with Claude Code); haiku_usd and sonnet_usd are what the same tokens cost on
+# the API with each model, to compare before switching
+USAGE_FIELDS = ["time", "backend", "model", "rounds", "input", "cache_write", "cache_read", "output", "cost_usd",
+                "haiku_usd", "sonnet_usd"]
 CLI_MODEL = "sonnet"  # Claude Code's name for its latest Sonnet
 CLI_TIMEOUT = 180  # seconds Claude Code gets per answer
 CLI_DIR = config.BASE_DIR / "data" / "coach"  # where Claude Code runs, away from the project's own files
@@ -359,28 +363,57 @@ def cost(model, input_tokens, output_tokens, cache_write, cache_read):
     return (input_tokens * price[0] + output_tokens * price[1] + cache_write * price[2] + cache_read * price[3]) / 1e6
 
 
-def _log_usage(used):
-    """One row per message in the usage log."""
-    USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
-    new = not USAGE_LOG.exists()
-    with open(USAGE_LOG, "a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=USAGE_FIELDS)
-        if new:
-            w.writeheader()
-        w.writerow({**{k: used[k] for k in USAGE_FIELDS if k in used}, "time": datetime.now().isoformat(timespec="seconds"),
-                    "cost_usd": f"{used['cost']:.6f}"})
+def _meter(how, model):
+    """The tokens one message uses, over all its rounds. `cost` is what the API charges; None with Claude Code."""
+    return {"backend": how, "model": model, "rounds": 0, "input": 0, "output": 0, "cache_write": 0, "cache_read": 0,
+            "tokens": 0, "cost": 0.0 if how == "api" else None, "haiku": 0.0, "sonnet": 0.0}
+
+
+def _count(used, model, input_tokens, output_tokens, cache_write, cache_read):
+    """Add one response's tokens to the message's total, priced as charged and on each API model."""
+    tokens = (input_tokens, output_tokens, cache_write, cache_read)
+    for k, n in zip(("input", "output", "cache_write", "cache_read"), tokens):
+        used[k] += n
+    used["tokens"] += sum(tokens)
+    used["haiku"] += cost(MODELS["haiku"], *tokens)
+    used["sonnet"] += cost(MODELS["sonnet"], *tokens)
+    if used["cost"] is not None:
+        used["cost"] += cost(model, *tokens)
+
+
+def _finish(used):
+    """Log the message's tokens: the meter, or None when nothing answered."""
+    if not used["rounds"]:
+        return None
+    try:
+        USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        new = not USAGE_LOG.exists()
+        with open(USAGE_LOG, "a", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=USAGE_FIELDS, extrasaction="ignore")
+            if new:
+                w.writeheader()
+            w.writerow({**used, "time": datetime.now().isoformat(timespec="seconds"),
+                        "cost_usd": "" if used["cost"] is None else f"{used['cost']:.6f}",
+                        "haiku_usd": f"{used['haiku']:.6f}", "sonnet_usd": f"{used['sonnet']:.6f}"})
+    except OSError as e:  # the file open in Excel, say: the answer still counts
+        log.warning("Couldn't write the chat usage log: %s", e)
+    return used
 
 
 def usage(today=None):
-    """{model: the chat's model on the API, or None with Claude Code; month_cost: dollars spent this month}."""
-    if backend() != "api":
-        return {"model": None, "month_cost": None}
+    """How the chat runs and this month's spend: {backend, model (on the API), month_cost (what the API charged),
+    month_haiku and month_sonnet (what every message this month would cost on the API with each)}."""
     month = (today or date.today()).isoformat()[:7]
-    total = 0.0
+    totals = {"cost_usd": 0.0, "haiku_usd": 0.0, "sonnet_usd": 0.0}
     if USAGE_LOG.exists():
         with open(USAGE_LOG, newline="", encoding="utf-8") as f:
-            total = sum(float(r["cost_usd"] or 0) for r in csv.DictReader(f) if r["time"].startswith(month))
-    return {"model": MODEL, "month_cost": round(total, 4)}
+            for r in csv.DictReader(f):
+                if r["time"].startswith(month):
+                    for k in totals:
+                        totals[k] += float(r.get(k) or 0)
+    how = backend()
+    return {"backend": how, "model": MODEL if how == "api" else None, "month_cost": round(totals["cost_usd"], 4),
+            "month_haiku": round(totals["haiku_usd"], 4), "month_sonnet": round(totals["sonnet_usd"], 4)}
 
 
 def clear(db_path):
@@ -416,7 +449,8 @@ def send(db_path, text, dashboard):
             how = _send_api if backend() == "api" else _send_cli
             reply, error, used = how(chat, text, dashboard, today, apply)
             chat["log"].append({"role": "assistant", "text": reply if not error else "", "error": error, "changes": made,
-                                **({"usage": {"tokens": used["tokens"], "cost": round(used["cost"], 6)}} if used else {})})
+                                **({"usage": {k: used[k] if used[k] is None else round(used[k], 6)
+                                              for k in ("tokens", "cost", "haiku", "sonnet")}} if used else {})})
             db.set_meta(conn, LOG_KEY, json.dumps(chat))
             conn.commit()
             return {"log": chat["log"], "changed": bool(made), **usage(today)}
@@ -446,29 +480,21 @@ def _create(client, messages):
     return client.beta.messages.create(**args, betas=["server-side-fallback-2026-07-01"], fallbacks="default")
 
 
-def _count(used, response):
-    """Add one response's tokens and price to the message's total."""
-    u = response.usage
-    tokens = (u.input_tokens or 0, u.output_tokens or 0, u.cache_creation_input_tokens or 0, u.cache_read_input_tokens or 0)
-    for k, n in zip(("input", "output", "cache_write", "cache_read"), tokens):
-        used[k] += n
-    used["rounds"] += 1
-    used["tokens"] += sum(tokens)
-    used["cost"] += cost(response.model, *tokens)
-
-
 def _send_api(chat, text, dashboard, today, apply):
     """(reply, error, tokens used) for one message, with the conversation kept in chat["messages"]."""
     messages, start = chat["messages"], len(chat["messages"])
     messages.append({"role": "user", "content": text})
     messages.append({"role": "system", "content": state(dashboard(), today)})
     reply, error = "", None
-    used = {"model": MODEL, "rounds": 0, "input": 0, "output": 0, "cache_write": 0, "cache_read": 0, "tokens": 0, "cost": 0.0}
+    used = _meter("api", MODEL)
     client = anthropic.Anthropic()
     try:
         for _ in range(MAX_ROUNDS):
             response = _create(client, messages)
-            _count(used, response)
+            u = response.usage
+            used["rounds"] += 1
+            _count(used, response.model, u.input_tokens or 0, u.output_tokens or 0, u.cache_creation_input_tokens or 0,
+                   u.cache_read_input_tokens or 0)
             if response.stop_reason == "refusal":
                 raise RuntimeError("Claude declined to answer that.")
             content = _content(response.content)
@@ -500,13 +526,7 @@ def _send_api(chat, text, dashboard, today, apply):
         # The turn didn't finish: the history keeps complete turns only, so the next message starts clean (the
         # changes made stay, and the next message's note shows them)
         del messages[start:]
-    if not used["rounds"]:
-        return reply, error, None
-    try:
-        _log_usage(used)
-    except OSError as e:  # the file open in Excel, say: the answer still counts
-        log.warning("Couldn't write the chat usage log: %s", e)
-    return reply, error, used
+    return reply, error, _finish(used)
 
 
 # ---- Through Claude Code: it answers in a fixed shape, a reply and the changes to make, which are then carried out
@@ -538,7 +558,7 @@ class CliError(Exception):
 
 
 def _run_cli(prompt, session):
-    """One answer from Claude Code: (the structured answer, its session id)."""
+    """One answer from Claude Code: (the structured answer, its session id, its tokens per model)."""
     args = [_claude_code(), "-p", "--output-format", "json", "--model", CLI_MODEL, "--effort", "medium",
             "--tools", "", "--setting-sources", "", "--strict-mcp-config", "--disable-slash-commands",
             "--system-prompt", CLI_SYSTEM, "--json-schema", json.dumps(_cli_schema())]
@@ -564,23 +584,29 @@ def _run_cli(prompt, session):
         log.error("Claude Code answered with an error: %s", str(out)[:500])
         detail = out.get("result") or out.get("api_error_status") or out.get("subtype")
         raise CliError(f"Claude Code couldn't answer: {detail}" if detail else "Claude Code couldn't answer.")
-    return out["structured_output"], out.get("session_id")
+    return out["structured_output"], out.get("session_id"), out.get("modelUsage") or {}
 
 
 def _send_cli(chat, text, dashboard, today, apply):
-    """(reply, error, None) for one message, continuing the day's Claude Code session (its subscription pays, so its
-    tokens aren't counted)."""
+    """(reply, error, tokens used) for one message, continuing the day's Claude Code session. Its subscription pays,
+    so the tokens are only priced as they would be on the API."""
     prompt = f"<dashboard_note>\n{state(dashboard(), today)}\n</dashboard_note>\n\nThe athlete says:\n{text}"
     reply = ""
+    used = _meter("claude_code", f"claude-{CLI_MODEL}")
     try:
         for _ in range(MAX_ROUNDS):
             try:
-                answer, chat["session"] = _run_cli(prompt, chat.get("session"))
+                answer, chat["session"], models = _run_cli(prompt, chat.get("session"))
             except CliError as e:
                 if not chat.get("session") or "too long" in str(e):
                     raise
                 # The saved session may be gone (deleted, or made on another machine): start a new one
-                answer, chat["session"] = _run_cli(prompt, None)
+                answer, chat["session"], models = _run_cli(prompt, None)
+            used["rounds"] += 1
+            for model, u in models.items():
+                used["model"] = model
+                _count(used, model, u.get("inputTokens") or 0, u.get("outputTokens") or 0,
+                       u.get("cacheCreationInputTokens") or 0, u.get("cacheReadInputTokens") or 0)
             reply = str(answer.get("reply") or "").strip()
             failed = []
             for action in answer.get("actions") or []:
@@ -593,5 +619,5 @@ def _send_cli(chat, text, dashboard, today, apply):
             prompt = ("These changes failed and weren't made:\n" + "\n".join(failed) +
                       "\nThe others went through. Fix the failed ones, or say in the reply why not.")
     except CliError as e:
-        return "", str(e), None
-    return reply, None, None
+        return "", str(e), _finish(used)
+    return reply, None, _finish(used)

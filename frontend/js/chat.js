@@ -14,13 +14,20 @@ function item(m) {
   if (m.role === "user") return `<li class="user">${escapeHtml(m.text)}</li>`;
   const changes = m.changes?.length ? `<ul class="chat-changes">${m.changes.map((c) => `<li>✓ ${escapeHtml(c)}</li>`).join("")}</ul>` : "";
   const body = m.error ? `<p class="error">${escapeHtml(m.error)}</p>` : m.pending ? '<p class="pending">Thinking…</p>' : paragraphs(m.text || "");
-  const usage = m.usage ? `<p class="chat-usage">${tokens(m.usage.tokens)} tokens · ${dollars(m.usage.cost)}</p>` : "";
-  return `<li class="assistant">${body}${changes}${usage}</li>`;
+  return `<li class="assistant">${body}${changes}${usage(m.usage)}</li>`;
 }
 
-// What the chat costs on the API this month (nothing with Claude Code: the subscription pays)
+// A reply's tokens and price: what the API charged, or with Claude Code what they'd cost on the API
+function usage(u) {
+  if (!u) return "";
+  const price = u.cost != null ? dollars(u.cost) : `on the API ≈ ${dollars(u.haiku)} Haiku, ${dollars(u.sonnet)} Sonnet`;
+  return `<p class="chat-usage">${tokens(u.tokens)} tokens · ${price}</p>`;
+}
+
+// This month's spend: on the API what it charged, with Claude Code what the same chats would cost there
 function cost(out) {
-  $("chatCost").textContent = out.model ? `${MODEL_NAME[out.model] || out.model} · ${dollars(out.month_cost || 0)} this month` : "";
+  $("chatCost").textContent = out.backend === "api" ? `${MODEL_NAME[out.model] || out.model} · ${dollars(out.month_cost || 0)} this month`
+    : out.backend ? `This month on the API ≈ ${dollars(out.month_haiku || 0)} Haiku, ${dollars(out.month_sonnet || 0)} Sonnet` : "";
 }
 
 function render() {

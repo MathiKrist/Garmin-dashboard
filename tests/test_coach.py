@@ -74,6 +74,28 @@ class UsageLog(unittest.TestCase):
         self.assertEqual(coach.usage()["model"], HAIKU)
         self.assertEqual(coach.usage(date(2020, 1, 1))["month_cost"], 0)
 
+    def test_a_message_is_priced_on_both_models(self):
+        (_, _, used), _ = self.send(response(HAIKU))
+        self.assertAlmostEqual(used["haiku"], used["cost"])
+        self.assertAlmostEqual(used["sonnet"], coach.cost(SONNET, 2000, 300, 0, 8000))
+
+    def test_claude_code_is_priced_as_the_api_would(self):
+        models = {SONNET: {"inputTokens": 2000, "outputTokens": 300, "cacheCreationInputTokens": 0,
+                           "cacheReadInputTokens": 8000}}
+        with mock.patch.object(coach, "_run_cli", return_value=({"reply": "Done.", "actions": []}, "s1", models)), \
+                mock.patch.object(coach, "state", return_value="note"):
+            reply, error, used = coach._send_cli({}, "Hi", lambda: {}, date.today(), None)
+        self.assertEqual((reply, error, used["cost"]), ("Done.", None, None))  # the subscription pays
+        with open(coach.USAGE_LOG, newline="") as f:
+            row = next(csv.DictReader(f))
+        self.assertEqual((row["backend"], row["model"], row["cost_usd"]), ("claude_code", SONNET, ""))
+        self.assertAlmostEqual(float(row["haiku_usd"]), coach.cost(HAIKU, 2000, 300, 0, 8000), places=6)
+        self.assertAlmostEqual(float(row["sonnet_usd"]), coach.cost(SONNET, 2000, 300, 0, 8000), places=6)
+        with mock.patch.object(coach, "backend", lambda: "claude_code"):
+            month = coach.usage()
+        self.assertEqual((month["backend"], month["model"], month["month_cost"]), ("claude_code", None, 0))
+        self.assertAlmostEqual(month["month_sonnet"], round(coach.cost(SONNET, 2000, 300, 0, 8000), 4))
+
     def test_no_log_without_an_answer(self):
         (_, error, used), _ = self.send(coach.anthropic.APIConnectionError(request=mock.Mock()))
         self.assertIsNone(used)
