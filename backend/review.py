@@ -1,5 +1,5 @@
 """How a run went against the workout it was run from: today's suggested session or a plan session, sent to the watch
-from the dashboard.
+from the dashboard. A run or ride done on its own, from no workout the dashboard sent, gets the coach's written feedback instead, read from its laps.
 
 Garmin marks an activity done from a scheduled workout with that workout's id, and the dashboard keeps each workout
 it sends under its id (the archive), as it went to the watch: a plan's paces adapt later, so the plan's own session
@@ -32,6 +32,25 @@ watch's laps), and the numbers that follow from it. Write 2-3 sentences: how the
 the numbers that matter, such as the reps and their paces), what it contributes to the week or the plan, and one \
 concrete thing to take into the next session of this kind. Warm-ups and cool-downs go by feel and have no target; \
 don't judge their pace. Be direct and specific, and don't repeat the numbers back as a list.
+
+Reply in plain text without markdown: no headings, no bold, no lists. Paces are min:sec per km."""
+
+FREE_SYSTEM = """You are the coach in a personal training dashboard. The athlete has just done a session on their \
+own, not one the dashboard sent to their watch, and asks for your feedback on it.
+
+You get the session's totals, its laps as the watch recorded them (each with its heart rate zone), Garmin's training \
+effect and the last 7 days of training in the same sport. There were no targets: read from the laps and heart rate what \
+kind of session it was (easy, steady, tempo, intervals, long, a race...). The athlete has already seen the laps; they \
+want a coach's read of them, not the numbers again.
+
+Write it as a coach talking to the athlete, in three short paragraphs:
+1. How it went: what the session turned out to be, and how it was carried out (pacing, whether the heart rate drifted \
+or the pace faded, whether the effort matched what the session seems meant to be). Mention only the numbers that make \
+the point.
+2. What could be better: one or two concrete things to change, such as starting slower, keeping an easy run easy, or \
+evening out the reps, and why it matters.
+3. The bigger picture: what it adds to the last 7 days, and what the next session or two could sensibly be.
+Be honest and direct, encouraging where it's earned, and don't pad.
 
 Reply in plain text without markdown: no headings, no bold, no lists. Paces are min:sec per km."""
 
@@ -192,6 +211,34 @@ def build(a, session, laps, plan):
     return out
 
 
+# ---- A run done on its own: its laps, without targets
+
+def _zone(hr, floors):
+    """The heart rate zone (1-5) of a heart rate, 0 below zone 1, None without one."""
+    return min(5, sum(hr >= f for f in floors[:5])) if hr and floors else None
+
+
+def build_free(a, laps, floors, week):
+    """The review of a run or ride done from no workout the dashboard sent: a row per lap (or the whole session
+    without laps), each with its heart rate zone. `week` is the same sport's activities in the 7 days to its date."""
+    laps = [l for l in laps or [] if l.get("duration_s")]
+    if len(laps) < 2:
+        laps = [{"duration_s": a.get("duration_s"), "km": a.get("km"), "speed": a.get("speed"), "avg_hr": a.get("avg_hr")}]
+    rows = [{"label": f"Lap {i + 1}" if len(laps) > 1 else "Whole session", "done_s": l.get("duration_s"),
+             "km": l.get("km"), "speed": l.get("speed"), "power": l.get("power"), "hr": l.get("avg_hr"),
+             "zone": _zone(l.get("avg_hr"), floors), "off": None, "target": None}
+            for i, l in enumerate(laps)]
+    return {
+        "id": a["id"], "sport": a["sport"], "title": a.get("name") or "Your session", "date": a["date"], "free": True,
+        "why": [], "plan": False, "paired": False, "rows": rows, "on_target": None, "reps": False,
+        "planned": None, "done": {"s": a.get("duration_s"), "km": a.get("km"), "hr": a.get("avg_hr")},
+        "effect": {"label": a.get("te_label"), "aerobic": a.get("aerobic_te"), "anaerobic": a.get("anaerobic_te")},
+        "week": {"n": len(week), "km": round(sum(x.get("km") or 0 for x in week), 1),
+                 "s": sum(x.get("duration_s") or 0 for x in week)},
+        "verdict": None, "projection": None,
+    }
+
+
 # ---- What the coach is asked
 
 def _pace(speed):
@@ -213,8 +260,34 @@ def _done(r, sport):
     return ", ".join(p for p in parts if p) + off
 
 
+def _effect_line(e):
+    if e["label"] or e["aerobic"]:
+        return (f"Garmin's training effect: {(e['label'] or '').replace('_', ' ').lower() or '-'}, aerobic "
+                f"{round(e['aerobic'] or 0, 1)}, anaerobic {round(e['anaerobic'] or 0, 1)}")
+    return None
+
+
+def _prompt_free(r):
+    noun = "runs" if r["sport"] == "run" else "rides"
+    lines = [f"Session: {r['title']} ({r['sport']}), {r['date']}, not from a workout the dashboard sent",
+             f"Done: {coach._minutes(r['done']['s'] or 0)}, {r['done']['km']} km" + (f", average {round(r['done']['hr'])} bpm" if r["done"]["hr"] else ""),
+             "", "Lap by lap:" if len(r["rows"]) > 1 else "No laps recorded; the whole session:"]
+    for x in r["rows"]:
+        lines.append(f"- {x['label']}: {_done(x, r['sport'])}" + (f", zone {x['zone']}" if x["zone"] is not None else ""))
+    lines += ["", _effect_line(r["effect"]),
+              f"Last 7 days ({noun} up to and including this one): {r['week']['n']} {noun}, {r['week']['km']} km, "
+              f"{coach._minutes(r['week']['s'])}"]
+    return "\n".join(l for l in lines if l is not None).strip()
+
+
+def system(r):
+    return FREE_SYSTEM if r.get("free") else SYSTEM
+
+
 def prompt(r):
     """The review as text for the coach."""
+    if r.get("free"):
+        return _prompt_free(r)
     lines = [f"Session: {r['title']} ({r['sport']}), {r['date']}",
              f"Why this session: {' · '.join(r['why'])}" if r["why"] else "",
              f"Planned: {coach._minutes(r['planned']['s'] or 0)}" + (f", about {r['planned']['km']} km" if r["planned"]["km"] else ""),
@@ -229,10 +302,7 @@ def prompt(r):
     if r["projection"]:
         lines.append(f"It moved the plan's projected race time from {coach._time(r['projection']['from_s'])} "
                      f"to {coach._time(r['projection']['to_s'])}")
-    e = r["effect"]
-    if e["label"] or e["aerobic"]:
-        lines.append(f"Garmin's training effect: {(e['label'] or '').replace('_', ' ').lower() or '-'}, aerobic "
-                     f"{e['aerobic'] or 0}, anaerobic {e['anaerobic'] or 0}")
+    lines.append(_effect_line(r["effect"]))
     return "\n".join(l for l in lines if l is not None).strip()
 
 

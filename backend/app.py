@@ -14,7 +14,7 @@ import socket
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -485,7 +485,8 @@ async def send_plan_week(request: Request):
 
 
 def _review(activity_id):
-    """(the activity's review, the activity), or (None, None) when it wasn't run from a workout the dashboard sent."""
+    """(the activity's review, the activity), or (None, None) for an activity that can't be reviewed: one not found,
+    or neither run from a workout the dashboard sent nor a run or ride."""
     data = _dashboard_data()
     conn = db.connect(DB_PATH)
     try:
@@ -498,9 +499,16 @@ def _review(activity_id):
         a = {**a, "workout_id": row["workout_id"], "aerobic_te": row["aerobic_te"], "anaerobic_te": row["anaerobic_te"]}
         session = review.planned(a, review.load_archive(conn), json.loads(db.get_meta(conn, "workouts_sent") or "[]"),
                                  json.loads(db.get_meta(conn, "plan_sent") or "[]"), data["plan"], data["workouts"])
-        if not session:
+        if session:
+            r = review.build(a, session, db.get_laps(conn, activity_id), data["plan"])
+        elif a["sport"] in review.SPORTS:
+            # Done on its own: the coach reads its laps, with the same sport's last 7 days
+            start = (date.fromisoformat(a["date"]) - timedelta(days=6)).isoformat()
+            week = [x for x in data["activities"] if x["sport"] == a["sport"] and start <= x["date"] <= a["date"]]
+            profile = json.loads(db.get_meta(conn, "training_profile") or "{}")
+            r = review.build_free(a, db.get_laps(conn, activity_id), workouts.Targets(profile, None).floors, week)
+        else:
             return None, None
-        r = review.build(a, session, db.get_laps(conn, activity_id), data["plan"])
         r["note"] = review.get_note(conn, r)
         return r, a
     finally:
@@ -509,8 +517,8 @@ def _review(activity_id):
 
 @app.get("/api/review/{activity_id}")
 def get_review(activity_id: int):
-    """How a run went against the workout it was run from: each step against its lap, and the coach's note if it has
-    been asked for before."""
+    """How a run went against the workout it was run from: each step against its lap (or, done on its own, each lap),
+    and the coach's note if it has been asked for before."""
     if DEMO:
         import demo
         demo.fill_details(DB_PATH, activity_id)
@@ -519,7 +527,7 @@ def get_review(activity_id: int):
         sync.fetch_sent_workouts(DB_PATH)  # the workout it was run from, if it was sent before they were kept
     r, _ = _review(activity_id)
     if not r:
-        return JSONResponse({"error": "This activity wasn't run from a workout the dashboard sent."}, status_code=404)
+        return JSONResponse({"error": "Only runs and rides can be reviewed."}, status_code=404)
     return r
 
 
@@ -528,7 +536,7 @@ async def review_note(activity_id: int):
     """The coach's note on a reviewed run. Asked once; kept, so opening the review again costs nothing."""
     r, a = _review(activity_id)
     if not r:
-        return JSONResponse({"error": "This activity wasn't run from a workout the dashboard sent."}, status_code=404)
+        return JSONResponse({"error": "Only runs and rides can be reviewed."}, status_code=404)
     if r["note"]:
         return r["note"]
     if DEMO:
@@ -536,7 +544,7 @@ async def review_note(activity_id: int):
     if not coach.backend():
         return JSONResponse({"error": "The coach needs Claude Code installed on the machine running the server, "
                                       "or ANTHROPIC_API_KEY in .env."}, status_code=400)
-    text, error, used = await asyncio.to_thread(coach.ask, review.SYSTEM, review.prompt(r))
+    text, error, used = await asyncio.to_thread(coach.ask, review.system(r), review.prompt(r))
     if error:
         return JSONResponse({"error": error}, status_code=502)
     note = {"text": text, "usage": {k: used[k] if used[k] is None else round(used[k], 6)

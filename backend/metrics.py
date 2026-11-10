@@ -470,13 +470,12 @@ def build_dashboard(db_path=None):
                 and w.get("key") and x.get("key") == w["key"]]
         w["done"] = any(i in run_today for i in mine)
 
-    # Whether each sport's newest activity was run from a workout the dashboard sent, so it can be reviewed
+    # Whether each sport's newest activity can be reviewed: against the workout the dashboard sent, or by the coach alone
     last_by_sport = {}
     for k, a in last_of.items():
         summary = next(x for x in recent_acts if x["id"] == a["id"])
         last_by_sport[k] = {**summary, "track": last_tracks[k] or None,
-                            "review": review.planned({**summary, "workout_id": a["workout_id"]}, archive, sent, plan_sent,
-                                                     plan, workout_list) is not None}
+                            "review": k in review.SPORTS}
 
     if race and plan and plan["projection"] and plan_cfg["goal"] == "race" and plan_cfg["date"] == race["date"]:
         race["plan"] = {k: plan["projection"][k] for k in ("low", "high")}

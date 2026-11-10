@@ -76,7 +76,7 @@ export function renderWorkout() {
   renderLast();
 }
 
-// ---- The sport's newest activity, at the top, and the review of a run done from a workout the dashboard sent
+// ---- The sport's newest activity, at the top, and its review: against the workout the dashboard sent, or the coach's written feedback
 
 export const lastWorkoutMap = routeMap($("wkLastMap"));
 const NOUN = { run: "run", bike: "ride", swim: "swim" };
@@ -171,6 +171,9 @@ function reviewHtml(r) {
   ].filter(Boolean).join("");
   const done = (x) => (r.sport === "run" ? fmtPace(x.speed && 1000 / x.speed)
     : x.power ? `${Math.round(x.power)} W` : x.speed ? `${(x.speed * 3.6).toFixed(1)} km/h` : "");
+  const head = r.sport === "run" ? "Pace" : "Power";
+  // Done on its own: the coach's written feedback is the review (the laps are in the activity's popup)
+  if (r.free) return `<p class="wk-review-title">Coach's review · ${escapeHtml(r.title)}</p>`;
   const rows = r.rows.map((x) => `<tr><td>${escapeHtml(x.label)}</td><td class="num">${x.m ? `${x.m} m` : len(x.planned_s)}</td>
     <td>${target(x)}</td><td class="num">${fmtDuration(x.done_s)}</td><td class="num">${done(x)}</td>
     <td class="num">${x.hr ? Math.round(x.hr) : ""}</td>${offCell(x)}</tr>`).join("");
@@ -178,7 +181,7 @@ function reviewHtml(r) {
     ${stats ? `<dl class="last-stats">${stats}</dl>` : ""}
     ${r.paired ? "" : `<p class="wk-review-why">The laps don't line up with the steps, so this is the whole session.</p>`}
     <div class="scroll"><table class="laps review"><thead><tr><th>Step</th><th class="num">Planned</th><th>Target</th>
-      <th class="num">Time</th><th class="num">${r.sport === "run" ? "Pace" : "Power"}</th><th class="num">HR</th><th></th></tr></thead>
+      <th class="num">Time</th><th class="num">${head}</th><th class="num">HR</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
 }
 

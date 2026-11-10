@@ -93,6 +93,27 @@ class Compare(unittest.TestCase):
         self.assertIn("4 of 4 reps on target", text)
 
 
+class OnItsOwn(unittest.TestCase):
+    """A run done from no workout the dashboard sent: lap by lap, without targets."""
+
+    def test_each_lap_with_its_zone(self):
+        r = review.build_free(run(workout_id=None, name="Morning Run"), [lap(330, 330, 150), lap(320, 320, 165)],
+                              T.floors, [run(), run(id=4, km=8.0, duration_s=2800)])
+        self.assertTrue(r["free"])
+        self.assertEqual([(x["label"], x["zone"]) for x in r["rows"]], [("Lap 1", 3), ("Lap 2", 4)])
+        self.assertEqual(r["week"], {"n": 2, "km": 18.0, "s": 6400})
+        text = review.prompt(r)
+        self.assertIn("not from a workout the dashboard sent", text)
+        self.assertIn("Lap 2: 5 min, 1.00 km, 5:20/km, 165 bpm, zone 4", text)
+        self.assertIn("Last 7 days (runs up to and including this one): 2 runs, 18.0 km", text)
+        self.assertIs(review.system(r), review.FREE_SYSTEM)
+
+    def test_the_whole_run_without_laps(self):
+        r = review.build_free(run(workout_id=None), [], T.floors, [run()])
+        self.assertEqual([x["label"] for x in r["rows"]], ["Whole session"])
+        self.assertIn("No laps recorded", review.prompt(r))
+
+
 ANAEROBIC = workouts._run_steps("anaerobic", 50, T)
 
 
