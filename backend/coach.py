@@ -156,7 +156,9 @@ def backend():
 # ---- The numbers the chat gets with each message
 
 def _mmss(s):
-    return f"{int(s) // 60}:{int(s) % 60:02d}"
+    """Rounded to the second, as the dashboard shows it: 307.8 s/km is 5:08, as on the page, not 5:07"""
+    s = round(s)
+    return f"{s // 60}:{s % 60:02d}"
 
 
 def _time(s):

@@ -117,5 +117,28 @@ class Sync(unittest.TestCase):
         self.assertEqual(self.query("SELECT id FROM activities ORDER BY id"), [(1,), (2,)])
 
 
+class Laps(unittest.TestCase):
+    def test_laps_take_the_timer_time(self):
+        # A threshold run as Garmin sent it: a 15 min warm-up auto-lapped at each km with a stop at a crossing,
+        # 2 x (8 min, 2 min jog) and a 10 min cool-down, then laps after the workout ended. Moving time leaves out
+        # the stop and is cut to whole seconds, so the steps would read 14:54, 7:59 and 1:59
+        raw = [(0, 424.84, 420.0, 1000), (0, 441.806, 441.0, 1000), (0, 33.354, 33.354, 75.89),
+               (1, 309.564, 309.0, 1000), (1, 170.436, 170.436, 557.64), (2, 120.0, 119.0, 160.51),
+               (1, 323.617, 323.617, 1000), (1, 156.383, 156.383, 510.08), (2, 120.0, 119.0, 161.94),
+               (4, 442.04, 441.0, 1000), (4, 157.96, 156.0, 374.15), (None, 184.308, 183.0, 414.8)]
+
+        class Client:
+            def get_activity_splits(self, activity_id):
+                return {"lapDTOs": [{"wktStepIndex": step, "duration": t, "movingDuration": moving, "distance": m,
+                                     "averageSpeed": m / t, "averageMovingSpeed": m / moving}
+                                    for step, t, moving, m in raw]}
+
+        import plans
+        steps = plans.step_laps(sync.fetch_laps(Client(), 1))
+        self.assertEqual([round(l["duration_s"]) for l in steps], [900, 480, 120, 480, 120, 784])
+        self.assertAlmostEqual(steps[0]["moving_s"], 894.354)
+        self.assertAlmostEqual(1000 / steps[1]["speed"], 480 / 1.55764, delta=0.5)  # pace over the timer time: 5:08
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -729,7 +729,8 @@ def _merge(laps):
         return max((l[k] for l in laps if l.get(k)), default=None)
 
     km = round(sum(l.get("km") or 0 for l in laps), 3)
-    return {**laps[0], "km": km, "duration_s": secs, "speed": km * 1000 / secs if secs else avg("speed"),
+    return {**laps[0], "km": km, "duration_s": secs, "moving_s": sum(l.get("moving_s") or 0 for l in laps),
+            "speed": km * 1000 / secs if secs else avg("speed"),
             "max_speed": top("max_speed"), "avg_hr": avg("avg_hr"), "max_hr": top("max_hr"),
             "elev_gain": sum(l.get("elev_gain") or 0 for l in laps), "elev_loss": sum(l.get("elev_loss") or 0 for l in laps),
             "cadence": avg("cadence"), "power": avg("power")}

@@ -150,8 +150,11 @@ def fetch_laps(client, activity_id):
         return None
     return [{
         "km": round((l.get("distance") or 0) / 1000, 3),
-        "duration_s": l.get("movingDuration") or l.get("duration"),
-        "speed": l.get("averageMovingSpeed") or l.get("averageSpeed"),
+        # The timer's time, as Garmin Connect shows it: moving time leaves out standing still and is cut to whole
+        # seconds, so a timed 15 min step would read 14:54
+        "duration_s": l.get("duration") or l.get("movingDuration"),
+        "moving_s": l.get("movingDuration"),
+        "speed": l.get("averageSpeed") or l.get("averageMovingSpeed"),
         "max_speed": l.get("maxSpeed"),
         "avg_hr": l.get("averageHR"),
         "max_hr": l.get("maxHR"),
@@ -220,8 +223,8 @@ def fetch_details(db_path, activity_id):
             return None
         need_track = bool(row["gps"]) and db.get_track(conn, activity_id) is None
         laps = db.get_laps(conn, activity_id)
-        # Laps stored before max speed, descent and the workout step were added are fetched again to get them
-        need_laps = laps is None or (laps and not {"max_speed", "step"} <= laps[0].keys())
+        # Laps stored before max speed, descent, the workout step and the timer's time were added are fetched again
+        need_laps = laps is None or (laps and not {"max_speed", "step", "moving_s"} <= laps[0].keys())
         # A run synced since the last batch of best efforts gets them now, so its 400 m shows straight away
         need_efforts = "running" in (row["type"] or "") and db.get_efforts(conn, activity_id) is None
         if not (need_track or need_laps or need_efforts):

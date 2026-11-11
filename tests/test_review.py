@@ -80,6 +80,11 @@ class Compare(unittest.TestCase):
         self.assertEqual(review._off({"power": 180}, {"type": "power", "lo": 190, "hi": 210}), (10, "low"))
         self.assertEqual(review._off({"power": 200}, {"type": "power", "lo": 190, "hi": 210}), (0, None))
 
+    def test_coach_reads_the_paces_the_page_shows(self):
+        # The page rounds 307.8 s/km to 5:08; the coach's text said 5:07 when it cut the seconds off
+        self.assertEqual(review._pace(1000 / 307.8), "5:08/km")
+        self.assertEqual(review._pace(1000 / 299.6), "5:00/km")
+
     def test_auto_laps_are_put_back_together_by_step(self):
         # Auto-lap splits each step at every km; Garmin marks each lap with its workout step (the repeat itself is
         # step 1, so the reps are 2 and their jogs 3), and the lap after the end has none
