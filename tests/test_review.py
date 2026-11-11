@@ -80,6 +80,20 @@ class Compare(unittest.TestCase):
         self.assertEqual(review._off({"power": 180}, {"type": "power", "lo": 190, "hi": 210}), (10, "low"))
         self.assertEqual(review._off({"power": 200}, {"type": "power", "lo": 190, "hi": 210}), (0, None))
 
+    def test_auto_laps_are_put_back_together_by_step(self):
+        # Auto-lap splits each step at every km; Garmin marks each lap with its workout step (the repeat itself is
+        # step 1, so the reps are 2 and their jogs 3), and the lap after the end has none
+        mid = (WORK["fast"] + WORK["slow"]) / 2
+        split = [{**lap(390, 450, 140), "step": 0}, {**lap(390, 450, 140), "step": 0}]
+        for _ in range(4):
+            split += [{**lap(mid, 300, 170), "step": 2}, {**lap(mid, 180, 176), "step": 2}, {**lap(420, 120), "step": 3}]
+        split += [{**lap(400, 400, 140), "step": 5}, {**lap(400, 200, 140), "step": None}]
+        r = review.build(run(), SESSION, split, None)
+        self.assertTrue(r["paired"])
+        self.assertEqual([x["done_s"] for x in r["rows"]], [900] + [480, 120] * 4 + [600])
+        self.assertEqual(r["on_target"], [4, 4])
+        self.assertAlmostEqual(r["rows"][1]["hr"], (170 * 300 + 176 * 180) / 480)
+
     def test_whole_run_when_the_laps_dont_pair(self):
         r = review.build(run(), SESSION, [lap(330, 600)] * 3, None)
         self.assertFalse(r["paired"])

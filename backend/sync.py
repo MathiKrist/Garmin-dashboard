@@ -159,6 +159,7 @@ def fetch_laps(client, activity_id):
         "elev_loss": l.get("elevationLoss"),
         "cadence": l.get("averageRunCadence") or l.get("averageBikeCadence"),
         "power": l.get("averagePower"),
+        "step": l.get("wktStepIndex"),  # the workout step the lap was run in; auto-laps split a step into several
     } for l in splits.get("lapDTOs") or [] if isinstance(l, dict)]
 
 
@@ -219,8 +220,8 @@ def fetch_details(db_path, activity_id):
             return None
         need_track = bool(row["gps"]) and db.get_track(conn, activity_id) is None
         laps = db.get_laps(conn, activity_id)
-        # Laps stored before max speed and descent were added are fetched again to get them
-        need_laps = laps is None or (laps and "max_speed" not in laps[0])
+        # Laps stored before max speed, descent and the workout step were added are fetched again to get them
+        need_laps = laps is None or (laps and not {"max_speed", "step"} <= laps[0].keys())
         # A run synced since the last batch of best efforts gets them now, so its 400 m shows straight away
         need_efforts = "running" in (row["type"] or "") and db.get_efforts(conn, activity_id) is None
         if not (need_track or need_laps or need_efforts):

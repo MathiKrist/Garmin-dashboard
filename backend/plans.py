@@ -714,10 +714,47 @@ def _work_step(steps):
     return next((s for s in _flat(steps) if _is_work(s)), None)
 
 
+def _merge(laps):
+    """One lap made of several: times and distances added up, the averages weighted by time."""
+    if len(laps) == 1:
+        return laps[0]
+    secs = sum(l.get("duration_s") or 0 for l in laps)
+
+    def avg(k):
+        have = [(l[k], l.get("duration_s") or 0) for l in laps if l.get(k)]
+        t = sum(s for _, s in have)
+        return sum(v * s for v, s in have) / t if t else None
+
+    def top(k):
+        return max((l[k] for l in laps if l.get(k)), default=None)
+
+    km = round(sum(l.get("km") or 0 for l in laps), 3)
+    return {**laps[0], "km": km, "duration_s": secs, "speed": km * 1000 / secs if secs else avg("speed"),
+            "max_speed": top("max_speed"), "avg_hr": avg("avg_hr"), "max_hr": top("max_hr"),
+            "elev_gain": sum(l.get("elev_gain") or 0 for l in laps), "elev_loss": sum(l.get("elev_loss") or 0 for l in laps),
+            "cadence": avg("cadence"), "power": avg("power")}
+
+
+def step_laps(laps):
+    """The laps one per workout step. With auto-lap on, the watch splits a step into a lap per km; Garmin marks each
+    lap with its step, so the laps of a step are put back together, and laps after the workout ended go with its
+    last step, as Garmin Connect shows them. Laps without the marks are returned as they are."""
+    if not laps or not any(l.get("step") is not None for l in laps):
+        return laps
+    groups = []
+    for l in laps:
+        if groups and (l.get("step") is None or l.get("step") == groups[-1][-1].get("step")):
+            groups[-1].append(l)
+        else:
+            groups.append([l])
+    return [_merge(g) for g in groups]
+
+
 def pair_laps(steps, laps):
     """[(lap, its step)] for every step, or None when they don't pair. A watch running a sent workout records a lap
     per step, so with as many laps as steps (or one more, for a lap after the end) they pair in order."""
     flat = list(_flat(steps))
+    laps = step_laps(laps)
     return list(zip(laps, flat)) if laps and len(laps) in (len(flat), len(flat) + 1) else None
 
 
