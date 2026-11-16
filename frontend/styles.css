@@ -1,101 +1,48 @@
+/* Training. Dark: a near-black page, cards a step lighter, one warm accent. Phones get the pages as tabs
+   along the bottom and everything in one column; wide screens a menu down the left and cards side by side. */
+
+/* ---- Colours and sizes */
 :root {
-  /* Kridt ground and Midnat text here, the other way round in dark */
-  --paper: #F2F4F1;
-  --ink: #0E1116;
-  --muted: #5F656E;
-  --rule: #DADDD6;
-  --panel: #FFFFFF;
-  --volt: #C6FF3D;     /* the Workout page's buttons and selected options, with Midnat text */
-  --on-volt: #0E1116;
-  --easy: #2F8C78;
-  --hard: #D98A1F;
-  --fitness: #2C4F86;
-  --fatigue: #C24A5A;
-  --good: #2F8C78;     /* text for better or done */
-  --nohr: #A9B2AC;
-  --sleep: #4B4FC9;
-  --body-battery: #1F6FE0;
-  --stress: #9A4FA6;
-  /* Workout page sessions: Volt for easy running (dimmer for easy, full for long), Puls for hard (darker for threshold) */
-  --k-easy: #B9EB4F;
-  --k-long: #8ACB00;
-  --k-threshold: #FF9B80;
-  --k-vo2: #FF5A36;
-  --k-anaerobic: #C0262D;  /* speed: a deeper Puls */
-  --k-jog: #D3D7D0;
-  --route: #FF6A00;  /* the glowing route line on the maps */
-  /* Sports with their own route color and map (ROUTE_STYLES in js/map.js); swim and disc golf sit on satellite
-     photos in both themes, so they always take the bright color */
-  --route-winter: #0A8FE8;
-  --route-swim: #3FE0FF;
-  --route-disc: #FF5CC4;
-  --satellite-brightness: 0.78;  /* dims satellite photos so the route stands out */
-  --hillshade-blend: multiply;
-  --hillshade-opacity: 0.7;
-  /* Garmin's load focus colors */
-  --low-aerobic: #33ADEA;
-  --high-aerobic: #FF8A15;
-  --anaerobic: #9D45D9;
-  /* Garmin's training status colors */
-  --st-peaking: #8E44C8;
-  --st-productive: #2E9E4F;
-  --st-maintaining: #D9A400;
-  --st-recovery: #2F6FCF;
-  --st-unproductive: #E8740F;
-  --st-strained: #E0559B;
-  --st-overreaching: #D63A2E;
-  --st-detraining: #7A807C;
-  /* Garmin's heart rate and power zone colors */
-  --z1: #A9B2AC;
-  --z2: #3FA9DE;
-  --z3: #2E9E4F;
-  --z4: #F08A24;
-  --z5: #D63A2E;
-  /* One fixed color per sport, for the menu and the sport pages (the dataviz reference palette, in its validated
-     order); sports without one use --nohr */
-  --sp-run: #2A78D6;
-  --sp-bike: #1BAF7A;
-  --sp-walk: #EB6834;
-  --sp-hike: #EDA100;
-  --sp-disc_golf: #E87BA4;
-  --sp-winter: #008300;
-  --sp-strength: #4A3AA7;
-  --sp-swim: #E34948;
-  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
-  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
-  color-scheme: light;
-}
-/* Dark: set by js/theme.js (at night, by the system, or by the menu's switch) */
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #0E1116;
-  --ink: #F2F4F1;
-  --muted: #8A909A;
-  --rule: #262B34;
-  --panel: #171B22;
-  --easy: #4FB59D;
-  --hard: #E9A443;
-  --fitness: #7FA3DB;
-  --fatigue: #E07383;
-  --good: #4FB59D;
-  --nohr: #55615B;
-  --sleep: #7B7FF2;
+  --paper: #0B0B0D;      /* the page (also the phone's status bar: the theme-color in the pages and manifest.json) */
+  --panel: #161618;      /* cards */
+  --raised: #232327;     /* what sits on a card: inputs, chips, bar tracks */
+  --rule: #2C2C31;       /* hairlines and chart grids */
+  --card-line: #1E1E22;  /* a card's edge */
+  --ink: #F5F5F2;
+  --muted: #9D9DA6;
+  --accent: #FF5A1F;     /* buttons, the tab you're on, links, single-series charts */
+  --on-accent: #1A0802;
+  --good: #3DD68C;       /* better, done */
+  --bad: #FF5C7A;        /* worse, errors */
+  --easy: #3DD68C;
+  --hard: #FFB23E;
+  --fitness: #5AA9FF;    /* fitness against fatigue */
+  --fatigue: #FF5C7A;
+  --nohr: #5F5F69;       /* no value: unknown effort, sports without a colour */
+  --sleep: #8C8CFF;
   --body-battery: #4DA8FF;
   --stress: #C27BC9;
-  --k-easy: #7CA02D;
-  --k-long: #C6FF3D;
-  --k-threshold: #A8432C;
-  --k-vo2: #FF5A36;
-  --k-anaerobic: #FF9478;
-  --k-jog: #2A2F38;
-  --route: #FF7A1A;
+  /* A session's steps and a plan's bars: cool for easy running, warm for hard */
+  --k-easy: #2F9E90;
+  --k-long: #5CE0C6;
+  --k-threshold: #FFB23E;
+  --k-vo2: #FF5A1F;
+  --k-anaerobic: #FF3D6E;
+  --k-jog: #3A3A41;
+  --route: #FF7A1A;  /* the glowing route line on the maps */
+  /* Sports with their own route color and map (ROUTE_STYLES in js/map.js) */
   --route-winter: #46C8FF;
-  --satellite-brightness: 0.58;
+  --route-swim: #3FE0FF;
+  --route-disc: #FF5CC4;
+  --satellite-brightness: 0.58;  /* dims satellite photos so the route stands out */
   --hillshade-blend: screen;
   --hillshade-opacity: 0.55;
+  /* Garmin's load focus colors */
   --low-aerobic: #50C1F6;
   --high-aerobic: #FF9A36;
   --anaerobic: #B46BEB;
+  /* Garmin's training status colors */
   --st-peaking: #B57BE6;
   --st-productive: #4CC46C;
   --st-maintaining: #F0C419;
@@ -104,638 +51,767 @@
   --st-strained: #F27AB5;
   --st-overreaching: #EF5A4B;
   --st-detraining: #9AA19D;
+  /* Garmin's heart rate and power zone colors */
   --z1: #6E7A74;
   --z2: #5BBDEB;
   --z3: #4CC46C;
   --z4: #F59A40;
   --z5: #EF5A4B;
-  --sp-run: #3987E5;
-  --sp-bike: #199E70;
-  --sp-walk: #D95926;
-  --sp-hike: #C98500;
-  --sp-disc_golf: #D55181;
-  --sp-winter: #3FAA3F;  /* lighter than in light mode, to read on the dark page */
-  --sp-strength: #9085E9;
-  --sp-swim: #E66767;
+  /* One fixed color per sport, for its icon, the menu and its page (the dataviz reference palette, in its validated
+     order); sports without one use --nohr */
+  --sp-run: #4A94F0;
+  --sp-bike: #22B583;
+  --sp-walk: #E8703F;
+  --sp-hike: #D99A1A;
+  --sp-disc_golf: #E0669A;
+  --sp-winter: #4DB8E8;
+  --sp-strength: #9A8FF0;
+  --sp-swim: #EE7272;
+  --sp-cardio: #F0C419;
+  --sp-yoga: #5CE0C6;
+  --body: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --r: 18px;     /* a card's corners */
+  --pad: 16px;   /* inside a card */
+  --gap: 12px;   /* between cards */
+  --gutter: 16px;
 }
+@media (min-width: 900px) {
+  :root { --pad: 22px; --gap: 18px; --gutter: clamp(1.5rem, 3vw, 2.5rem); }
+}
+
+/* ---- Base */
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; }
 body {
-  background: var(--paper);
-  color: var(--ink);
-  font: 400 1rem/1.5 var(--body);
-  font-variant-numeric: tabular-nums;
-  padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+  background: var(--paper); color: var(--ink);
+  font: 400 0.9375rem/1.45 var(--body); font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
 }
-/* A menu down the left, the selected page beside it; on narrow screens the menu slides in from the left */
-.app {
-  display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0 clamp(1.5rem, 3vw, 3rem);
-  max-width: 1680px; margin: 0 auto; padding: 0 clamp(1.25rem, 3vw, 2.5rem);
-}
-.content { min-width: 0; padding-bottom: 4rem; }
-.side {
-  position: sticky; top: 0; align-self: start; height: 100dvh; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 1.75rem; padding: 1.5rem 1.25rem 1.5rem 0; border-right: 1px solid var(--rule);
-}
-.side-top { display: flex; flex-direction: column; gap: 0.9rem; }
-.brand { font: 600 1.35rem/1 var(--display); letter-spacing: 0.01em; }
-.brand small { display: block; font: 400 0.85rem var(--body); color: var(--muted); margin-top: 0.3rem; }
-.sync { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; color: var(--muted); font-size: 0.85rem; }
-.nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.1rem; }
-.nav a {
-  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
-  padding: 0.45rem 0.7rem; border-radius: 6px; color: var(--ink); text-decoration: none; font-weight: 500;
-}
-.nav a .count { color: var(--muted); font-size: 0.82rem; font-weight: 400; }
-.nav a:hover { background: var(--panel); }
-.nav a[aria-current="page"] { background: var(--ink); color: var(--paper); }
-.nav a[aria-current="page"] .count { color: inherit; opacity: 0.75; }
-.nav a .swatch { width: 0.55rem; height: 0.55rem; border-radius: 2px; flex: none; align-self: center; margin-right: 0.15rem; }
-.nav a .label { flex: 1; display: flex; align-items: center; gap: 0.5rem; }
-.nav-label { margin: 1.25rem 0 0.4rem 0.7rem; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; }
+h1, h2, h3, p, dl, dd, ol, ul, figure { margin: 0; }
+a { color: inherit; text-decoration: none; }
+svg.ico { display: block; width: 1.4em; height: 1.4em; flex: none; }
+i[data-icon] { display: contents; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 
-/* Page titles, each with a sentence or two on where things stand */
-.page-head { padding: 2rem 0 1.25rem; border-bottom: 1px solid var(--rule); }
-.page-head h1 { font: 700 clamp(2.4rem, 6vw, 3.4rem)/1 var(--display); margin: 0; text-wrap: balance; }
-.story { margin: 0.75rem 0 0; max-width: 70ch; font-size: 1.08rem; }
-.story:empty { display: none; }
-.page-head-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; }
-.range-switch { display: flex; gap: 0.4rem; }
-.range-switch button { border-color: var(--rule); padding: 0.35rem 0.9rem; }
-.range-switch button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-/* Light or dark, at the bottom of the menu (js/theme.js) */
-.theme-switch { margin-top: auto; gap: 0.3rem; }
-.theme-switch button { padding: 0.25rem 0.65rem; font-size: 0.82rem; }
-/* Workout: today's session on the left, its shape and steps on the right */
-/* The Workout page in Volt and Puls; the other pages keep the data colours above */
-#page-workout { --fitness: #4F7F00; --fatigue: #E8492A; --good: #4F7F00; }
-:root[data-theme="dark"] #page-workout { --fitness: #C6FF3D; --fatigue: #FF5A36; --good: #C6FF3D; }
-#page-workout button.primary, #page-workout .range-switch button[aria-pressed="true"] {
-  background: var(--volt); border-color: var(--volt); color: var(--on-volt);
+button { font: 600 0.9rem/1.2 var(--body); color: var(--ink); background: none; border: 0; padding: 0; margin: 0; cursor: pointer; touch-action: manipulation; }
+button:disabled { opacity: 0.55; cursor: default; }
+/* The two kinds of button: the thing to do, and everything else */
+.primary, .ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 44px; padding: 0.55rem 1.15rem; border-radius: 999px; white-space: nowrap;
+  transition: transform 0.12s, filter 0.15s, background 0.15s;
 }
-#page-workout button.primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-/* A sent workout's button: "On the watch ✓", turning into "Remove from watch" in Puls on hover or focus */
-#page-workout button.on-watch .rm { display: none; }
-#page-workout button.on-watch:is(:hover, :focus-visible) .ok { display: none; }
-#page-workout button.on-watch:is(:hover, :focus-visible) .rm { display: inline; }
-#page-workout button.on-watch:is(:hover, :focus-visible):not(:disabled) { background: var(--fatigue); border-color: var(--fatigue); color: var(--paper); }
-
-/* The chat on the workout page: the conversation, then the box to write in */
-.chat { padding: 1.25rem 0; border-bottom: 1px solid var(--rule); }
-.chat-log { list-style: none; margin: 0 0 1rem; padding: 0 0.25rem 0 0; display: grid; gap: 0.75rem; max-height: 24rem; overflow-y: auto; }
-.chat-log li { max-width: min(42rem, 88%); line-height: 1.45; overflow-wrap: anywhere; }
-.chat-log .user { justify-self: end; background: var(--ink); color: var(--paper); padding: 0.5rem 0.85rem; border-radius: 14px 14px 4px 14px; white-space: pre-wrap; }
-.chat-log .assistant { justify-self: start; }
-.chat-log .assistant p { margin: 0 0 0.5rem; }
-.chat-log .assistant p:last-child { margin-bottom: 0; }
-.chat-log .error { color: var(--fatigue); }
-.chat-log .pending { color: var(--muted); }
-.chat-log .chat-usage { margin-top: 0.3rem; color: var(--muted); font-size: 0.75rem; }
-.chat-changes { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
-.chat-changes li { font-size: 0.85rem; color: var(--good); border: 1px solid var(--good); border-radius: 999px; padding: 0.1rem 0.6rem; }
-.chat-form { display: flex; gap: 0.6rem; align-items: flex-end; }
-.chat-form textarea {
-  flex: 1; min-width: 0; resize: none; max-height: 9rem; font: 400 1rem/1.4 var(--body); color: var(--ink);
-  background: var(--panel); border: 1px solid var(--rule); border-radius: 18px; padding: 0.5rem 0.9rem;
+.primary { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.ghost { background: var(--raised); color: var(--ink); }
+.primary svg, .ghost svg { width: 1.15rem; height: 1.15rem; }
+.small { min-height: 34px; padding: 0.35rem 0.85rem; font-size: 0.82rem; }
+:is(.primary, .ghost, .icon-btn, .act-row, a.card, .strip .day, .sport-card):active:not(:disabled) { transform: scale(0.975); }
+@media (hover: hover) {
+  .primary:hover:not(:disabled) { filter: brightness(1.1); }
+  .ghost:hover:not(:disabled), .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--raised) 80%, var(--ink)); }
 }
-.chat-form button { padding: 0.5rem 1.1rem; }
-.chat-foot { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: baseline; margin: 0.5rem 0 0; color: var(--muted); font-size: 0.85rem; }
-.chat-foot span:empty { display: none; }
-.chat-foot .link-btn { font-size: 0.85rem; }
-.chat-foot span.error { color: var(--fatigue); }
-.wk-ahead { list-style: none; margin: 0.9rem 0 0; padding: 0; font-size: 0.95rem; }
-.wk-ahead li { padding: 0.2rem 0; }
-.wk-ahead b { font-weight: 600; }
-
-.wk { display: grid; gap: 1.5rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
-@media (min-width: 60rem) { .wk { grid-template-columns: minmax(16rem, 2fr) 3fr; } }
-.wk .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.wk h2 { font: 700 clamp(1.9rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; }
-.wk-total { margin: 0.35rem 0 0; font: 600 1.5rem/1.1 var(--display); }
-.wk-why { margin: 0.9rem 0 0; color: var(--muted); font-size: 0.95rem; }
-.wk-send { margin-top: 1.25rem; display: flex; align-items: center; gap: 0.5rem 0.9rem; flex-wrap: wrap; }
-.wk-send button { border-color: var(--ink); padding: 0.45rem 1rem; }
-.wk-send button[disabled] { opacity: 0.6; cursor: default; }
-.wk-send span { color: var(--muted); font-size: 0.85rem; }
-.wk-send span.error { color: var(--fatigue); }
-.wk-send span.done { color: var(--good); font-weight: 600; font-size: 0.95rem; }
-/* Block widths follow each step's length, heights its intensity, like the workout preview on the watch */
-.wk-bar { display: flex; gap: 2px; height: 2.6rem; align-items: flex-end; }
-.wk-bar i { display: block; min-width: 2px; border-radius: 2px; }
-.wk-steps { list-style: none; margin: 1.25rem 0 0; padding: 0; display: grid; gap: 0.9rem; }
-.wk-steps li { display: grid; grid-template-columns: 0.3rem 5rem 1fr; gap: 0.15rem 0.9rem; align-items: baseline; }
-.wk-steps li::before { content: ""; align-self: stretch; border-radius: 2px; background: var(--c); grid-row: span 2; }
-.wk-steps .len { font: 600 1.45rem/1 var(--display); white-space: nowrap; }
-.wk-steps .what { font-weight: 600; }
-.wk-steps .target { grid-column: 3; color: var(--muted); font-size: 0.9rem; }
-.wk-steps .reps { grid-template-columns: 0.3rem 1fr; }
-.wk-steps .reps .len { grid-column: 2; }
-.wk-steps .reps ol { grid-column: 2; list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.7rem; }
-
-/* Workout: the sport's newest activity at the top, its route beside it, and the review of a run under both */
-.wk-last { border-bottom: 1px solid var(--rule); }
-.wk-last > div:first-child { display: flex; flex-direction: column; gap: 1.25rem; }
-.wk-last .last-map { min-height: 240px; }
-@media (min-width: 1000px) {
-  .last.wk-last { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem 3rem; }
-  .last.wk-last:has(> .last-map[hidden]) { grid-template-columns: minmax(0, 1fr); }
+.link-btn, .more-link { color: var(--accent); font-weight: 600; font-size: 0.85rem; }
+.link-btn.danger { color: var(--bad); }
+.icon-btn { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--raised); transition: transform 0.12s, background 0.15s; }
+.icon-btn svg { width: 20px; height: 20px; }
+.icon-btn.primary { min-height: 0; padding: 0; background: var(--accent); }
+input, select, textarea {
+  font: 400 1rem var(--body); color: var(--ink); background: var(--raised);  /* 16 px, so phones don't zoom in on focus */
+  border: 1px solid transparent; border-radius: 12px; padding: 0.65rem 0.8rem; min-width: 0;
 }
-.wk-review-open { margin: 0; }
-.wk-review { grid-column: 1 / -1; display: grid; gap: 1rem; min-width: 0; }
-.wk-review p { margin: 0; }
-.wk-review-title, .wk-review-why, .wk-review .pending { color: var(--muted); font-size: 0.92rem; }
-.wk-review .error { color: var(--fatigue); }
-table.laps.review td.ok { color: var(--good); font-weight: 600; }
-table.laps.review td.off { color: var(--fatigue); font-weight: 600; white-space: nowrap; }
-.wk-review-note { display: grid; gap: 0.6rem; max-width: 72ch; }
-.wk-review-note .chat-usage { color: var(--muted); font-size: 0.75rem; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
 
-/* Race goal: what, when and how far off, with Garmin's prediction moving toward the target */
-.race { display: grid; gap: 1.25rem 3rem; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
-@media (min-width: 1000px) { .race { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; } }
-.race .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.race-title { display: flex; align-items: baseline; gap: 1rem; }
-.race h2 { font: 700 clamp(1.9rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; }
-.race-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1.1rem 0 0; }
-.race-stats dd { margin: 0; font: 600 2rem/1 var(--display); white-space: nowrap; }
-.race-stats dt { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
-.race-stats .note { display: block; color: var(--ink); font-size: 0.85rem; }
-.race-stats .over { color: var(--fatigue); }
-.race-stats .under { color: var(--good); }
-.race-trend .chart { height: 190px; }
-button.link-btn { all: unset; cursor: pointer; color: var(--fitness); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
-button.link-btn:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
-.page-head > button.link-btn { margin-top: 0.75rem; }
-.race-dialog {
-  width: min(420px, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid var(--rule); border-radius: 10px;
-  background: var(--paper); color: var(--ink); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+/* ---- The frame: tabs along the bottom on phones, a menu down the left on wide screens */
+.side { display: none; }
+.topbar {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 0.6rem;
+  height: calc(54px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) var(--gutter) 0;
+  background: color-mix(in srgb, var(--paper) 90%, transparent); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
 }
-.race-dialog::backdrop { background: rgba(10, 16, 14, 0.65); }
-.race-dialog form { display: grid; gap: 0.9rem; }
-.race-dialog h2 { margin: 0; font: 700 1.8rem/1 var(--display); }
-.race-dialog label { display: grid; gap: 0.3rem; color: var(--muted); font-size: 0.9rem; }
-.race-dialog input, .race-dialog select {
-  font: 400 1rem var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 0.5rem 0.65rem;
+.topbar-title { flex: 1; min-width: 0; font: 800 1.45rem/1 var(--body); letter-spacing: -0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .icon-btn { background: none; margin-right: -8px; }
+.topbar #backBtn { margin: 0 -2px 0 -10px; }
+.demo-tag { padding: 0.15rem 0.5rem; border-radius: 999px; background: var(--raised); color: var(--muted); font: 600 0.7rem var(--body); letter-spacing: 0.04em; text-transform: uppercase; }
+/* Syncing turns the arrows; a failed sync puts a dot on them */
+.syncing svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.has-error { position: relative; }
+.has-error::after { content: ""; position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+
+.content { min-width: 0; padding: 4px var(--gutter) calc(88px + env(safe-area-inset-bottom, 0px)); }
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--panel) 93%, transparent); backdrop-filter: blur(20px) saturate(1.5); -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-top: 1px solid var(--card-line); user-select: none; -webkit-user-select: none;
 }
-.form-error { margin: 0; color: var(--fatigue); }
-.form-actions { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.4rem; }
-.form-actions .link-btn { margin-left: auto; color: var(--fatigue); }
-button.primary { background: var(--ink); color: var(--paper); }
-.section-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem 1rem; }
-/* A chart's fixed period, where the Fitness chart has its switch */
-.section-head .period { color: var(--muted); font-size: 0.85rem; }
-.more-link { color: var(--fitness); font-weight: 500; text-underline-offset: 3px; }
+.tabbar a { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 3px; border-radius: 12px; color: var(--muted); font-size: 0.66rem; font-weight: 600; transition: color 0.15s; }
+.tabbar svg { width: 24px; height: 24px; transition: transform 0.2s; }
+.tabbar a[aria-current] { color: var(--accent); }
+.tabbar a[aria-current] svg { transform: translateY(-1px) scale(1.06); stroke-width: 2.2; }
+.tabbar a:active svg { transform: scale(0.9); }
 
-/* A sport's headline totals */
-.tiles { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); margin: 0; padding: 1.75rem 0; border-bottom: 1px solid var(--rule); gap: 1.25rem 0; }
-.tiles div { padding: 0 1.25rem; border-left: 1px solid var(--rule); min-width: 0; }
-.tiles div:first-child { border-left: 0; padding-left: 0; }
-.tiles dd { margin: 0; font: 600 2.4rem/1 var(--display); }
-.tiles dd span { font: 500 1rem var(--body); color: var(--muted); margin-left: 0.15rem; }
-.tiles dt { color: var(--muted); font-size: 0.9rem; margin-top: 0.35rem; }
-.tiles .note { display: block; color: var(--ink); font-size: 0.85rem; }
-.tiles .up { color: var(--good); }
-.tiles .down { color: var(--fatigue); }
-
-/* Personal bests: label, value and date; each opens its top five, and each of those its activity */
-.records { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 0 2.5rem; align-items: start; }
-.records .rec, .records .empty-rec { border-bottom: 1px solid var(--rule); }
-.records .empty-rec { opacity: 0.6; }
-.records button, .records .empty-rec {
-  all: unset; box-sizing: border-box; width: 100%;
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.1rem 1rem; padding: 0.6rem 0.25rem;
-}
-.records button { cursor: pointer; }
-.records button:hover:not(:disabled) { background: var(--panel); color: var(--ink); }
-.records button:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
-.records .rl { color: var(--muted); }
-.rec-head .rl::after { content: " ▾"; font-size: 0.75em; }
-.rec-head[aria-expanded="true"] .rl::after { content: " ▴"; }
-.records .rv { font-weight: 600; text-align: right; }
-.records small { color: var(--muted); font-size: 0.82rem; }
-.rec-head small, .empty-rec small { grid-column: 1 / -1; }
-.rec-top { list-style: none; margin: 0 0 0.4rem; padding: 0; }
-.rec-top button { grid-template-columns: 1.25rem minmax(0, 1fr) auto; align-items: baseline; padding: 0.35rem 0.25rem; }
-.rec-top .rn { color: var(--muted); font-size: 0.82rem; }
-.rec-top .rn + small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-button {
-  font: 500 0.95rem var(--body); color: var(--ink); background: transparent;
-  border: 1px solid var(--ink); border-radius: 999px; padding: 0.4rem 1rem; cursor: pointer;
-}
-button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
-button:disabled { opacity: 0.55; cursor: progress; }
-:focus-visible { outline: 2px solid var(--fitness); outline-offset: 3px; }
-
-.notice {
-  margin: 1rem 0 0; padding: 0.75rem 1rem; border-left: 3px solid var(--fatigue);
-  background: var(--panel); max-width: 72ch;
-}
-.notice.info { border-color: var(--fitness); }
-
-/* Garmin training status */
-.tstatus { display: grid; gap: 1.75rem; padding: 1.75rem 0 1.5rem; align-content: start; }
-.focus { border-top: 1px solid var(--rule); padding-top: 1.75rem; }
-#tsMain[hidden] + .focus { border-top: 0; padding-top: 0; }
-.tstatus .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.tstatus-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1.25rem; }
-.tstatus h2 { font: 700 clamp(2.6rem, 8vw, 4rem)/1 var(--display); margin: 0.15rem 0 0; color: var(--status-color, var(--ink)); }
-.tstatus .since { color: var(--muted); }
-.tstatus .facts { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.95rem; }
-.weeks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 clamp(0.6rem, 2.5vw, 1.25rem); margin-top: 1.1rem; max-width: 620px; }
-.week .days { display: flex; gap: 3px; }
-.week .days i { flex: 1; height: 1.1rem; border-radius: 2px; background: var(--rule); }
-.week .days i.today { outline: 2px solid var(--ink); outline-offset: 1px; }
-.week span { display: block; margin-top: 0.35rem; color: var(--muted); font-size: 0.8rem; }
-.status-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.85rem; }
-.status-legend i { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -0.05rem; }
-
-/* Garmin load focus */
-.focus h3 { font: 700 clamp(1.9rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; color: var(--focus-color, var(--ink)); }
-.focus .about { margin: 0.5rem 0 0; max-width: 60ch; }
-.frows { display: grid; gap: 0.8rem; margin-top: 1.2rem; max-width: 600px; }
-.frow { display: grid; grid-template-columns: 6.5rem 3rem minmax(0, 1fr) 4.5rem; align-items: center; gap: 0.75rem; font-size: 0.95rem; }
-.frow .fval { text-align: right; font-weight: 600; }
-.frow .fstate { color: var(--muted); font-size: 0.85rem; }
-.track { position: relative; height: 1.15rem; }
-.track .range { position: absolute; top: 0; bottom: 0; border: 1.5px dashed var(--muted); border-radius: 999px; }
-.track .fill { position: absolute; left: 0; top: 50%; height: 0.55rem; transform: translateY(-50%); border-radius: 999px; }
-.status-legend i.range-key { width: 1.5rem; background: none; border: 1.5px dashed var(--muted); border-radius: 999px; }
-
-/* Overview: training status and load focus on the left, the last activity on the right */
-.overview { display: grid; border-bottom: 1px solid var(--rule); }
-.overview > :not([hidden]) + .last { border-top: 1px solid var(--rule); }
-@media (min-width: 1000px) {
-  .overview { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3rem; }
-  .overview:has(> [hidden]) { grid-template-columns: minmax(0, 1fr); }
-  .overview > :not([hidden]) + .last { border-top: 0; border-left: 1px solid var(--rule); padding-left: 3rem; }
+@media (min-width: 900px) {
+  .app { display: grid; grid-template-columns: 236px minmax(0, 1fr); max-width: 1560px; margin: 0 auto; }
+  .topbar, .tabbar { display: none; }
+  .content { padding: 0 var(--gutter) 4rem; }
+  .side {
+    position: sticky; top: 0; height: 100dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem;
+    padding: 1.6rem 1rem 1.1rem; border-right: 1px solid var(--card-line);
+  }
+  .brand { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.6rem; font: 800 1.3rem/1 var(--body); letter-spacing: -0.03em; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 8px; background: var(--accent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231A0802' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 13h3.2l1.8-4.2 3 8.4 2.2-6.2 1.3 2h3.5'/%3E%3C/svg%3E") center / 20px no-repeat; }
+  .nav ul { list-style: none; padding: 0; display: grid; gap: 2px; }
+  .nav a { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.7rem; border-radius: 12px; color: var(--muted); font-weight: 600; transition: background 0.15s, color 0.15s; }
+  .nav a svg { width: 21px; height: 21px; }
+  .nav a .label { flex: 1; }
+  .nav a .count { font-size: 0.78rem; font-weight: 500; opacity: 0.8; }
+  .nav a:hover { background: var(--panel); color: var(--ink); }
+  .nav a[aria-current="page"] { background: var(--panel); color: var(--ink); }
+  .nav a[aria-current="page"] svg { color: var(--accent); }
+  .nav a .swatch { width: 9px; height: 9px; margin: 0 6px; border-radius: 3px; flex: none; }
+  .nav-label { margin: 1.4rem 0 0.4rem 0.7rem; color: var(--muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; }
+  .side-foot { margin-top: auto; display: flex; align-items: center; gap: 0.5rem; }
+  .sync-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.7rem; border-radius: 12px; color: var(--muted); font-size: 0.8rem; font-weight: 500; text-align: left; }
+  .sync-btn svg { width: 18px; height: 18px; }
+  .sync-btn:hover:not(:disabled) { background: var(--panel); color: var(--ink); }
+  .sync-btn:disabled { opacity: 1; }
 }
 
-/* Last activity, with its route when it has GPS */
-.last { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.75rem 0 1.5rem; min-width: 0; }
-.last .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.last h2 { font: 700 clamp(2rem, 6vw, 3rem)/1.05 var(--display); margin: 0.15rem 0 0; overflow-wrap: anywhere; }
+/* ---- A page: its title (the bar on top has it on phones), then cards */
+.page { display: flex; flex-direction: column; gap: var(--gap); animation: page-in 0.24s ease-out; }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
+.page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; }
+.page-head h1 { display: none; font: 800 2rem/1.1 var(--body); letter-spacing: -0.035em; }
+.page-head:has(> h1:only-child), .sport-head { display: none; }
+#page-home .page-head { display: block; }
+@media (min-width: 900px) {
+  .page-head, .page-head:has(> h1:only-child) { display: flex; padding: 1.9rem 0 0.4rem; }
+  .page-head h1 { display: block; }
+  .sport-head { display: flex; justify-content: flex-start; }
+  #page-home .page-head { display: block; }
+}
+.eyebrow { color: var(--muted); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.card { min-width: 0; padding: var(--pad); border-radius: var(--r); background: var(--panel); border: 1px solid var(--card-line); }
+a.card { display: block; transition: transform 0.12s, background 0.15s; }
+@media (hover: hover) { a.card:hover { background: color-mix(in srgb, var(--panel) 92%, var(--ink)); } }
+.card h2 { font: 700 1.05rem/1.25 var(--body); letter-spacing: -0.01em; }
+.section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 1rem; margin-bottom: 0.5rem; }
+.section-head > svg, .section-head > i > svg { width: 18px; height: 18px; color: var(--muted); }
+.period { color: var(--muted); font-size: 0.78rem; }
+.reading { margin: 0 0 0.85rem; max-width: 62ch; color: var(--muted); font-size: 0.86rem; }
+.reading:empty { display: none; }
+.card > h2 + .chart, .card > h2 + .reading { margin-top: 0.35rem; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); }
+/* Side-by-side cards line their charts up, whatever the text above them */
+.grid > .card { display: flex; flex-direction: column; }
+.grid > .card .chart { margin-top: auto; }
+@media (min-width: 1100px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid .wide { grid-column: 1 / -1; }
+}
+.chart { position: relative; height: 210px; width: 100%; min-width: 0; }
+@media (min-width: 900px) { .chart { height: 270px; } }
+.legend, .status-legend, .kind-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.76rem; }
+:is(.legend, .status-legend, .kind-legend) i { display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 3px; margin-right: 0.35rem; vertical-align: -0.05rem; }
+.legend i.line { height: 3px; border-radius: 2px; vertical-align: 0.18rem; }
+.legend i.dashed { height: 0; border-top: 2px dashed; background: none !important; }
+
+/* A switch between two or three choices */
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--panel); border: 1px solid var(--card-line); }
+.card .seg { background: var(--raised); border-color: transparent; }
+.seg button { min-height: 34px; padding: 0.3rem 0.95rem; border-radius: 999px; color: var(--muted); font-size: 0.82rem; transition: background 0.15s, color 0.15s; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.seg.small button { min-height: 28px; padding: 0.2rem 0.7rem; font-size: 0.76rem; }
+.seg:empty, .seg:has(> button:only-child) { display: none; }
+
+/* A row of filters, scrolling sideways on phones */
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter); }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex: none; min-height: 38px; padding: 0.4rem 0.95rem; border-radius: 999px; background: var(--panel); border: 1px solid var(--card-line); font-size: 0.85rem; transition: background 0.15s, color 0.15s; }
+.chips button span { margin-left: 0.4rem; color: var(--muted); font-weight: 500; }
+.chips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.chips button[aria-pressed="true"] span { color: inherit; opacity: 0.6; }
+@media (min-width: 900px) { .chips { flex-wrap: wrap; margin: 0; padding: 0; } }
+
+/* A small label with a dot in the colour of what it says */
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 0.22rem 0.65rem 0.22rem 0.55rem; border-radius: 999px; background: var(--raised); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); }
+
+/* Numbers with their labels: the label, the value under it, a note under that */
+.tiles, .last-stats { display: grid; gap: 16px 14px; }
+.tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.last-stats { grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr)); }
+@media (min-width: 900px) {
+  .tiles { grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); }
+  .last-stats { grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); }
+}
+:is(.tiles, .last-stats) > div { min-width: 0; }
+:is(.tiles, .last-stats) dt { margin-bottom: 0.15rem; color: var(--muted); font-size: 0.76rem; font-weight: 500; }
+:is(.tiles, .last-stats) dd { font: 800 1.6rem/1.1 var(--body); letter-spacing: -0.035em; white-space: nowrap; }
+:is(.tiles, .last-stats) dd span { margin-left: 0.15rem; color: var(--muted); font: 600 0.8rem var(--body); letter-spacing: 0; }
+:is(.tiles, .last-stats) dd.note { margin-top: 0.25rem; color: var(--muted); font: 400 0.78rem/1.35 var(--body); letter-spacing: 0; white-space: normal; }
+dd.note a { color: var(--accent); font-weight: 600; }
+:is(.up, .under) { color: var(--good); }
+:is(.down, .over) { color: var(--bad); }
+dd.note :is(.up, .down, .under, .over) { margin: 0; color: var(--good); font: inherit; font-weight: 700; }
+dd.note :is(.down, .over) { color: var(--bad); }
+.tiles.two { --cols: 2; }
+
+.notice { display: flex; gap: 0.6rem; margin: 0 0 var(--gap); padding: 0.8rem 1rem; border-radius: 14px; background: color-mix(in srgb, var(--bad) 14%, var(--panel)); font-size: 0.88rem; }
+@media (min-width: 900px) { .notice { margin-top: 1.5rem; } }
+.empty { padding: 3rem 0; max-width: 52ch; }
+.empty h1 { font: 800 1.9rem/1.1 var(--body); letter-spacing: -0.03em; margin-bottom: 0.6rem; }
+.empty p { color: var(--muted); }
+/* A card asking for something to be set up */
+.empty-card { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; }
+.empty-card > i > svg { width: 42px; height: 42px; padding: 10px; border-radius: 13px; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.empty-card > div { flex: 1 1 14rem; }
+.empty-card p { margin-top: 0.15rem; color: var(--muted); font-size: 0.86rem; }
+/* Before the first numbers: cards taking shape */
+.loading { display: grid; gap: var(--gap); padding-top: 8px; }
+.loading i { display: block; height: 150px; border-radius: var(--r); background: linear-gradient(100deg, var(--panel) 35%, var(--raised) 50%, var(--panel) 65%) 0 0 / 220% 100%; animation: shimmer 1.3s linear infinite; }
+.loading i:nth-child(2) { height: 320px; }
+@keyframes shimmer { to { background-position: -220% 0; } }
+
+/* ---- A sport's icon on its colour */
+.sport-ico { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 12px; color: var(--c); background: color-mix(in srgb, var(--c) 17%, transparent); }
+.sport-ico svg { width: 22px; height: 22px; }
+.sport-ico.lg { width: 46px; height: 46px; border-radius: 14px; }
+.sport-ico.lg svg { width: 26px; height: 26px; }
+
+/* ---- Home */
+.home { display: flex; flex-direction: column; gap: var(--gap); }
+.home-col { display: contents; }
+#homeWeek { order: 1; } #lastAct { order: 2; } #homeToday { order: 3; } #homeFitness { order: 4; } #homeRace { order: 5; } #homeRecovery { order: 6; } #homeRecent { order: 7; }
+#homeDate { font-size: 0.78rem; }
+@media (min-width: 900px) { #homeDate { margin-bottom: 0.2rem; } }
+@media (min-width: 1100px) {
+  .home { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(330px, 1fr); align-items: start; }
+  .home-col { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+}
+
+/* This week: a ring against the goal, the week's number, and its days as bars */
+.week-top { display: flex; align-items: center; gap: 16px; }
+.ring { width: 86px; height: 86px; flex: none; }
+.ring circle { fill: none; stroke-width: 8; }
+.ring-track { stroke: var(--raised); }
+.ring-fill { stroke: var(--accent); stroke-linecap: round; }
+.ring.full .ring-fill { stroke: var(--good); }
+.ring-pct { fill: var(--ink); font: 800 17px var(--body); letter-spacing: -0.03em; text-anchor: middle; }
+.week-main { min-width: 0; }
+.week-big { margin-top: 0.15rem; font: 800 2.15rem/1.05 var(--body); letter-spacing: -0.04em; white-space: nowrap; }
+.week-big span { margin-left: 0.15rem; color: var(--muted); font: 600 0.95rem var(--body); letter-spacing: 0; }
+.week-big small { margin-left: 0.55rem; color: var(--muted); font: 500 0.85rem var(--body); letter-spacing: 0; }
+.week-note, .week-goal { color: var(--muted); font-size: 0.82rem; }
+.week-note { margin-top: 0.15rem; }
+.week-goal { margin-top: 0.7rem; font-size: 0.76rem; }
+.week-goal:empty { display: none; }
+.vol-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 14px; text-align: center; }
+.vol-days .bar { display: flex; align-items: flex-end; height: 46px; border-radius: 7px; background: var(--raised); overflow: hidden; }
+.vol-days .bar i { display: block; width: 100%; border-radius: 7px; background: var(--accent); }
+.vol-days .day { display: block; margin-top: 0.3rem; color: var(--muted); font-size: 0.7rem; font-weight: 600; }
+.vol-days .is-today .day { color: var(--ink); }
+.vol-days .is-today .bar { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 35%, transparent); }
+.vol-days .future .bar { background: none; box-shadow: inset 0 0 0 1.5px var(--raised); }
+
+/* The latest activity (here and on Train), with its route when it has GPS */
+.last { display: flex; flex-direction: column; gap: 14px; }
+.last-head { display: flex; align-items: flex-start; gap: 12px; }
+.last-head > div { min-width: 0; }
 .last .last-open { cursor: pointer; }
-.last h2 button, .last h2 button:hover:not(:disabled) { all: unset; cursor: pointer; }
-.last h2 button::after { content: " ›"; color: var(--muted); }
-.last .last-open:hover h2 button, .last h2 button:focus-visible { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.12em; }
-.last h2 button:focus-visible { outline: 2px solid var(--fitness); outline-offset: 3px; }
-.last-effect { margin: 0.4rem 0 0; }
-.last-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: 1.25rem; margin: 0; }
-.last-stats dd { margin: 0; font: 600 2rem/1 var(--display); white-space: nowrap; }
-.last-stats dd span { font: 500 0.95rem var(--body); color: var(--muted); margin-left: 0.15rem; }
-.last-stats dt { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
-/* Grows to line up with the bottom of the status column; isolated so Leaflet's 400+ z-indexes stay under the mobile menu */
-.last-map { flex: 1; min-height: 280px; border-radius: 6px; overflow: hidden; isolation: isolate; }
-.last-map.leaflet-container { background: var(--panel); font: 400 0.72rem var(--body); }
-.last-map .leaflet-bar { border: 1px solid var(--rule); box-shadow: none; }
+.last h2 { margin-top: 0.1rem; font: 800 1.4rem/1.15 var(--body); letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.last h2 button { all: unset; cursor: pointer; }
+.last h2 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+@media (hover: hover) { .last .last-open:hover h2 button { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.14em; } }
+.last-effect { margin-top: 0.25rem; color: var(--muted); font-size: 0.84rem; }
+/* The map runs to the card's edges; isolated so Leaflet's 400+ z-indexes stay under the bars and sheets */
+.last-map { height: 230px; margin: 2px calc(var(--pad) * -1) calc(var(--pad) * -1); border-radius: 0 0 calc(var(--r) - 1px) calc(var(--r) - 1px); overflow: hidden; isolation: isolate; }
+@media (min-width: 900px) { .last-map { height: 360px; } }
+.last-map.still, .last-map.still * { cursor: pointer; }
+.last-map.leaflet-container { background: var(--raised); font: 400 0.66rem var(--body); }
+.last-map .leaflet-bar { border: 0; box-shadow: none; border-radius: 10px; overflow: hidden; }
 .last-map .leaflet-bar a { background: var(--panel); color: var(--ink); border-bottom-color: var(--rule); }
-.last-map .leaflet-bar a:hover { background: var(--paper); }
-.last-map .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 80%, transparent); color: var(--muted); }
+.last-map .leaflet-bar a:hover { background: var(--raised); }
+.last-map .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 70%, transparent); color: var(--muted); border-radius: 6px 0 0 0; }
 .last-map .leaflet-control-attribution a { color: inherit; }
 /* Soft bloom in the route's color (set on the map by js/map.js); stacked under the wide halo lines drawn there */
 .last-map .route-glow { filter: drop-shadow(0 0 4px var(--route)) drop-shadow(0 0 10px var(--route)); }
 .last-map .tiles-satellite { filter: brightness(var(--satellite-brightness)); }
-/* Terrain shading blended into the grey map: darkens the shadows in light mode, lights the slopes in dark mode */
+/* Terrain shading blended into the grey map: it lights the slopes */
 .last-map .tiles-hillshade { mix-blend-mode: var(--hillshade-blend); opacity: var(--hillshade-opacity); }
 
-/* Today: sleep and recovery */
-.hero { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
-/* The overview's hero: today's numbers, with today's calories as a ring at the end */
-.hero-cal { display: flex; align-items: center; gap: 1.25rem 2rem; flex-wrap: wrap; }
-.hero-cal .today { flex: 1 1 32rem; }
-.cal-ring { display: flex; align-items: center; gap: 1rem; padding-left: 2rem; border-left: 1px solid var(--rule); }
-.cal-ring svg { width: 112px; height: 112px; flex: none; }
-.cal-ring circle { fill: none; stroke-width: 11; }
-.cal-ring .cal-rest { stroke: var(--low-aerobic); }
-.cal-ring .cal-active { stroke: var(--fatigue); stroke-linecap: butt; }
-.cal-ring text { text-anchor: middle; fill: var(--ink); }
-.cal-ring .cal-total { font: 600 26px var(--display); }
-.cal-ring .cal-unit { font: 500 12px var(--body); fill: var(--muted); }
-.cal-key p { margin: 0.2rem 0; font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
-.cal-key p.eyebrow { margin-bottom: 0.4rem; }
-.cal-key b { color: var(--ink); font-weight: 600; margin-right: 0.25rem; }
-.cal-key i { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.45rem; background: var(--low-aerobic); vertical-align: -1px; }
-.cal-key i.active { background: var(--fatigue); }
+/* Today's session in short */
+.today-link { display: block; }
+.today-card h2, .wk h2 { margin-top: 0.15rem; font: 800 1.45rem/1.15 var(--body); letter-spacing: -0.03em; }
+.today-total { margin-top: 0.2rem; font-weight: 600; }
+.today-total:empty { display: none; }
+.today-card .wk-bar { margin-top: 14px; height: 40px; }
+.wk-send { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; }
+.wk-send > span { color: var(--muted); font-size: 0.8rem; }
+.wk-send > span:empty { display: none; }
+.wk-send > span.error { color: var(--bad); }
+.wk-send > span.done { color: var(--good); font-weight: 700; font-size: 0.92rem; }
+.today-card .wk-send .more-link { margin-left: auto; }
 
-/* Form, inside the fitness and fatigue section */
-.form-now { margin: 0 0 0.5rem; }
-.form-now .state { font: 600 1.6rem/1.1 var(--display); color: var(--state-color, var(--ink)); }
-.form-now .advice { display: block; margin-top: 0.15rem; }
-.reading { margin: 0 0 0.5rem; max-width: 60ch; }
-.grid .wide { grid-column: 1 / -1; }
-/* Side-by-side sections line their charts up, whatever the text above them */
-.grid > section { display: flex; flex-direction: column; min-width: 0; }
-.grid > section .chart { margin-top: auto; }
+/* Fitness in short: the number, where it's been, and the state it's in */
+.fit-row { display: flex; align-items: center; gap: 14px; }
+.fit-big { font: 800 2.5rem/1 var(--body); letter-spacing: -0.04em; }
+.fit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.spark { position: relative; height: 56px; margin-top: 12px; }
+.spark svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.spark-line { fill: none; stroke: var(--fitness); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.spark-area { fill: color-mix(in srgb, var(--fitness) 13%, transparent); }
+.spark-dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -8px; border-radius: 50%; background: var(--fitness); box-shadow: 0 0 0 3px var(--panel); }
+.fit-note { margin-top: 0.7rem; color: var(--muted); font-size: 0.82rem; }
+.fit-note:empty { display: none; }
+.race-count { margin-bottom: 14px; color: var(--muted); }
+.race-count b { margin-right: 0.3rem; color: var(--ink); font: 800 2.1rem/1.05 var(--body); letter-spacing: -0.04em; }
+.race-count span { display: block; margin-top: 0.15rem; font-size: 0.8rem; }
+.recovery-card .section-head { margin-bottom: 0.8rem; }
 
-.today {
-  display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr));
-  margin: 0; gap: 1.25rem 0;
-}
-.today div { padding: 0 1.25rem; border-left: 1px solid var(--rule); }
-.today div:nth-child(4n+1) { border-left: 0; padding-left: 0; }
-.today dd { margin: 0; font: 600 2.4rem/1 var(--display); }
-.today dd span { font: 500 1rem var(--body); color: var(--muted); margin-left: 0.15rem; }
-.today dt { color: var(--muted); font-size: 0.9rem; margin-top: 0.35rem; }
-.today .note { display: block; color: var(--ink); font-size: 0.85rem; }
-
-/* Chart sections */
-/* minmax(0, …) lets columns shrink below the width a chart was drawn at, so charts redraw on resize */
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3rem 2.5rem; padding-top: 2.5rem; }
-section h2 { font: 600 1.6rem/1.1 var(--display); margin: 0 0 0.3rem; }
-section p.sub { margin: 0 0 1rem; color: var(--muted); font-size: 0.95rem; max-width: 60ch; }
-.chart { position: relative; height: 260px; width: 100%; min-width: 0; }
-@media (min-width: 1300px) { .chart { height: 320px; } }
-.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.75rem; font-size: 0.88rem; color: var(--muted); }
-.legend i { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -0.1rem; }
-.legend i.line { height: 3px; border-radius: 0; vertical-align: 0.2rem; }
-.legend i.dashed { height: 0; border-top: 3px dashed; background: none !important; }
-
-/* Training calendar: a column per week, Monday at the top, the month above its first week */
-.cal-scroll { overflow-x: auto; }
-.cal { display: flex; gap: 6px; min-width: 620px; }
-.cal-labels, .cal-grid { display: grid; grid-template-rows: 1.1rem repeat(7, 1fr); gap: 3px; }
-.cal-grid { flex: 1; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-.cal-label, .cal-month { color: var(--muted); font-size: 0.72rem; line-height: 1; white-space: nowrap; }
-.cal-label { align-self: center; }
-.cal-day { display: block; aspect-ratio: 1; border-radius: 2px; background: color-mix(in srgb, var(--rule) 75%, transparent); }
-.cal-day.on { cursor: pointer; }
-.cal-day.on:hover { outline: 2px solid var(--ink); outline-offset: 1px; }
-.cal-day.future { background: none; }
-.cal-legend { align-items: center; gap: 0.3rem; }
-.cal-legend i { margin: 0; }
-.cal-legend span:last-child { margin-left: 0.3rem; }
-.cal-legend span:first-child { margin-right: 0.3rem; }
-
-/* Activities */
-.activities { padding-top: 1.75rem; }
-.scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 640px; }
-th, td { text-align: left; padding: 0.6rem 0.75rem 0.6rem 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
-th { font-weight: 500; color: var(--muted); font-size: 0.88rem; }
-td.num, th.num { text-align: right; }
-td.name { white-space: normal; }
-.dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; margin-right: 0.4rem; background: var(--nohr); }
+/* ---- Lists of activities: rows on phones and on Home, a table on wide screens */
+.acts { list-style: none; padding: 0; }
+.acts li + li { border-top: 1px solid var(--rule); }
+.act-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; text-align: left; font-weight: 400; transition: transform 0.12s; }
+.act-row::after { content: ""; width: 8px; height: 8px; margin: 0 4px 0 2px; flex: none; border: solid var(--muted); border-width: 2px 2px 0 0; transform: rotate(45deg); opacity: 0.6; }
+.acts li:first-child .act-row { padding-top: 4px; }
+.acts li:last-child .act-row { padding-bottom: 2px; }
+.act-main { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.act-name { font-weight: 700; font-size: 0.97rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-meta { color: var(--muted); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-stats { display: flex; gap: 14px; margin-top: 3px; color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+.act-stats b { color: var(--ink); font-weight: 700; font-size: 0.9rem; }
+.acts .no-match, td.no-match { padding: 1.5rem 0; color: var(--muted); }
+.dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 50%; margin-right: 0.35rem; background: var(--nohr); }
 .dot.low { background: var(--low-aerobic); }
 .dot.high { background: var(--high-aerobic); }
 .dot.anaerobic { background: var(--anaerobic); }
 
-/* Sport filter, like Garmin Connect's row of activity buttons */
-.sports { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 1.25rem; }
-.sports button { border-color: var(--rule); padding: 0.35rem 0.9rem; }
-.sports button span { color: var(--muted); margin-left: 0.35rem; font-size: 0.85rem; }
-.sports button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-.sports button[aria-pressed="true"] span { color: inherit; opacity: 0.75; }
-.sports button:hover:not([aria-pressed="true"]) span { color: inherit; }
-.act-layout { display: grid; gap: 2.5rem; }
-.act-layout > .scroll { min-width: 0; align-self: start; }
-@media (min-width: 1000px) { .act-layout { grid-template-columns: minmax(0, 1fr) 300px; } }
-.act-list { min-width: 0; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.7rem 0.9rem 0.7rem 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { padding-top: 0.2rem; color: var(--muted); font-size: 0.74rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+td.name { white-space: normal; }
+tr:last-child td { border-bottom: 0; }
 .act-table tbody tr { cursor: pointer; }
-.act-table tbody tr:hover td { background: var(--panel); }
-/* The activity name opens the popup; looks like plain text until hovered */
-button.act-link { all: unset; cursor: pointer; font-weight: 500; }
-button.act-link:hover, .act-table tr:hover button.act-link { text-decoration: underline; text-underline-offset: 3px; }
+.act-table tbody tr:hover td { background: color-mix(in srgb, var(--raised) 55%, transparent); }
+.act-table td:first-child { color: var(--muted); }
+/* The activity name opens the activity; looks like plain text until hovered */
+button.act-link { all: unset; cursor: pointer; font-weight: 600; }
+.act-table tr:hover button.act-link { text-decoration: underline; text-underline-offset: 3px; }
+button.act-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 /* Sortable column headers: look like the other headers, with an arrow on the sorted one */
 th button.sort { all: unset; cursor: pointer; }
 th button.sort:hover { color: var(--ink); }
-th button.sort:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; border-radius: 2px; }
+th button.sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 th[aria-sort] { color: var(--ink); }
-td.no-match { color: var(--muted); padding: 1.5rem 0; }
-.search {
-  font: 400 1rem var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 999px;
-  padding: 0.45rem 1rem; width: min(20rem, 100%);
+.act-list > .scroll { display: none; }
+.list-tools { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 6px; }
+.sort-pick { display: flex; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.78rem; }
+.sort-pick select { padding: 0.3rem 0.5rem; border-radius: 10px; font-size: 0.82rem; font-weight: 600; }
+.more { width: 100%; margin-top: 12px; }
+@media (min-width: 900px) {
+  .act-list > .acts, .sort-pick { display: none; }
+  .act-list > .scroll { display: block; }
+  .more { width: auto; }
 }
-button.act-link:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; border-radius: 2px; }
 
-/* Activity popup */
-.act-modal {
-  width: min(1040px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; overflow: hidden;
-  border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); color: var(--ink);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+/* Activities: the search, the sport filter, the list, and this week and this year beside it */
+.search { display: flex; align-items: center; gap: 0.5rem; flex: 1; height: 44px; padding: 0 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--card-line); color: var(--muted); }
+.search svg { width: 18px; height: 18px; }
+.search input { all: unset; flex: 1; min-width: 0; color: var(--ink); font: 400 1rem var(--body); }
+.search:focus-within { border-color: var(--accent); }
+.act-layout { display: flex; flex-direction: column; gap: var(--gap); }
+.act-layout > .volume { order: -1; }
+@media (min-width: 900px) { .search { flex: 0 1 20rem; } }
+@media (min-width: 1100px) {
+  .act-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+  .act-layout > .volume { order: 0; }
 }
-/* No backdrop blur: it's redone for every frame the route replay or a scroll draws, which made the popup stutter */
-.act-modal::backdrop { background: rgba(10, 16, 14, 0.65); }
-.act-modal[open] { animation: modal-in 180ms ease-out; }
-@keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
-@media (prefers-reduced-motion: reduce) { .act-modal[open] { animation: none; } .side, .scrim { transition: none !important; } }
-/* A class set from JS rather than body:has(), which the browser rechecks on every change inside the page */
-body.modal-open { overflow: hidden; }
-/* The box scrolls rather than the dialog, so its scrollbar isn't mistaken for a click outside */
-.modal-box {
-  display: flex; flex-direction: column; gap: 1.5rem; padding: 0 clamp(1.25rem, 3vw, 2.25rem) 2rem;
-  max-height: calc(100dvh - 2rem); overflow: hidden auto; overscroll-behavior: contain;
-}
-/* Stays at the top while the popup scrolls, so the close button is always in reach */
-.modal-head {
-  position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
-  padding: 1.5rem 0 1rem; background: var(--paper); border-bottom: 1px solid var(--rule);
-}
-.modal-head .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.modal-back { display: inline-block; margin-bottom: 0.4rem; font-size: 0.9rem; }
-.modal-head h2 { font: 700 clamp(1.8rem, 5vw, 2.6rem)/1.05 var(--display); margin: 0.15rem 0 0; overflow-wrap: anywhere; }
-button.close {
-  flex: none; width: 2.5rem; height: 2.5rem; padding: 0; border-color: var(--rule);
-  font: 400 1.7rem/1 var(--body); display: grid; place-items: center;
-}
-/* Leaflet's panes have z-indexes of 400+; isolate them so they scroll under the sticky header */
-.modal-map { flex: none; height: clamp(260px, 45vh, 420px); min-height: 0; isolation: isolate; }
-.modal-status { margin: 0; color: var(--muted); }
-.modal-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 1.75rem 2.5rem; }
-.dgroup { min-width: 0; }  /* lets the laps table scroll instead of widening the popup */
-.dgroup h3 { margin: 0 0 0.5rem; font: 600 1.25rem/1.1 var(--display); }
-.dgroup.wide { grid-column: 1 / -1; }
-.dgroup dl { margin: 0; }
-.dgroup dl div { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.4rem 0; border-bottom: 1px solid var(--rule); }
-.dgroup dt { color: var(--muted); font-size: 0.92rem; }
-.dgroup dd { margin: 0; font-weight: 600; text-align: right; }
-.dgroup dd small { display: block; font-weight: 400; color: var(--muted); font-size: 0.8rem; }
-.zones { display: grid; gap: 0.45rem; margin-top: 0.85rem; }
-.zrow { display: grid; grid-template-columns: 3.6rem minmax(0, 1fr) 5.5rem; align-items: center; gap: 0.6rem; font-size: 0.88rem; }
-.zrow > span:first-child { color: var(--muted); }
-.zbar { height: 0.7rem; border-radius: 999px; background: var(--rule); overflow: hidden; }
-.zbar i { display: block; height: 100%; border-radius: 999px; }
-.zval { text-align: right; font-weight: 600; }
-.zval small { font-weight: 400; color: var(--muted); margin-left: 0.4rem; }
-table.laps { min-width: 520px; }
-button.more { margin-top: 1rem; }
-
-/* Weekly and yearly totals, like Strava's side panel */
-.volume { align-self: start; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 1.25rem 1.5rem; }
-.volume .eyebrow { margin: 0 0 0.25rem; color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; }
-.vol-block { padding: 1rem 0; text-align: center; }
-.vol-block + .vol-block { border-top: 1px solid var(--rule); }
-.vol-block h3 { margin: 0; font: 500 0.85rem var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.vol-big { margin: 0.2rem 0 0; font: 600 2.4rem/1.05 var(--display); }
-.vol-big span { font: 500 1rem var(--body); color: var(--muted); margin-left: 0.2rem; }
-.vol-note { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
-.vol-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.35rem; margin-top: 1rem; }
-.vol-days .bar { height: 3.5rem; display: flex; align-items: flex-end; border-bottom: 2px solid var(--rule); }
-.vol-days .bar i { display: block; width: 100%; background: var(--fitness); border-radius: 2px 2px 0 0; }
-.vol-days .day { display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--muted); }
-.vol-days .is-today .day { color: var(--ink); font-weight: 600; }
-.vol-days .future .bar { border-bottom-style: dashed; }
-.vol-long { margin-top: 0.75rem; color: var(--ink); }
+/* This week day by day, and this year */
+.vol-blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 10px; }
+.vol-block h3 { color: var(--muted); font-size: 0.76rem; font-weight: 500; }
+.vol-big { margin-top: 0.1rem; font: 800 1.8rem/1.1 var(--body); letter-spacing: -0.04em; white-space: nowrap; }
+.vol-big span { margin-left: 0.15rem; color: var(--muted); font: 600 0.85rem var(--body); letter-spacing: 0; }
+.vol-note { margin-top: 0.25rem; color: var(--muted); font-size: 0.78rem; }
+.vol-long { color: var(--ink); font-weight: 600; }
 .vol-long:empty { display: none; }
-
-.empty { padding: 4rem 0; max-width: 56ch; }
-.empty h1 { font: 700 3rem/1 var(--display); margin: 0 0 0.75rem; }
-
-/* Login page (login.html): one small form in the middle of the screen */
-.login { min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem 1rem; }
-.login form {
-  width: min(360px, 100%); display: grid; gap: 1rem; padding: 2rem 1.75rem;
-  background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
-}
-.login .eyebrow { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.login h1 { margin: 0.15rem 0 0.25rem; font: 700 2.4rem/1 var(--display); }
-.login label { display: grid; gap: 0.3rem; color: var(--muted); font-size: 0.9rem; }
-.login input {
-  font: 400 1rem var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 0.6rem 0.7rem;
-}
-.login input:focus-visible { outline: 2px solid var(--fitness); outline-offset: 1px; }
-.login button { justify-self: start; margin-top: 0.25rem; padding: 0.5rem 1.4rem; }
-.logout .link-btn { color: var(--muted); font-size: 0.85rem; }
-
-.topbar, .scrim { display: none; }
-@media (max-width: 900px) {
-  .app { grid-template-columns: minmax(0, 1fr); }
-  /* A bar on top with the menu button; the menu slides in from the left over a dimmed page */
-  .topbar {
-    display: flex; align-items: center; gap: 0.5rem; position: sticky; top: 0; z-index: 20;
-    padding: 0.5rem 0; background: var(--paper); border-bottom: 1px solid var(--rule);
-  }
-  .menu-btn { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; margin-left: -0.6rem; padding: 0; border: 0; background: none; color: var(--ink); border-radius: 6px; }
-  .menu-btn:hover { background: var(--panel); }
-  .topbar-title { font: 600 1.15rem/1 var(--display); }
-  .side {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; width: min(82vw, 290px); height: 100dvh;
-    padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.25rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
-    background: var(--paper); transform: translateX(-100%); visibility: hidden;
-    transition: transform 0.25s ease, visibility 0s 0.25s;
-  }
-  .scrim {
-    display: block; position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.4);
-    opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
-  }
-  body.menu-open { overflow: hidden; }
-  .menu-open .side { transform: none; visibility: visible; transition: transform 0.25s ease; box-shadow: 0 0 48px rgba(0, 0, 0, 0.3); }
-  .menu-open .scrim { opacity: 1; pointer-events: auto; }
-  .grid { grid-template-columns: minmax(0, 1fr); }
-  .today, .tiles { grid-template-columns: repeat(2, 1fr); }
-  .today div:nth-child(odd), .tiles div:nth-child(odd) { border-left: 0; padding-left: 0; }
-  .cal-ring { border-left: 0; padding-left: 0; }
+.volume .vol-days { margin-top: 10px; gap: 4px; }
+.volume .vol-days .bar { height: 38px; }
+.vol-link { display: inline-block; margin-top: 14px; }
+@media (min-width: 1100px) {
+  .act-layout .vol-blocks { grid-template-columns: 1fr; gap: 0; }
+  .act-layout .vol-block + .vol-block { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--rule); }
 }
 
-/* Phones: the activity tables drop training effect, heart rate, load and climbing, so they fit without scrolling
-   sideways (the popup has them all) */
-@media (max-width: 600px) {
-  table.act-table { min-width: 0; }
-  .act-table :is(.col-effect, .col-hr, .col-load, .col-ascent, .col-descent) { display: none; }
-  .act-table .weekday { display: none; }
-  .act-table th, .act-table td { padding-right: 0.5rem; }
+/* ---- Train: a session, in steps like a Garmin workout */
+.wk { display: grid; gap: 18px; }
+@media (min-width: 1000px) { .wk { grid-template-columns: minmax(16rem, 2fr) 3fr; gap: 2.5rem; } }
+.wk-total { margin-top: 0.25rem; font: 700 1.05rem/1.2 var(--body); }
+.wk-total:empty, .wk-why:empty { display: none; }
+.wk-why { margin-top: 0.7rem; color: var(--muted); font-size: 0.84rem; }
+.wk-ahead { list-style: none; margin-top: 0.8rem; padding: 0; font-size: 0.88rem; }
+.wk-ahead li { padding: 0.15rem 0; }
+.wk-shape:has(> .wk-bar:empty) { display: none; }
+/* A sent workout's button: "On the watch ✓", turning into "Remove from watch" under a mouse or with focus */
+button.on-watch { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+button.on-watch .rm { display: none; }
+@media (hover: hover) {
+  button.on-watch:is(:hover, :focus-visible) .ok { display: none; }
+  button.on-watch:is(:hover, :focus-visible) .rm { display: inline; }
+  button.on-watch:is(:hover, :focus-visible):not(:disabled) { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); filter: none; }
 }
+/* Block widths follow each step's length, heights its intensity, like the workout preview on the watch */
+.wk-bar { display: flex; gap: 2px; height: 46px; align-items: flex-end; }
+.wk-bar i { display: block; min-width: 2px; border-radius: 3px; }
+.wk-steps { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 14px; }
+.wk-steps li { display: grid; grid-template-columns: 4px 4.6rem minmax(0, 1fr); gap: 0.1rem 0.8rem; align-items: baseline; }
+.wk-steps li::before { content: ""; align-self: stretch; border-radius: 2px; background: var(--c); grid-row: span 2; }
+.wk-steps .len { font: 800 1.15rem/1.15 var(--body); letter-spacing: -0.02em; white-space: nowrap; }
+.wk-steps .what { font-weight: 600; }
+.wk-steps .target { grid-column: 3; color: var(--muted); font-size: 0.82rem; }
+.wk-steps .target:empty { display: none; }
+.wk-steps .reps { grid-template-columns: 4px minmax(0, 1fr); }
+.wk-steps .reps .len { grid-column: 2; }
+.wk-steps .reps ol { grid-column: 2; list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.7rem; }
 
-/* Training plan, under today's workout: the week's sessions, each opening its steps, and every week of the plan */
-.plan-add { margin: 0 0 0.5rem; }
-.plan-add:has(> [hidden]) { display: none; }
+/* The sport's newest activity, its route beside it on wide screens, and the review of a run under both */
+.wk-last-text { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.wk-review-open:has(> [hidden]) { display: none; }
+.wk-review { display: grid; gap: 14px; min-width: 0; }
+.wk-last .wk-review { order: 1; }  /* under the map on phones */
+.wk-last .last-map:not([hidden]) + .wk-review:not([hidden]) { margin-top: var(--pad); }
+@media (min-width: 1000px) {
+  .last.wk-last { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 2rem; }
+  .last.wk-last:has(> .last-map[hidden]) { grid-template-columns: minmax(0, 1fr); }
+  .wk-last .last-map { height: auto; min-height: 250px; margin: 0; border-radius: 14px; }
+  .wk-last .wk-review { grid-column: 1 / -1; }
+  .wk-last .last-map:not([hidden]) + .wk-review:not([hidden]) { margin-top: 0; }
+}
+.wk-review-title, .wk-review-why, .wk-review .pending { color: var(--muted); font-size: 0.84rem; }
+.wk-review .error { color: var(--bad); }
+table.laps.review td.ok { color: var(--good); font-weight: 700; }
+table.laps.review td.off { color: var(--bad); font-weight: 600; }
+.wk-review-note { display: grid; gap: 0.6rem; max-width: 72ch; padding: 14px; border-radius: 14px; background: var(--raised); }
+.chat-usage { color: var(--muted); font-size: 0.72rem; }
 
-/* The plan in one line: name, projected range, last change, target, where in the plan */
-.plan-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1.6rem; padding: 0.9rem 0; border-block: 1px solid var(--rule); }
-.plan-line h2 { font: 700 1.6rem/1.1 var(--display); margin: 0; }
-.plan-stat { display: flex; align-items: baseline; gap: 0.45rem; color: var(--muted); font-size: 0.92rem; }
-.plan-stat b { font: 600 1.6rem/1 var(--display); color: var(--ink); }
-.plan-stat .under, .plan-stat .over { font-weight: 600; font-size: 1rem; }
-.plan-stat .under { color: var(--good); }
-.plan-stat .over { color: var(--fatigue); }
-.plan-when { color: var(--muted); font-size: 0.92rem; }
+/* The plan in a card: name, where in it, projected range, last change, target */
+.plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.plan-head h2 { margin-top: 0.15rem; font: 800 1.35rem/1.15 var(--body); letter-spacing: -0.03em; }
+.plan-stats { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 14px; }
+.plan-stats:not(:has(> :not([hidden]))) { display: none; }
+.plan-stat { display: flex; flex-direction: column; gap: 0.15rem; color: var(--muted); font-size: 0.78rem; }
+.plan-stat b { color: var(--ink); font: 800 1.5rem/1.1 var(--body); letter-spacing: -0.035em; }
+.plan-stat :is(.under, .over) { font-weight: 800; font-size: 1.1rem; line-height: 1.5rem; }
 
-/* The next 7 days: each session tinted with its type's (or sport's) colour, rest days dashed; a day with two sports
-   holds two shorter buttons */
-.strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.45rem; margin: 1.25rem 0 0; }
-.strip .col { display: grid; gap: 0.3rem; }
+/* The next 7 days: each session with its type's (or sport's) colour down its side, rest days dashed; a day with two
+   sports holds two shorter buttons. A row to swipe on phones. */
+.strip { display: grid; grid-auto-flow: column; grid-auto-columns: 7.1rem; gap: 8px; margin: var(--gap) calc(var(--gutter) * -1) 0; padding: 0 var(--gutter);
+  overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; scroll-padding: 0 var(--gutter); }
+.strip::-webkit-scrollbar { display: none; }
+.strip .col { display: grid; gap: 6px; scroll-snap-align: start; }
 .strip .day {
-  all: unset; box-sizing: border-box; cursor: pointer; position: relative; display: flex; flex-direction: column; gap: 0.15rem;
-  min-height: 6.2rem; padding: 0.6rem 0.65rem 0.65rem; border-radius: 8px; overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--c) 45%, var(--rule)); background: color-mix(in srgb, var(--c) 13%, transparent);
+  position: relative; display: flex; flex-direction: column; gap: 0.2rem; min-height: 6.6rem; padding: 11px 12px 11px 15px;
+  border-radius: 14px; overflow: hidden; text-align: left; font-weight: 400; background: var(--panel); border: 1px solid var(--card-line);
+  transition: transform 0.12s, box-shadow 0.15s;
 }
-.strip .day::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--c); }
-.strip .day.rest { border: 1px dashed var(--rule); background: none; }
+.strip .day::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--c); }
+.strip .day.rest { background: none; border-style: dashed; border-color: var(--rule); }
 .strip .day.rest::before { display: none; }
-.strip .day:hover { color: var(--ink); background: color-mix(in srgb, var(--c, var(--rule)) 22%, transparent); }
-.strip .day[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
-.strip .day:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
-.strip .dn { color: var(--muted); font-size: 0.8rem; }
-.strip .dt { font: 600 1.08rem/1.1 var(--display); }
+.strip .day[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); border-color: transparent; }
+.strip .dn { color: var(--muted); font-size: 0.74rem; font-weight: 600; }
+.strip .dn .now { color: var(--accent); font-weight: 800; }
+.strip .dt { font: 700 0.92rem/1.2 var(--body); letter-spacing: -0.01em; }
 .strip .rest .dt { color: var(--muted); font-weight: 500; }
-.strip .dk { margin-top: auto; color: var(--muted); font-size: 0.8rem; }
-.strip .tag { position: absolute; top: 0.5rem; right: 0.5rem; padding: 0 0.45rem; border-radius: 999px; font-size: 0.68rem; font-weight: 600;
-  letter-spacing: 0.05em; text-transform: uppercase; background: var(--volt); color: var(--on-volt); }
-.strip .tag.sent { background: none; color: var(--good); font-size: 0.8rem; }
-.strip .two .day { min-height: 3rem; }
-.strip .two .dt { font-size: 0.95rem; }
+.strip .dk { margin-top: auto; color: var(--muted); font-size: 0.72rem; }
+.strip .tag.sent { position: absolute; top: 9px; right: 10px; color: var(--good); font-size: 0.8rem; font-weight: 800; }
+.strip .two .day { min-height: 3.1rem; }
+@media (min-width: 900px) {
+  .strip { grid-auto-flow: row; grid-template-columns: repeat(7, minmax(0, 1fr)); margin: var(--gap) 0 0; padding: 0; overflow: visible; }
+  .strip .day:hover { background: color-mix(in srgb, var(--panel) 90%, var(--ink)); }
+}
 
 /* Week by week: planned km per week split by session type, the km done as a line, phases underneath */
-.plan-weeks { padding: 1.75rem 0; border-bottom: 1px solid var(--rule); }
+.plan-weeks .section-head { margin-bottom: 0.2rem; }
 .plan-weeks .wk-send { margin-top: 0; }
-.kind-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0.6rem 0 1rem; color: var(--muted); font-size: 0.82rem; }
-.kind-legend i { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 2px; margin-right: 0.35rem; vertical-align: -1px; }
-.kmchart .bars, .kmchart .wnums, .kmchart .wphases { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 0.45rem; }
+.kind-legend { margin: 0.4rem 0 1.1rem; }
+.kmchart .bars, .kmchart .wnums, .kmchart .wphases { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 0.25rem; }
 .kmchart .bars { height: 170px; align-items: end; border-bottom: 1px solid var(--rule); }
-.wbar { all: unset; box-sizing: border-box; cursor: pointer; position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.2rem; }
-.wbar .km { color: var(--muted); font-size: 0.78rem; text-align: center; }
-.wbar .stack { display: flex; flex-direction: column-reverse; gap: 2px; min-height: 2px; border-radius: 4px 4px 0 0; overflow: hidden; }
+.wbar { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 0.2rem; }
+.wbar .km { color: var(--muted); font-size: 0.66rem; font-weight: 500; text-align: center; }
+.wbar .stack { display: flex; flex-direction: column-reverse; gap: 2px; min-height: 2px; border-radius: 5px 5px 0 0; overflow: hidden; }
 .wbar .stack i { display: block; min-height: 2px; }
 .wbar.light .stack { opacity: 0.5; }
-.wbar .done { position: absolute; left: -2px; right: -2px; height: 2px; border-radius: 1px; background: var(--ink); }
-.wbar[aria-pressed="true"] .km { color: var(--ink); font-weight: 600; }
+.wbar .done { position: absolute; left: -1px; right: -1px; height: 2px; border-radius: 1px; background: var(--ink); }
+.wbar[aria-pressed="true"] .km { color: var(--ink); font-weight: 800; }
 .wbar[aria-pressed="true"] .stack { outline: 2px solid var(--ink); outline-offset: 2px; }
-.wbar:focus-visible { outline: 2px solid var(--fitness); outline-offset: 2px; }
-.kmchart .wbar:hover { background: none; color: inherit; }
-.kmchart .wbar:hover .stack { filter: brightness(1.12); }
-.kmchart .wnums { padding-top: 0.3rem; color: var(--muted); font-size: 0.78rem; text-align: center; }
-.kmchart .wnums .now { color: var(--ink); font-weight: 600; }
-.kmchart .wphases { margin-top: 0.35rem; color: var(--muted); font-size: 0.78rem; }
-.kmchart .wphases span { border-top: 2px solid var(--rule); padding-top: 0.2rem; }
-.plan-week-title { margin: 1.5rem 0 0; font: 600 1.15rem/1.2 var(--display); }
-.plan-sessions { list-style: none; margin: 0.6rem 0 0; padding: 0; }
-.kdot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; background: var(--c); margin-right: 0.5rem; }
-.ps { border-top: 1px solid var(--rule); }
-.ps-row { display: grid; grid-template-columns: 7rem minmax(0, 1.4fr) 8.5rem 8.5rem minmax(0, 1.4fr); gap: 0.25rem 1rem; align-items: baseline; padding: 0.7rem 0; cursor: pointer; list-style: none; }
+@media (hover: hover) { .kmchart .wbar:hover .stack { filter: brightness(1.15); } }
+.kmchart .wnums { padding-top: 0.35rem; color: var(--muted); font-size: 0.68rem; text-align: center; }
+.kmchart .wnums .now { color: var(--ink); font-weight: 800; }
+.kmchart .wphases { margin-top: 0.35rem; color: var(--muted); font-size: 0.7rem; }
+.kmchart .wphases span { border-top: 2px solid var(--rule); padding-top: 0.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-week-title { margin: 1.4rem 0 0.2rem; font: 700 0.95rem/1.3 var(--body); }
+.plan-sessions { list-style: none; padding: 0; }
+.kdot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 3px; background: var(--c); margin-right: 0.5rem; }
+.ps + .ps { border-top: 1px solid var(--rule); }
+.ps-row { display: grid; grid-template-columns: 5.4rem minmax(0, 1fr); gap: 0.15rem 0.8rem; align-items: baseline; padding: 0.75rem 0; cursor: pointer; list-style: none; }
 div.ps-row { cursor: default; }
 .ps-row::-webkit-details-marker { display: none; }
-.ps-day, .ps-size, .ps-pace { color: var(--muted); font-size: 0.92rem; white-space: nowrap; }
-.ps-title { font-weight: 600; }
-.ps-status { font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.2rem 0.6rem; }
-.ps-done { color: var(--good); font-weight: 600; white-space: nowrap; }
-.ps-missed { color: var(--muted); }
+.ps-day, .ps-size, .ps-pace { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+.ps-size, .ps-pace, .ps-status { grid-column: 2; }
+:is(.ps-size, .ps-pace, .ps-status):empty { display: none; }
+.ps-title { font-weight: 700; }
+.ps-status { display: flex; flex-wrap: wrap; gap: 0.15rem 0.6rem; font-size: 0.82rem; }
+.ps-done { color: var(--good); font-weight: 700; white-space: nowrap; }
+.ps-missed, .verdict { color: var(--muted); }
 .is-missed .ps-title, .is-moved .ps-title { color: var(--muted); text-decoration: line-through; }
-.verdict { color: var(--muted); }
 .verdict.better { color: var(--good); }
-.verdict.worse { color: var(--fatigue); }
+.verdict.worse { color: var(--bad); }
 .ps-steps { padding: 0.25rem 0 1.25rem; max-width: 46rem; }
-.ps-steps .wk-steps { margin-top: 1rem; }
+@media (min-width: 900px) {
+  .kmchart .bars, .kmchart .wnums, .kmchart .wphases { gap: 0.45rem; }
+  .wbar .km, .kmchart .wnums { font-size: 0.74rem; }
+  .ps-row { grid-template-columns: 7rem minmax(0, 1.4fr) 8.5rem 8.5rem minmax(0, 1.4fr); gap: 0.25rem 1rem; }
+  .ps-size, .ps-pace, .ps-status { grid-column: auto; }
+  :is(.ps-size, .ps-pace, .ps-status):empty { display: block; }
+}
+
+/* The coach: the conversation, then the box to write in */
+.chat h2 { display: flex; align-items: center; gap: 0.5rem; }
+.chat h2 svg { width: 20px; height: 20px; color: var(--accent); }
+.chat-hint { margin-bottom: 12px; color: var(--muted); font-size: 0.84rem; max-width: 60ch; }
+.chat-log { list-style: none; margin: 4px 0 12px; padding: 0; display: grid; gap: 10px; max-height: 26rem; overflow-y: auto; overscroll-behavior: contain; }
+.chat-log li { max-width: min(42rem, 88%); line-height: 1.45; overflow-wrap: anywhere; }
+.chat-log .user { justify-self: end; padding: 0.5rem 0.85rem; border-radius: 16px 16px 4px 16px; background: var(--accent); color: var(--on-accent); white-space: pre-wrap; }
+.chat-log .assistant { justify-self: start; padding: 0.6rem 0.85rem; border-radius: 16px 16px 16px 4px; background: var(--raised); }
+.chat-log .assistant p + p, .wk-review-note p + p { margin-top: 0.5rem; }
+.chat-log .error { color: var(--bad); }
+.chat-log .pending { color: var(--muted); }
+.chat-changes { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chat-changes li { padding: 0.1rem 0.6rem; border-radius: 999px; background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); font-size: 0.8rem; font-weight: 600; }
+.chat-form { display: flex; gap: 8px; align-items: flex-end; }
+.chat-form textarea { flex: 1; resize: none; max-height: 9rem; line-height: 1.4; border-radius: 22px; padding: 0.6rem 1rem; }
+.chat-form .icon-btn { width: 44px; height: 44px; }
+.chat-foot { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; align-items: baseline; margin-top: 0.6rem; color: var(--muted); font-size: 0.8rem; }
+.chat-foot:not(:has(> :not([hidden], :empty))) { display: none; }
+.chat-foot span:empty { display: none; }
+.chat-foot span.error { color: var(--bad); }
+
+/* ---- Progress */
+.story { max-width: 70ch; margin-top: 0.35rem; font-size: 0.98rem; line-height: 1.5; }
+.story strong { color: var(--accent); }
+/* Race goal: what, when and how far off, with Garmin's prediction moving toward the target */
+.race { display: grid; gap: 18px; }
+@media (min-width: 1100px) { .race { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 2.5rem; align-items: center; } }
+.race-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.race h2 { margin-top: 0.15rem; font: 800 1.5rem/1.15 var(--body); letter-spacing: -0.03em; }
+.race-stats { margin-top: 16px; }
+@media (min-width: 900px) { .race-stats { --cols: 3; } }
+.race-trend .chart { height: 180px; }
+
+/* Garmin training status, and its load focus */
+.tstatus { display: contents; }
+.tstatus-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.9rem; }
+#tsLabel { margin-top: 0.15rem; font: 800 clamp(2rem, 9vw, 2.7rem)/1.05 var(--body); letter-spacing: -0.04em; color: var(--status-color, var(--ink)); }
+.since, .facts { color: var(--muted); font-size: 0.84rem; }
+.facts { margin-top: 0.3rem; }
+.weeks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 clamp(0.5rem, 2.5vw, 1.1rem); margin-top: 1.1rem; max-width: 620px; }
+.week .days { display: flex; gap: 3px; }
+.week .days i { flex: 1; height: 1.15rem; border-radius: 4px; background: var(--raised); }
+.week .days i.today { outline: 2px solid var(--ink); outline-offset: 1px; }
+.week span { display: block; margin-top: 0.4rem; color: var(--muted); font-size: 0.68rem; }
+.focus h3 { margin-top: 0.15rem; font: 800 1.5rem/1.15 var(--body); letter-spacing: -0.03em; color: var(--focus-color, var(--ink)); }
+.focus .about { margin-top: 0.4rem; max-width: 60ch; color: var(--muted); font-size: 0.86rem; }
+.frows { display: grid; gap: 0.8rem; margin-top: 1.1rem; max-width: 600px; }
+.frow { display: grid; grid-template-columns: 6rem 2.6rem minmax(0, 1fr) 4.2rem; align-items: center; gap: 0.6rem; font-size: 0.86rem; }
+.frow .fval { text-align: right; font-weight: 800; }
+.frow .fstate { color: var(--muted); font-size: 0.76rem; }
+.track { position: relative; height: 1.1rem; }
+.track .range { position: absolute; top: 0; bottom: 0; border: 1.5px dashed var(--muted); border-radius: 999px; }
+.track .fill { position: absolute; left: 0; top: 50%; height: 0.55rem; transform: translateY(-50%); border-radius: 999px; }
+.status-legend i.range-key { width: 1.5rem; background: none; border: 1.5px dashed var(--muted); border-radius: 999px; }
+
+/* Form, inside the fitness and fatigue card */
+.form-now { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; color: var(--muted); font-size: 0.86rem; }
+.form-now .state { display: inline-flex; align-items: center; gap: 6px; padding: 0.22rem 0.65rem 0.22rem 0.55rem; border-radius: 999px; background: var(--raised); color: var(--ink); font-size: 0.8rem; font-weight: 700; }
+.form-now .state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--state-color, var(--muted)); }
+
+/* Training calendar: a column per week, Monday at the top, the month above its first week */
+.cal-scroll { overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--pad) * -1); padding: 0 var(--pad); }
+.cal-scroll::-webkit-scrollbar { display: none; }
+.cal { display: flex; gap: 6px; min-width: 660px; }
+.cal-labels, .cal-grid { display: grid; grid-template-rows: 1.1rem repeat(7, 1fr); gap: 3px; }
+.cal-grid { flex: 1; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.cal-label, .cal-month { color: var(--muted); font-size: 0.66rem; line-height: 1; white-space: nowrap; }
+.cal-label { align-self: center; }
+.cal-day { display: block; aspect-ratio: 1; border-radius: 3px; background: var(--raised); }
+.cal-day.on { cursor: pointer; }
+.cal-day.on:hover { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cal-day.future { background: none; }
+.cal-legend { align-items: center; gap: 0.25rem; margin: 0; }
+.cal-legend i { margin: 0; }
+.cal-legend span:last-child { margin-left: 0.25rem; }
+.cal-legend span:first-child { margin-right: 0.25rem; }
+
+/* The sports with a page of their own */
+.sport-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 8px; margin-top: 6px; }
+.sport-card { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 14px; background: var(--raised); transition: transform 0.12s; }
+.sport-card > svg { width: 16px; height: 16px; color: var(--muted); }
+.sc-main { display: grid; flex: 1; min-width: 0; }
+.sc-main b { font-weight: 700; }
+.sc-main span { color: var(--muted); font-size: 0.76rem; }
+.sc-big { font: 800 1.1rem var(--body); letter-spacing: -0.03em; white-space: nowrap; }
+.sc-big span { margin-left: 0.12rem; color: var(--muted); font: 600 0.74rem var(--body); letter-spacing: 0; }
+
+/* ---- Health: last night and today, with today's calories as a ring at the end */
+.hero-cal { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 32px; }
+.hero-cal .tiles { flex: 1 1 22rem; }
+.hero-from { flex: 1 1 100%; margin-bottom: -6px; }
+.card h2 .period { margin-left: 0.4rem; font-weight: 400; letter-spacing: 0; }
+@media (min-width: 900px) { .hero-cal .tiles { --cols: 4; } }
+.cal-ring { display: flex; align-items: center; gap: 1rem; }
+.cal-ring svg { width: 104px; height: 104px; flex: none; }
+.cal-ring circle { fill: none; stroke-width: 11; }
+.cal-ring .cal-rest { stroke: var(--low-aerobic); }
+.cal-ring .cal-active { stroke: var(--accent); stroke-linecap: butt; }
+.cal-ring text { text-anchor: middle; fill: var(--ink); }
+.cal-ring .cal-total { font: 800 24px var(--body); letter-spacing: -0.03em; }
+.cal-ring .cal-unit { font: 500 12px var(--body); fill: var(--muted); }
+.cal-key p { margin: 0.2rem 0; color: var(--muted); font-size: 0.84rem; white-space: nowrap; }
+.cal-key p.eyebrow { margin-bottom: 0.4rem; font-size: 0.72rem; }
+.cal-key b { margin-right: 0.25rem; color: var(--ink); font-weight: 700; }
+.cal-key i { display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 3px; margin-right: 0.45rem; background: var(--low-aerobic); vertical-align: -1px; }
+.cal-key i.active { background: var(--accent); }
+
+/* ---- A sport's page */
+.sport-head { align-items: center; gap: 14px; }
+/* Personal bests: label, value and date; each opens its top five, and each of those its activity */
+.records { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 0 2.5rem; align-items: start; margin-top: 4px; }
+.records .rec, .records .empty-rec { border-bottom: 1px solid var(--rule); }
+.records .empty-rec { opacity: 0.55; }
+.records button, .records .empty-rec { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.1rem 1rem; width: 100%; padding: 0.7rem 0; text-align: left; font-weight: 400; }
+.records .rl { color: var(--muted); font-size: 0.86rem; }
+.rec-head .rl::after { content: " ▾"; font-size: 0.75em; }
+.rec-head[aria-expanded="true"] .rl::after { content: " ▴"; }
+.records .rv { font-weight: 800; text-align: right; }
+.records .rv small { font-weight: 500; }
+.records small { color: var(--muted); font-size: 0.76rem; }
+.rec-head small, .empty-rec small { grid-column: 1 / -1; }
+.rec-top { list-style: none; margin: 0 0 0.5rem; padding: 4px 12px; border-radius: 12px; background: var(--raised); }
+.rec-top button { grid-template-columns: 1.1rem minmax(0, 1fr) auto; align-items: baseline; padding: 0.5rem 0; }
+.rec-top .rn { color: var(--muted); font-size: 0.76rem; }
+.rec-top .rn + small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) { .records button:hover .rl, .records button:hover small { color: var(--ink); } }
+
+/* ---- Sheets: up from the bottom on phones, a window in the middle on wide screens */
+dialog.sheet {
+  position: fixed; inset: auto 0 0 0; width: 100%; max-width: none; max-height: 92dvh; margin: 0; padding: 0; border: 0;
+  border-radius: 22px 22px 0 0; background: var(--panel); color: var(--ink); overflow: hidden; box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.45);
+}
+dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.6); }
+dialog.sheet[open] { animation: sheet-up 0.3s cubic-bezier(0.2, 0.85, 0.25, 1); }
+dialog.sheet[open]::backdrop { animation: fade-in 0.25s ease-out; }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
+.sheet-box { display: grid; gap: 14px; max-height: 92dvh; padding: 20px var(--gutter) calc(22px + env(safe-area-inset-bottom, 0px)); overflow: hidden auto; overscroll-behavior: contain; }
+.sheet-box h2 { font: 800 1.35rem/1.15 var(--body); letter-spacing: -0.03em; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+@media (min-width: 900px) {
+  dialog.sheet { inset: 0; width: min(440px, calc(100% - 2rem)); height: fit-content; max-height: calc(100dvh - 2rem); margin: auto; border-radius: 22px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45); }
+  dialog.sheet[open] { animation: modal-in 0.18s ease-out; }
+  .sheet-box { max-height: calc(100dvh - 2rem); padding: 24px; }
+}
+/* A class set from JS rather than body:has(), which the browser rechecks on every change inside the page */
+body.modal-open { overflow: hidden; }
+
+/* Settings */
+.set-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 0 0; border-top: 1px solid var(--rule); }
+.set-row > div:first-child { display: grid; gap: 0.1rem; flex: 1 1 12rem; }
+.set-row > div:first-child span { color: var(--muted); font-size: 0.8rem; }
+
+/* The race goal and training plan forms */
+.form-sheet label { display: grid; gap: 0.3rem; color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.form-error { color: var(--bad); font-size: 0.88rem; }
+.form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.form-actions .link-btn { margin-left: auto; padding: 0.5rem 0; }
 /* The plan form's days: a row per sport, a column per weekday, and each sport's fields two to a row */
 .plan-grid { border: 0; margin: 0; padding: 0; min-width: 0; }
-.plan-grid legend { color: var(--muted); font-size: 0.9rem; padding: 0; margin-bottom: 0.3rem; }
-.plan-grid table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
+.plan-grid legend { padding: 0; margin-bottom: 0.3rem; color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.plan-grid table { table-layout: fixed; }
 .plan-grid th, .plan-grid td { border-bottom: 0; white-space: normal; }
-.plan-grid th { color: var(--muted); font-size: 0.85rem; font-weight: 500; text-align: center; padding: 0 0 0.25rem; }
-.plan-grid th[scope="row"], .plan-grid tr:first-child th:first-child { width: 3.2rem; text-align: left; color: var(--ink); padding: 0; }
-.plan-grid td { text-align: center; padding: 0.2rem 0; }
-.race-dialog .plan-grid input, .race-dialog .plan-check input { width: 1.1rem; height: 1.1rem; margin: 0; padding: 0; }
-.race-dialog .plan-check { display: flex; align-items: center; gap: 0.5rem; color: var(--ink); font-size: 0.95rem; }
-.plan-sport { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
-.plan-sport input, .plan-sport select { width: 100%; min-width: 0; box-sizing: border-box; }
-.race-stats .note a { color: var(--fitness); }
-@media (max-width: 760px) {
-  .ps-row { grid-template-columns: 5.5rem minmax(0, 1fr); }
-  .ps-size, .ps-pace, .ps-status { grid-column: 2; }
-  .strip { gap: 0.25rem; }
-  .strip .day { min-height: 4.8rem; padding: 0.5rem 0.35rem; }
-  .strip .dt { font-size: 0.88rem; overflow-wrap: anywhere; }
-  .strip .dk { display: none; }
-  .strip .tag { position: static; align-self: flex-start; margin-top: auto; font-size: 0.6rem; padding: 0 0.3rem; }
-  .kmchart .bars, .kmchart .wnums, .kmchart .wphases { gap: 0.2rem; }
-  .wbar .km { font-size: 0.68rem; }
+.plan-grid th { padding: 0 0 0.25rem; color: var(--muted); font-size: 0.72rem; font-weight: 600; text-align: center; text-transform: none; letter-spacing: 0; }
+.plan-grid th[scope="row"], .plan-grid tr:first-child th:first-child { width: 3rem; padding: 0; color: var(--ink); text-align: left; font-size: 0.82rem; }
+.plan-grid td { padding: 0.15rem 0; text-align: center; }
+.plan-grid input, .plan-check input { width: 1.5rem; height: 1.5rem; margin: 0; padding: 0; accent-color: var(--accent); }
+.form-sheet .plan-check { display: flex; align-items: center; gap: 0.6rem; color: var(--ink); font-size: 0.92rem; }
+.plan-sport { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
+
+/* An activity: the whole screen on phones */
+dialog.act-modal { inset: 0; max-height: none; height: 100dvh; border-radius: 0; background: var(--paper); box-shadow: none; }
+.modal-box { display: flex; flex-direction: column; gap: 14px; height: 100%; padding: 0 var(--gutter) calc(24px + env(safe-area-inset-bottom, 0px)); overflow: hidden auto; overscroll-behavior: contain; }
+/* Stays at the top while the sheet scrolls, so the close button is always in reach */
+.modal-head {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; flex: none;
+  margin: 0 calc(var(--gutter) * -1); padding: calc(10px + env(safe-area-inset-top, 0px)) var(--gutter) 10px;
+  background: color-mix(in srgb, var(--paper) 90%, transparent); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
+}
+.modal-titles { flex: 1; min-width: 0; }
+.modal-head h2 { font: 800 1.3rem/1.15 var(--body); letter-spacing: -0.03em; overflow-wrap: anywhere; }
+.modal-back { display: block; margin-bottom: 0.2rem; }
+#modalEffect { margin-top: -6px; }
+/* Leaflet's panes have z-indexes of 400+; isolate them so they scroll under the sticky header */
+.modal-map { flex: none; height: clamp(240px, 42vh, 400px); margin: 0 calc(var(--gutter) * -1); border-radius: 0; }
+#modalStats, .modal-review .wk-review, .dgroup { padding: var(--pad); border-radius: var(--r); background: var(--panel); border: 1px solid var(--card-line); }
+#modalStats:empty { display: none; }
+/* The coach's review: a button, and the review under it once asked for */
+.modal-review { display: grid; gap: var(--gap); }
+.modal-review > button { background: var(--panel); border: 1px solid var(--card-line); }
+.modal-review > button svg { color: var(--accent); }
+@media (min-width: 900px) { .modal-review > button { justify-self: start; } }
+.modal-status { color: var(--muted); font-size: 0.88rem; }
+.modal-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: var(--gap); }
+.dgroup { min-width: 0; }  /* lets the laps table scroll instead of widening the sheet */
+.dgroup h3 { margin-bottom: 0.4rem; font: 700 1rem/1.25 var(--body); }
+.dgroup.wide { grid-column: 1 / -1; }
+.dgroup dl div { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--rule); }
+.dgroup dl div:last-child { border-bottom: 0; padding-bottom: 0; }
+.dgroup dt { color: var(--muted); font-size: 0.86rem; }
+.dgroup dd { font-weight: 700; text-align: right; }
+.dgroup dd small { display: block; color: var(--muted); font-weight: 400; font-size: 0.76rem; }
+.zones { display: grid; gap: 0.5rem; margin-top: 0.85rem; }
+.zrow { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr) 5.4rem; align-items: center; gap: 0.6rem; font-size: 0.82rem; }
+.zrow > span:first-child { color: var(--muted); }
+.zbar { height: 0.7rem; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.zbar i { display: block; height: 100%; border-radius: 999px; }
+.zval { text-align: right; font-weight: 700; }
+.zval small { margin-left: 0.4rem; color: var(--muted); font-weight: 400; }
+table.laps { min-width: 480px; font-size: 0.88rem; }
+table.laps th, table.laps td { padding: 0.55rem 0.9rem 0.55rem 0; }
+@media (min-width: 900px) {
+  dialog.act-modal { inset: 0; width: min(1040px, calc(100% - 2rem)); height: fit-content; max-height: calc(100dvh - 2rem); margin: auto; border-radius: 22px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45); }
+  .modal-box { height: auto; max-height: calc(100dvh - 2rem); padding: 0 28px 28px; gap: var(--gap); }
+  .modal-head { margin: 0 -28px; padding: 20px 28px 14px; }
+  .modal-head h2 { font-size: 1.7rem; }
+  .modal-head #modalClose { order: 3; }
+  .modal-map { margin: 0; border-radius: var(--r); }
+}
+
+/* ---- Login page (login.html): one small form in the middle of the screen */
+.login { min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem 1rem; }
+.login form { width: min(360px, 100%); display: grid; gap: 1rem; padding: 1.75rem 1.5rem; border-radius: 22px; background: var(--panel); border: 1px solid var(--card-line); }
+.login .brand-mark { display: block; width: 44px; height: 44px; margin-bottom: 1rem; border-radius: 13px; background: var(--accent)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231A0802' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 13h3.2l1.8-4.2 3 8.4 2.2-6.2 1.3 2h3.5'/%3E%3C/svg%3E") center / 32px no-repeat; }
+.login h1 { margin-top: 0.2rem; font: 800 1.9rem/1.1 var(--body); letter-spacing: -0.035em; }
+.login label { display: grid; gap: 0.3rem; color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.login button { justify-self: stretch; margin-top: 0.25rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

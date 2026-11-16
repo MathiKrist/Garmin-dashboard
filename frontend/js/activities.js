@@ -2,7 +2,7 @@
 
 import { data } from "./state.js";
 import { $, escapeHtml } from "./util.js";
-import { sportCounts, sportsByCount, sportLabel, PAGE, DEFAULT_SORT, sortRows, nextSort, tableParts, renderVolume } from "./sports.js";
+import { sportCounts, sportsByCount, sportLabel, PAGE, DEFAULT_SORT, sortRows, nextSort, tableParts, renderVolume, actRows, sortOptions, pickedSort } from "./sports.js";
 
 let sport = "all";
 
@@ -32,11 +32,16 @@ export function renderActivities() {
     `<button type="button" data-sport="${key}" aria-pressed="${key === sport}">${label}<span>${key === "all" ? acts.length : counts[key]}</span></button>`).join("");
 
   const list = sport === "all" ? acts : acts.filter((a) => a.sport === sport);
-  // The search and the sort order only change the table; the totals next to it follow the sport filter
+  // The search and the sort order only change the list; the totals next to it follow the sport filter
   const q = query.trim().toLowerCase(), rows = sortRows(q ? list.filter((a) => matches(a, q)) : list, sort);
+  const none = `No activities match “${escapeHtml(query.trim())}”.`;
+  // A table on wide screens, a list of rows on phones (styles.css shows one or the other)
   const t = tableParts(rows.slice(0, shown), sport, sort);
   $("actHead").innerHTML = t.head;
-  $("actBody").innerHTML = rows.length ? t.body : `<tr><td class="no-match" colspan="${t.width}">No activities match “${escapeHtml(query.trim())}”.</td></tr>`;
+  $("actBody").innerHTML = rows.length ? t.body : `<tr><td class="no-match" colspan="${t.width}">${none}</td></tr>`;
+  $("actCards").innerHTML = rows.length ? actRows(rows.slice(0, shown)) : `<li class="no-match">${none}</li>`;
+  $("actCount").textContent = `${rows.length.toLocaleString("en-GB")} ${rows.length === 1 ? "activity" : "activities"}`;
+  $("actSort").innerHTML = sortOptions(sport, sort);
   $("actMore").hidden = rows.length <= shown;
   $("actMore").textContent = `Show more (${rows.length - shown} left)`;
 
@@ -54,6 +59,11 @@ $("actHead").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-sort]");
   if (!b) return;
   sort = nextSort(sort, b.dataset.sort);
+  renderActivities();
+});
+
+$("actSort").addEventListener("change", (e) => {
+  sort = pickedSort(e.target.value);
   renderActivities();
 });
 

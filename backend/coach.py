@@ -1,4 +1,4 @@
-"""The chat on the Workout page: Claude, with tools that change the suggested or planned sessions.
+"""The chat on the Train page: Claude, with tools that change the suggested or planned sessions.
 
 Claude is reached one of two ways: through the Anthropic API when ANTHROPIC_API_KEY is set (billed per message, on
 Haiku unless CHAT_MODEL says sonnet), otherwise through the Claude Code program on this machine, run in the background
@@ -49,7 +49,7 @@ MAX_ROUNDS = 8  # tool rounds per message (with Claude Code: answers after chang
 LOG_KEY = "coach_chat"
 _lock = threading.Lock()  # one message at a time: the conversation and the changes are shared by every device
 
-SYSTEM = """You are the coach in a personal training dashboard. The athlete talks to you from the Workout page, which \
+SYSTEM = """You are the coach in a personal training dashboard. The athlete talks to you from the Train page, which \
 shows today's suggested session per sport (running and cycling) and, if they have one, a training plan toward a race, \
 a triathlon or general fitness: runs, and rides and swims if they picked those. The sessions come from Garmin's numbers: readiness, training status, load focus, lactate \
 threshold and race predictions.

@@ -1039,7 +1039,7 @@ def week_key(sessions):
 
 
 def todays(plan, today):
-    """Today's session for each of the plan's sports as a workout for the Workout page (the shape workouts.recommend
+    """Today's session for each of the plan's sports as a workout for the Train page (the shape workouts.recommend
     gives), or a rest day; a triathlon's race day under running."""
     if plan["over"]:
         return []

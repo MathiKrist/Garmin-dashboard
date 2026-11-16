@@ -159,7 +159,7 @@ def seed(db_path, days=420):
 
 def todays_run(conn, rng, today):
     """This morning's threshold intervals, run from a workout sent to the watch from the dashboard (Garmin marks the
-    activity with the workout's id), with a lap per step: the Workout page shows it at the top, with its review."""
+    activity with the workout's id), with a lap per step: the Train page shows it at the top, with its review."""
     t = workouts.Targets({"lt_speed": 3.45, "zones": [98, 117, 137, 156, 175, 195]}, None)
     steps = workouts._run_steps("threshold", 60, t)  # 4 × 8 min, the third a little slow
     laps = []

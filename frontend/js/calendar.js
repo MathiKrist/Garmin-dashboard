@@ -4,7 +4,7 @@ import { data } from "./state.js";
 import { $, css, fmtDay, mondayOf, alpha, addDays, fmtHours, escapeHtml } from "./util.js";
 
 const WEEKS = 53;
-// Shades of the fitness color for the four load levels (quartiles of the days you trained)
+// Shades of the accent color for the four load levels (quartiles of the days you trained)
 const LEVEL_ALPHA = [0.25, 0.45, 0.7, 1];
 
 // The [25th, 50th, 75th] percentile of the training days' loads, splitting them into four levels
@@ -30,7 +30,7 @@ export function renderCalendar() {
 
   const cuts = quartiles(trained.map((d) => d.load));
   const level = (d) => (d.load <= cuts[0] ? 0 : d.load <= cuts[1] ? 1 : d.load <= cuts[2] ? 2 : 3);
-  const fit = css("--fitness"), colors = LEVEL_ALPHA.map((a) => alpha(fit, a));
+  const fit = css("--accent"), colors = LEVEL_ALPHA.map((a) => alpha(fit, a));
 
   // The grid fills column by column: a column per week, Monday at the top
   const cells = [];
@@ -62,7 +62,7 @@ export function renderCalendar() {
   $("calReading").textContent = `${days.length} training days in the last ${WEEKS} weeks, ${(days.length / span * 7).toFixed(1)} a week. ` +
     `Longest streak: ${best} day${best === 1 ? "" : "s"}.`;
   $("cal").setAttribute("aria-label", `Training calendar, last ${WEEKS} weeks: ${days.length} training days`);
-  $("calLegend").innerHTML = `<span>Less</span>${colors.map((c) => `<i style="background:${c}"></i>`).join("")}<span>More load</span>`;
+  $("calLegend").innerHTML = `<span>Less</span>${colors.map((c) => `<i style="background:${c}"></i>`).join("")}<span>More</span>`;
   // Phones show the newest weeks first; the older ones are a scroll to the left
   const scroller = $("cal").parentElement;
   scroller.scrollLeft = scroller.scrollWidth;

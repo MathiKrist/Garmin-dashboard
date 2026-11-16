@@ -1,17 +1,19 @@
 // Health: recovery, sleep and the body's daily numbers
 
 import { data } from "./state.js";
-import { $, css, fmtShort, round, fmtSleep, fromDay, statItems, alpha, addDays, fmtHours } from "./util.js";
+import { $, css, fmtDay, fmtShort, round, fmtSleep, fromDay, statItems, alpha, addDays, fmtHours } from "./util.js";
 import { PARTIAL_ALPHA, baseOptions, draw } from "./charts.js";
+import { renderCalRing } from "./progress.js";
 
 // Garmin's readiness and stress levels
 export const readinessLevel = (v) => (v >= 95 ? "Prime" : v >= 75 ? "High" : v >= 50 ? "Moderate" : v >= 25 ? "Low" : "Poor");
 
 export const stressLevel = (v) => (v > 75 ? "High" : v > 50 ? "Medium" : v > 25 ? "Low" : "Resting");
 
-// Last night and today: [label, value, note]; the first four are the overview's, the health page shows them all
+// Last night and today: [label, value, note]; the first four are Home's, the health page shows them all
 export function todayItems() {
-  const t = data.today, day = (field) => fromDay(t.dates[field]);
+  // Each number says which day it's from when that isn't today, unless they're all from the same day (staleDay)
+  const t = data.today, same = staleDay(), day = (field) => (same ? "" : fromDay(t.dates[field]));
   let hrvNote = "";
   if (t.hrv_last_night != null && t.hrv_low != null && t.hrv_high != null) {
     hrvNote = t.hrv_last_night < t.hrv_low ? "Below your range" : t.hrv_last_night > t.hrv_high ? "Above your range" : "In your normal range";
@@ -28,9 +30,16 @@ export function todayItems() {
   ].filter((i) => i[1] != null).map(([label, val, note, from]) => [label, val, [note, from].filter(Boolean).join(" · ")]);
 }
 
-// Average of a daily field over the days from `from` to `to` days ago (to excluded), skipping days without it
+// The one day all of today's numbers are from, when that isn't today (the watch hasn't synced since); null when
+// they're today's, or from different days
+export function staleDay() {
+  const t = data.today, days = new Set(Object.keys(t.dates || {}).filter((k) => t[k] != null).map((k) => t.dates[k]));
+  return days.size === 1 && !days.has(data.generated) ? [...days][0] : null;
+}
+
 const kcal = (v) => Math.round(v).toLocaleString("en-GB");
 
+// Average of a daily field over the days from `from` to `to` days ago (to excluded), skipping days without it
 export function trendAvg(field, from, to) {
   const lo = addDays(data.generated, -from), hi = addDays(data.generated, -to);
   const vals = data.trends.filter((d) => d.date > lo && d.date <= hi && d[field] != null).map((d) => d[field]);
@@ -80,20 +89,24 @@ $("healthRange").addEventListener("click", (e) => {
 });
 
 export function renderHealth() {
-  Chart.defaults.font.family = css("--body");
   $("healthRange").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.days) === healthDays)));
-  $("healthToday").innerHTML = statItems(todayItems().filter(([label]) => label !== "Readiness"));
+  // The calories have their ring beside the tiles
+  $("healthToday").innerHTML = statItems(todayItems().filter(([label]) => label !== "Calories today"));
+  renderCalRing();
+  $("healthFrom").hidden = !staleDay();
+  if (staleDay()) $("healthFrom").textContent = `The latest numbers are from ${fmtDay(staleDay())}`;
   healthReadings();
   const from = addDays(data.generated, -healthDays);
   const tr = data.trends.filter((d) => d.date > from), labels = tr.map((d) => fmtShort(d.date));
-  const fit = css("--fitness"), muted = css("--muted"), rule = css("--rule"), dots = healthDays > 90 ? 0 : 2;
+  const fit = css("--accent"), muted = css("--muted"), rule = css("--rule"), dots = healthDays > 90 || innerWidth < 600 ? 0 : 2;
+  const blue = css("--low-aerobic"), sleep = css("--sleep");
   const has = (f) => tr.some((d) => d[f] != null);
   // Each measure gets its own chart (one y-axis each); a chart with no data hides its section
   const chart = (section, id, config) => {
     $(section).hidden = !config;
     if (config) draw(id, config);
   };
-  const yAxis = (extra = {}) => ({ y: { grid: { color: rule }, ticks: { color: muted }, border: { display: false }, ...extra } });
+  const yAxis = (extra = {}) => ({ y: { grid: { color: rule }, ticks: { color: muted, maxTicksLimit: 6, padding: 4 }, border: { display: false }, ...extra } });
   const opts = (extra, label) => {
     const o = baseOptions(yAxis(extra));
     if (label) o.plugins.tooltip.callbacks = { label };
@@ -101,7 +114,7 @@ export function renderHealth() {
   };
   const line = (label, f, color) => ({ label, data: tr.map((d) => d[f]), borderColor: color, backgroundColor: color, borderWidth: 2,
     pointRadius: 0, pointHoverRadius: 4, tension: 0.3, spanGaps: true });
-  const bars = (label, data, color) => ({ type: "bar", label, data, backgroundColor: color, borderRadius: 2, maxBarThickness: 14 });
+  const bars = (label, data, color) => ({ type: "bar", label, data, backgroundColor: color, borderRadius: 3, maxBarThickness: 14 });
 
   chart("hrvSection", "hrvChart", has("hrv_last_night") && {
     type: "line",
@@ -118,10 +131,10 @@ export function renderHealth() {
   });
   chart("rhrSection", "rhrChart", has("resting_hr") && {
     type: "line", data: { labels, datasets: [line("Resting HR", "resting_hr", css("--fatigue"))] },
-    options: opts({ ticks: { color: muted, precision: 0 } }, (c) => ` Resting HR: ${c.parsed.y} bpm`),
+    options: opts({ ticks: { color: muted, precision: 0, maxTicksLimit: 6, padding: 4 } }, (c) => ` Resting HR: ${c.parsed.y} bpm`),
   });
   chart("sleepSection", "sleepChart", has("sleep_s") && {
-    data: { labels, datasets: [bars("Sleep", tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(2) : null)), alpha(css("--sleep"), 0.85))] },
+    data: { labels, datasets: [bars("Sleep", tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(2) : null)), alpha(sleep, 0.85))] },
     options: opts({ min: 0 }, (c) => ` ${fmtHours(c.parsed.y * 3600)}`),
   });
   // Floating bars from the day's lowest to its highest Body Battery
@@ -140,7 +153,7 @@ export function renderHealth() {
   }).slice(all.length - tr.length);
   const avgLine = (f) => ({ type: "line", label: "7-day average", data: avg7(f), borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true });
   chart("sleepScoreSection", "sleepScoreChart", has("sleep_score") && {
-    data: { labels, datasets: [bars("Sleep score", tr.map((d) => d.sleep_score), alpha(fit, 0.55)), avgLine("sleep_score")] },
+    data: { labels, datasets: [bars("Sleep score", tr.map((d) => d.sleep_score), alpha(sleep, 0.6)), avgLine("sleep_score")] },
     options: opts({ min: 0, max: 100 }, (c) => (c.dataset.label === "Sleep score" ? ` Sleep score: ${c.parsed.y}` : ` 7-day average: ${c.parsed.y}`)),
   });
   const isToday = (i) => tr[i].date === data.generated;
@@ -148,7 +161,7 @@ export function renderHealth() {
   chart("stepsSection", "stepsChart", has("steps") && {
     data: { labels, datasets: [
       // Today's steps are still counting: paler, like the other unfinished periods
-      bars("Steps", tr.map((d) => d.steps), tr.map((d) => alpha(fit, d.date === data.generated ? 0.55 * PARTIAL_ALPHA : 0.55))),
+      bars("Steps", tr.map((d) => d.steps), tr.map((d) => alpha(blue, d.date === data.generated ? 0.7 * PARTIAL_ALPHA : 0.7))),
       avgLine("steps"),
     ] },
     options: opts({ min: 0 }, (c) => c.dataset.label === "Steps"
@@ -159,10 +172,10 @@ export function renderHealth() {
   if (best) $("stepsReading").textContent += ` Best day: ${steps(best.steps)} on ${fmtShort(best.date)}.`;
 
   // Calories: the day's total, today's paler as it's still counting; the split into active and resting in the tooltip
-  const red = css("--fatigue");
+  const red = fit;
   chart("caloriesSection", "caloriesChart", has("cal_total") && {
     data: { labels, datasets: [
-      bars("Calories", tr.map((d) => d.cal_total), tr.map((d) => alpha(red, d.date === data.generated ? 0.6 * PARTIAL_ALPHA : 0.6))),
+      bars("Calories", tr.map((d) => d.cal_total), tr.map((d) => alpha(red, d.date === data.generated ? 0.7 * PARTIAL_ALPHA : 0.7))),
       avgLine("cal_total"),
     ] },
     options: (() => {

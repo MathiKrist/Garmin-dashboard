@@ -1,12 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The app icon: a Volt pulse with a soft glow on Midnat, the dark theme's ground. The drawing stays inside the
-       middle 60%, so it survives any launcher shape (maskable) -->
-  <defs>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter>
-  </defs>
-  <rect width="512" height="512" fill="#0E1116"/>
-  <g fill="none" stroke="#C6FF3D" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M140 270h56l28-62 44 118 34-96 22 40h48" stroke-width="26" opacity="0.45" filter="url(#glow)"/>
-    <path d="M140 270h56l28-62 44 118 34-96 22 40h48" stroke-width="20"/>
-  </g>
+  <!-- The app icon: a pulse on the accent color. The drawing stays inside the middle 60%, so it survives any
+       launcher shape (maskable) -->
+  <rect width="512" height="512" fill="#FF5A1F"/>
+  <path d="M134 272h60l30-72 50 144 38-108 22 36h44" fill="none" stroke="#1A0802" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

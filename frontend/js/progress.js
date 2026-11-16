@@ -1,34 +1,45 @@
-// Overview: the athlete's story, then the big picture
+// Progress: the athlete's story, then the big picture of fitness and training
 
 import { data } from "./state.js";
-import { $, css, fmtDay, fmtShort, round, fmtDuration, plural, sum, between, fmtKm, listText, statusLabel, fromDay, statItems, alpha, addDays, fmtHours } from "./util.js";
-import { baseOptions, draw } from "./charts.js";
-import { routeMap } from "./map.js";
-import { sportsByCount, sportLabel, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, FOCUS, headlineStats, effectCell, COLUMNS, tableParts, renderVolume, measureFor } from "./sports.js";
+import { $, css, fmtDay, fmtShort, round, fmtDuration, plural, sum, between, fmtKm, listText, statusLabel, fromDay, alpha, addDays, fmtHours } from "./util.js";
+import { baseOptions, draw, monthTicks } from "./charts.js";
+import { sportCounts, sportsByCount, sportLabel, hasPage, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, FOCUS, measureFor } from "./sports.js";
+import { sportIcon, icon } from "./icons.js";
 import { renderRace } from "./race.js";
-import { todayItems } from "./health.js";
 import { renderCalendar } from "./calendar.js";
 
-export function renderOverview() {
+// Your main sport: the one you do most
+export const mainSport = () => sportsByCount().find(([key]) => key !== "other")?.[0];
+
+export function renderProgress() {
   renderStory();
   renderRace();
-  renderHero();
+  renderForm();
   renderTrainingStatus();
-  renderLastActivity();
   renderFitnessCharts();
   renderCalendar();
-  const t = tableParts(data.activities.slice(0, 15), "all");
-  $("recentHead").innerHTML = t.head;
-  $("recentBody").innerHTML = t.body;
-  // Your main sport (the one you do most): its weekly chart, and this week and this year next to the activities
-  const main = sportsByCount().find(([key]) => key !== "other")?.[0];
-  $("weeklySection").hidden = $("ovVolume").hidden = !main;
+  renderSportCards();
+  // The main sport's weekly chart
+  const main = mainSport();
+  $("weeklySection").hidden = !main;
   if (!main) return;
   const list = data.activities.filter((a) => a.sport === main), m = measureFor(list);
   $("weeklyTitle").textContent = `Weekly ${sportLabel(main).toLowerCase()}`;
   $("weeklySub").textContent = main === "run" ? lowShare(list) : "";
   weeklyChart("weeklyChart", "weeklyLegend", main, list, weekStarts(12), m);
-  renderVolume($("ovVolume"), list, sportLabel(main), main);
+}
+
+// The sports with a page of their own, each with this year so far; a card opens its page
+function renderSportCards() {
+  const counts = sportCounts(), sports = sportsByCount(counts).filter(([key]) => hasPage(key, counts));
+  $("sportsSection").hidden = !sports.length;
+  const year = data.generated.slice(0, 4);
+  $("sportCards").innerHTML = sports.map(([key, label]) => {
+    const list = data.activities.filter((a) => a.sport === key && a.date.startsWith(year)), m = measureFor(list);
+    return `<a class="sport-card" href="#sport/${key}">${sportIcon(key)}
+      <span class="sc-main"><b>${label}</b><span>${plural(list.length, SPORT_NOUNS[key])} this year</span></span>
+      <span class="sc-big">${list.length ? m.big(m.of(list)) : ""}</span>${icon("chevron")}</a>`;
+  }).join("");
 }
 
 // Every run's personal best events, oldest first: [{m, s, a}] whenever a run beat the best so far over a distance.
@@ -80,6 +91,7 @@ export function renderStory() {
       ? `, ${change > 0 ? "up" : "down"} from ${fmtHours(before4)} the four weeks before` : ", about the same as the four weeks before"}.`);
   }
   $("story").innerHTML = parts.join(" ");
+  $("storyCard").hidden = !parts.length;
 }
 
 // Garmin's own colors per status
@@ -142,7 +154,9 @@ export function renderTrainingStatus() {
       const style = d.status ? ` style="background:${statusColor(d.status)}"` : "";
       return `<i class="${d.date === data.generated ? "today" : ""}"${style} title="${fmtDay(d.date)}: ${statusLabel(d.status)}"></i>`;
     }).join("");
-    const label = w === 3 ? "Last 7 days" : `${fmtShort(week[0].date)} – ${fmtShort(week[6].date)}`;
+    // "21–27 Oct", or "28 Oct–3 Nov" across two months
+    const [a, b] = [week[0].date, week[6].date];
+    const label = w === 3 ? "Last 7 days" : `${a.slice(5, 7) === b.slice(5, 7) ? +a.slice(8) : fmtShort(a)}–${fmtShort(b)}`;
     return `<div class="week"><div class="days">${days}</div><span>${label}</span></div>`;
   }).join("");
   $("tsWeeks").setAttribute("aria-label", "Training status per day, last 4 weeks: " +
@@ -165,18 +179,20 @@ export function fitnessReading(f) {
   return `Fitness ${now}, ${change > 0 ? "up" : "down"} from ${before} four weeks ago (${change > 0 ? "+" : ""}${change}%).`;
 }
 
-export function renderHero() {
-  const f = data.form;
-  $("state").textContent = f.pct != null ? `${f.state} (${f.pct > 0 ? "+" : ""}${Math.round(f.pct)}%)` : f.state;
-  $("state").style.setProperty("--state-color", `var(${FORM_COLORS[f.state] || "--ink"})`);
-  $("fitnessReading").textContent = fitnessReading(f);
+// Form in words: "Building (−14%)"
+export const formText = (f) => (f.pct != null ? `${f.state} (${f.pct > 0 ? "+" : "−"}${Math.abs(Math.round(f.pct))}%)` : f.state);
 
-  $("today").innerHTML = statItems(todayItems().slice(0, 4));
-  renderCalRing();
+export const formColor = (f) => `var(${FORM_COLORS[f.state] || "--ink"})`;
+
+function renderForm() {
+  const f = data.form;
+  $("state").textContent = formText(f);
+  $("state").style.setProperty("--state-color", formColor(f));
+  $("fitnessReading").textContent = fitnessReading(f);
 }
 
 // Today's calories so far as a ring: active against resting, the total in the middle
-function renderCalRing() {
+export function renderCalRing() {
   const t = data.today, ring = $("calRing");
   ring.hidden = t.cal_total == null;
   if (ring.hidden) return;
@@ -198,30 +214,6 @@ function renderCalRing() {
     </div>`;
 }
 
-// The newest activity at the top: name, when, the sport's stats, and its route on a map when it has GPS
-export function renderLastActivity() {
-  lastCard($("lastAct"), data.last_activity, lastMap, "Last activity");
-}
-
-// A last activity card (here and on the Workout page), or hidden without an activity; `label` heads it
-export function lastCard(root, a, map, label) {
-  root.hidden = !a;
-  if (!a) return;
-  const days = Math.round((new Date(data.generated + "T12:00:00") - new Date(a.date + "T12:00:00")) / 864e5);
-  const day = days === 0 ? "Today" : days === 1 ? "Yesterday" : COLUMNS.date[2](a);
-  root.querySelector(".eyebrow").textContent = [label, `${day}${a.start ? `, ${a.start.slice(11, 16)}` : ""}`, a.location].filter(Boolean).join(" · ");
-  root.querySelector("h2 button").textContent = a.name || a.type.replace(/_/g, " ");
-  const effect = root.querySelector(".last-effect");
-  effect.innerHTML = effectCell(a);
-  effect.hidden = !effect.innerHTML;
-  root.querySelector(".last-stats").innerHTML = headlineStats(a);
-  // The name, date and stats open the activity; the map stays free to pan and zoom
-  root.querySelectorAll(".last-open").forEach((el) => { el.dataset.act = a.id; });
-  map.show(a.track, a.name || label.toLowerCase(), a.sport);
-}
-
-export const lastMap = routeMap($("lastMap"));
-
 // The fitness chart's period: 120 days or the year the server sends, remembered per device
 let fitnessDays = 120;
 try { fitnessDays = Number(localStorage.getItem("fitnessDays")) || 120; } catch {}
@@ -235,7 +227,6 @@ $("fitnessRange").addEventListener("click", (e) => {
 });
 
 export function renderFitnessCharts() {
-  Chart.defaults.font.family = css("--body");
   const fit = css("--fitness");
   $("fitnessRange").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.days) === fitnessDays)));
   $("fitnessChart").setAttribute("aria-label", `Fitness and fatigue over the last ${fitnessDays === 120 ? "120 days" : "year"}`);
@@ -291,19 +282,19 @@ export function renderVo2max() {
   $("vo2Section").hidden = !v;
   if (!v) return;
   $("vo2Reading").textContent = vo2Reading(v);
-  const fit = css("--fitness");
+  const fit = css("--accent");
   const vals = v.weeks.map((x) => x.vo2max).filter((x) => x != null);
   const o = baseOptions({
     y: { suggestedMin: Math.floor(Math.min(...vals) - 1), suggestedMax: Math.ceil(Math.max(...vals) + 1),
       grid: { color: css("--rule") }, ticks: { color: css("--muted"), precision: 0 }, border: { display: false } },
   });
-  // One tick at the first week of each month (every 2nd or 3rd month over long ranges); the tooltip names the week
+  // One tick at the first week of a month, as many months as the chart has room for; the tooltip names the week
   const sameYear = v.weeks[0].week.slice(0, 4) === data.generated.slice(0, 4);
   const fmtMonth = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-GB", sameYear ? { month: "short" } : { month: "short", year: "2-digit" });
-  const step = v.weeks.length > 80 ? 3 : v.weeks.length > 60 ? 2 : 1;
   const month = (i) => v.weeks[i].week.slice(0, 7);
-  const tickAt = (i) => i > 0 && month(i) !== month(i - 1) && Number(month(i).slice(5)) % step === 0;
-  o.scales.x.ticks = { ...o.scales.x.ticks, autoSkip: false, callback: (i) => (tickAt(i) ? fmtMonth(v.weeks[i].week) : null) };
+  const firsts = v.weeks.map((_, i) => i).filter((i) => i > 0 && month(i) !== month(i - 1));
+  const shown = monthTicks("vo2Chart", firsts, sameYear ? 34 : 52);
+  o.scales.x.ticks = { ...o.scales.x.ticks, autoSkip: false, callback: (i) => (shown.has(i) ? fmtMonth(v.weeks[i].week) : null) };
   o.plugins.tooltip.callbacks = {
     title: (items) => `Week of ${fmtShort(v.weeks[items[0].dataIndex].week)}`,
     label: (c) => ` VO2 max: ${c.parsed.y.toFixed(1)}`,
@@ -313,7 +304,7 @@ export function renderVo2max() {
     data: {
       labels: v.weeks.map((x) => x.week),
       datasets: [{ label: "VO2 max", data: v.weeks.map((x) => x.vo2max), borderColor: fit, backgroundColor: alpha(fit, 0.1),
-        fill: "start", borderWidth: 2, spanGaps: true,
+        fill: "start", borderWidth: 2.5, spanGaps: true,
         tension: 0.4, cubicInterpolationMode: "monotone",  // smooth curve that never overshoots past the real values
         pointRadius: v.weeks.map((_, i) => (i === v.weeks.length - 1 ? 4 : 0)), pointBackgroundColor: fit }],
     },

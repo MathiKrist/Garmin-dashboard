@@ -7,111 +7,164 @@
 <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#0E1116">
-<link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
+<meta name="theme-color" content="#0B0B0D">
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/static/styles.css">
-<script src="/static/js/theme.js"></script>
 </head>
 <body>
 <div class="app">
-  <!-- Phones: a bar with the page's name and a button that slides the menu in from the left -->
-  <header class="topbar">
-    <button type="button" class="menu-btn" id="menuBtn" aria-label="Menu" aria-controls="side" aria-expanded="false">
-      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    </button>
-    <span class="topbar-title" id="topbarTitle">Training</span>
-  </header>
-  <div class="scrim" id="scrim"></div>
+  <!-- Wide screens: the pages down the left, with the sports that have a page of their own -->
   <aside class="side" id="side">
-    <div class="side-top">
-      <div class="brand">Training<small id="demo" hidden>Demo data</small></div>
-      <div class="sync">
-        <span id="synced"></span>
-        <button id="syncBtn" type="button">Sync now</button>
-        <form class="logout" id="logout" method="post" action="/logout" hidden><button type="submit" class="link-btn">Log out</button></form>
-      </div>
-    </div>
+    <a class="brand" href="#home"><span class="brand-mark" aria-hidden="true"></span>Training<small class="demo-tag" hidden>Demo</small></a>
     <nav class="nav" id="nav" aria-label="Pages" hidden>
       <ul>
-        <li><a href="#overview" data-page="overview">Overview</a></li>
-        <li><a href="#workout" data-page="workout">Workout</a></li>
-        <li><a href="#health" data-page="health">Health</a></li>
-        <li><a href="#activities" data-page="activities">Activities<span class="count" id="navActCount"></span></a></li>
+        <li><a href="#home" data-page="home"><i data-icon="home"></i><span class="label">Home</span></a></li>
+        <li><a href="#train" data-page="train"><i data-icon="train"></i><span class="label">Train</span></a></li>
+        <li><a href="#activities" data-page="activities"><i data-icon="activities"></i><span class="label">Activities</span><span class="count" id="navActCount"></span></a></li>
+        <li><a href="#progress" data-page="progress"><i data-icon="progress"></i><span class="label">Progress</span></a></li>
+        <li><a href="#health" data-page="health"><i data-icon="health"></i><span class="label">Health</span></a></li>
       </ul>
       <p class="nav-label" id="navSportsLabel">Sports</p>
       <ul id="navSports"></ul>
     </nav>
-    <div class="range-switch theme-switch" id="themeSwitch" role="group" aria-label="Theme">
-      <button type="button" data-theme="auto" title="Dark from 20:00 to 07:00, otherwise like the system">Auto</button>
-      <button type="button" data-theme="light">Light</button>
-      <button type="button" data-theme="dark">Dark</button>
+    <div class="side-foot">
+      <button type="button" class="sync-btn js-sync" title="Sync with Garmin now"><i data-icon="sync"></i><span class="js-synced"></span></button>
+      <button type="button" class="icon-btn js-settings" aria-label="Settings" title="Settings"><i data-icon="settings"></i></button>
     </div>
   </aside>
+
+  <!-- Phones: the page's name on top, the pages as tabs along the bottom -->
+  <header class="topbar">
+    <button type="button" class="icon-btn" id="backBtn" aria-label="Back" hidden><i data-icon="back"></i></button>
+    <span class="topbar-title" id="topbarTitle">Training</span>
+    <small class="demo-tag" hidden>Demo</small>
+    <button type="button" class="icon-btn js-settings" id="settingsBtn" aria-label="Sync and settings"><i data-icon="sync"></i></button>
+  </header>
 
   <div class="content">
   <div id="notice" class="notice" role="status" hidden></div>
 
+  <!-- Until the first numbers arrive -->
+  <div class="loading" id="loading" aria-hidden="true"><i></i><i></i><i></i></div>
+
   <main id="main" hidden>
-    <!-- Workout: a chat with Claude that changes the sessions, today's session per sport, which the Send to watch
-         button puts in the Garmin calendar, and the training plan it comes from: weeks of runs (and rides and swims if
-         picked) toward a race, a triathlon or general fitness, with the time it projects -->
-    <div class="page" id="page-workout" data-title="Workout" hidden>
+    <!-- Home: this week at a glance, the latest activity, today's session, then where fitness and recovery stand -->
+    <div class="page" id="page-home" data-title="Training">
+      <header class="page-head">
+        <p class="eyebrow" id="homeDate"></p>
+        <h1>Home</h1>
+      </header>
+      <div class="home">
+        <div class="home-col home-main">
+          <!-- The newest activity, with its route when it has GPS -->
+          <section class="card last" id="lastAct" aria-labelledby="lastName" hidden>
+            <header class="last-head last-open">
+              <span class="last-ico"></span>
+              <div>
+                <p class="eyebrow"></p>
+                <h2><button type="button" class="last-open" id="lastName"></button></h2>
+                <p class="last-effect"></p>
+              </div>
+            </header>
+            <dl class="last-stats last-open"></dl>
+            <div class="last-map" id="lastMap" role="img" hidden></div>
+          </section>
+          <section class="card" id="homeRecent" aria-labelledby="homeRecentTitle" hidden>
+            <div class="section-head">
+              <h2 id="homeRecentTitle">Recent activities</h2>
+              <a class="more-link" href="#activities">See all</a>
+            </div>
+            <ul class="acts" id="recentList"></ul>
+          </section>
+        </div>
+        <div class="home-col home-side">
+          <a class="card week-card" id="homeWeek" hidden></a>
+          <section class="card today-card" id="homeToday" aria-labelledby="homeTodayTitle" hidden></section>
+          <a class="card fit-card" id="homeFitness" href="#progress" hidden></a>
+          <a class="card race-card" id="homeRace" href="#progress" hidden></a>
+          <a class="card recovery-card" id="homeRecovery" href="#health" hidden>
+            <div class="section-head"><h2>Recovery <span class="period" id="todayFrom"></span></h2><i data-icon="chevron"></i></div>
+            <dl class="tiles" id="today"></dl>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Train: today's session per sport, which the Send to watch button puts in the Garmin calendar, the training
+         plan it comes from (weeks of runs, and rides and swims if picked, toward a race, a triathlon or general
+         fitness, with the time it projects), and a chat with the coach that changes the sessions -->
+    <div class="page" id="page-train" data-title="Train" hidden>
       <header class="page-head page-head-row">
-        <h1>Workout</h1>
-        <div class="range-switch" id="workoutSport" role="group" aria-label="Sport"></div>
+        <h1>Train</h1>
+        <div class="seg" id="workoutSport" role="group" aria-label="Sport"></div>
       </header>
       <!-- The sport's newest activity, when it's from today or the last 12 hours; a run or ride can be reviewed,
            against the workout the dashboard sent or with the coach's written feedback -->
-      <section class="last wk-last" id="wkLast" aria-labelledby="wkLastName" hidden>
-        <div>
-          <header class="last-open">
-            <p class="eyebrow"></p>
-            <h2><button type="button" class="last-open" id="wkLastName"></button></h2>
-            <p class="last-effect"></p>
+      <section class="card last wk-last" id="wkLast" aria-labelledby="wkLastName" hidden>
+        <div class="wk-last-text">
+          <header class="last-head last-open">
+            <span class="last-ico"></span>
+            <div>
+              <p class="eyebrow"></p>
+              <h2><button type="button" class="last-open" id="wkLastName"></button></h2>
+              <p class="last-effect"></p>
+            </div>
           </header>
           <dl class="last-stats last-open"></dl>
-          <p class="wk-review-open"><button type="button" class="link-btn" id="wkReviewBtn" aria-expanded="false" aria-controls="wkReview" hidden></button></p>
+          <p class="wk-review-open"><button type="button" class="ghost" id="wkReviewBtn" aria-expanded="false" aria-controls="wkReview" hidden></button></p>
         </div>
         <div class="last-map" id="wkLastMap" role="img" hidden></div>
         <div class="wk-review" id="wkReview" aria-live="polite" hidden></div>
       </section>
-      <p class="plan-add"><button type="button" class="link-btn" id="planAdd" hidden>+ Training plan</button></p>
       <!-- The plan's line and the next 7 days; a day opens below -->
       <div id="planTop" hidden>
-        <div class="plan-line">
-          <h2 id="planName"></h2>
-          <span class="plan-stat" id="planProj"></span>
-          <span class="plan-stat" id="planChange"></span>
-          <span class="plan-stat" id="planTarget"></span>
-          <span class="plan-when" id="planWhen"></span>
-          <button type="button" class="link-btn" id="planEdit">Edit</button>
-        </div>
+        <section class="card plan-line">
+          <div class="plan-head">
+            <div>
+              <p class="eyebrow" id="planWhen"></p>
+              <h2 id="planName"></h2>
+            </div>
+            <button type="button" class="ghost small" id="planEdit">Edit</button>
+          </div>
+          <div class="plan-stats">
+            <span class="plan-stat" id="planProj"></span>
+            <span class="plan-stat" id="planChange"></span>
+            <span class="plan-stat" id="planTarget"></span>
+          </div>
+        </section>
         <div class="strip" id="planStrip" role="group" aria-label="The next 7 days"></div>
       </div>
-      <section class="wk" id="workout" aria-labelledby="wkTitle">
-        <div>
+      <section class="card wk" id="workout" aria-labelledby="wkTitle">
+        <div class="wk-text">
           <p class="eyebrow" id="wkWhen"></p>
           <h2 id="wkTitle"></h2>
           <p class="wk-total" id="wkTotal"></p>
           <p class="wk-why" id="wkWhy"></p>
           <ul class="wk-ahead" id="wkAhead" hidden></ul>
           <div class="wk-send">
-            <button type="button" id="wkSend">Send to watch</button>
+            <button type="button" class="primary" id="wkSend">Send to watch</button>
             <span id="wkSendNote" role="status"></span>
           </div>
         </div>
-        <div>
+        <div class="wk-shape">
           <div class="wk-bar" id="wkBar" role="img"></div>
           <ol class="wk-steps" id="wkSteps"></ol>
         </div>
       </section>
-      <section class="plan-weeks" id="planWeeksSec" aria-labelledby="planWeeksTitle" hidden>
+      <section class="card empty-card" id="planAddCard" hidden>
+        <i data-icon="flag"></i>
+        <div>
+          <h2>Train toward something</h2>
+          <p>A plan builds your weeks toward a race, a triathlon or steady fitness, and adapts its paces to the runs you do.</p>
+        </div>
+        <button type="button" class="primary" id="planAdd">Create a plan</button>
+      </section>
+      <section class="card plan-weeks" id="planWeeksSec" aria-labelledby="planWeeksTitle" hidden>
         <div class="section-head">
           <h2 id="planWeeksTitle">Week by week</h2>
           <div class="wk-send">
-            <button type="button" id="planSend">Send next 7 days</button>
             <span id="planSendNote" role="status"></span>
+            <button type="button" class="ghost small" id="planSend">Send next 7 days</button>
           </div>
         </div>
         <div class="kind-legend" id="planLegend"></div>
@@ -119,93 +172,121 @@
         <h3 class="plan-week-title" id="planWeekTitle"></h3>
         <ol class="plan-sessions" id="planSessions"></ol>
       </section>
-      <section class="chat" aria-label="Chat about the workout">
+      <section class="card chat" aria-labelledby="chatTitle">
+        <div class="section-head">
+          <h2 id="chatTitle"><i data-icon="coach"></i>Coach</h2>
+          <span class="period" id="chatCost"></span>
+        </div>
+        <p class="chat-hint" id="chatHint">Tell the coach what to change, and the sessions change at once. Nothing reaches the watch until you send it.</p>
         <ol class="chat-log" id="chatLog" aria-live="polite" hidden></ol>
         <form class="chat-form" id="chatForm">
           <textarea id="chatInput" rows="1" maxlength="2000" aria-label="Message"
-            placeholder="Change it: only 30 minutes today, move Thursday's intervals to Friday…"></textarea>
-          <button type="submit" class="primary" id="chatSend">Send</button>
+            placeholder="Only 30 minutes today…"></textarea>
+          <button type="submit" class="primary icon-btn" id="chatSend" aria-label="Send"><i data-icon="send"></i></button>
         </form>
-        <p class="chat-foot"><span id="chatNote" role="status"></span><span id="chatCost"></span>
+        <p class="chat-foot"><span id="chatNote" role="status"></span>
           <button type="button" class="link-btn" id="chatUndo" hidden>Undo all changes</button>
           <button type="button" class="link-btn" id="chatNew" hidden>New chat</button></p>
       </section>
     </div>
 
-    <!-- Overview: the athlete's story, with the big picture of fitness and training -->
-    <div class="page" id="page-overview" data-title="Overview">
-      <header class="page-head">
-        <h1>Overview</h1>
-        <p class="story" id="story"></p>
-        <button type="button" class="link-btn" id="raceAdd" hidden>+ Race goal</button>
+    <!-- Activities: everything, filterable by sport -->
+    <div class="page" id="page-activities" data-title="Activities" hidden>
+      <header class="page-head page-head-row">
+        <h1>Activities</h1>
+        <label class="search"><i data-icon="search"></i>
+          <input type="search" id="actSearch" placeholder="Search activities" aria-label="Search activities by name, place or type"></label>
       </header>
+      <div class="chips" id="sportFilter" role="group" aria-label="Filter by sport"></div>
+      <div class="act-layout">
+        <section class="card act-list" aria-label="Activities">
+          <div class="list-tools">
+            <span class="period" id="actCount"></span>
+            <label class="sort-pick">Sort by <select id="actSort" aria-label="Sort activities by"></select></label>
+          </div>
+          <ul class="acts" id="actCards"></ul>
+          <div class="scroll"><table class="act-table">
+            <thead id="actHead"></thead>
+            <tbody id="actBody"></tbody>
+          </table></div>
+          <button type="button" class="ghost more" id="actMore" hidden>Show more</button>
+        </section>
+        <aside class="card volume" id="actVolume" aria-label="Activity totals"></aside>
+      </div>
+    </div>
 
-      <section class="race" id="race" aria-labelledby="raceName" hidden>
+    <!-- Progress: the big picture of fitness and training -->
+    <div class="page" id="page-progress" data-title="Progress" hidden>
+      <header class="page-head">
+        <h1>Progress</h1>
+      </header>
+      <section class="card story-card" id="storyCard">
+        <p class="eyebrow">Where you stand</p>
+        <p class="story" id="story"></p>
+      </section>
+
+      <section class="card empty-card" id="raceAddCard" hidden>
+        <i data-icon="flag"></i>
         <div>
-          <p class="eyebrow" id="raceWhen"></p>
-          <div class="race-title"><h2 id="raceName"></h2><button type="button" class="link-btn" id="raceEdit">Edit</button></div>
-          <dl class="race-stats" id="raceStats"></dl>
+          <h2>Got a race coming up?</h2>
+          <p>Set a target time and follow Garmin's prediction closing in on it.</p>
+        </div>
+        <button type="button" class="primary" id="raceAdd">Add a race goal</button>
+      </section>
+      <section class="card race" id="race" aria-labelledby="raceName" hidden>
+        <div>
+          <div class="race-title">
+            <div>
+              <p class="eyebrow" id="raceWhen"></p>
+              <h2 id="raceName"></h2>
+            </div>
+            <button type="button" class="ghost small" id="raceEdit">Edit</button>
+          </div>
+          <dl class="race-stats tiles" id="raceStats"></dl>
         </div>
         <div class="race-trend" id="raceTrend">
           <div class="chart"><canvas id="raceChart" aria-label="Garmin's predicted time for the race against the target, last 6 months" role="img"></canvas></div>
-          <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Garmin predicts</span><span><i class="line dashed" style="color:var(--ink)"></i>Target</span></div>
+          <div class="legend"><span><i class="line" style="background:var(--accent)"></i>Garmin predicts</span><span><i class="line dashed" style="color:var(--ink)"></i>Target</span></div>
         </div>
       </section>
 
-      <section class="hero hero-cal" aria-label="Last night and today">
-        <dl class="today" id="today"></dl>
-        <div class="cal-ring" id="calRing" hidden></div>
-      </section>
+      <div class="grid">
+        <div class="tstatus" id="tstatus" hidden>
+          <section class="card" id="tsMain" aria-labelledby="tsLabel">
+            <p class="eyebrow" id="tsEyebrow">Garmin training status</p>
+            <div class="tstatus-row">
+              <h2 id="tsLabel"></h2>
+              <span class="since" id="tsSince"></span>
+            </div>
+            <p class="facts" id="tsFacts"></p>
+            <div class="weeks" id="tsWeeks" role="img"></div>
+            <div class="status-legend" id="tsLegend"></div>
+          </section>
 
-      <div class="overview">
-        <section class="tstatus" id="tstatus" hidden>
-          <div id="tsMain" aria-labelledby="tsLabel">
-          <p class="eyebrow" id="tsEyebrow">Garmin training status</p>
-          <div class="tstatus-row">
-            <h2 id="tsLabel"></h2>
-            <span class="since" id="tsSince"></span>
-          </div>
-          <p class="facts" id="tsFacts"></p>
-          <div class="weeks" id="tsWeeks" role="img"></div>
-          <div class="status-legend" id="tsLegend"></div>
-          </div>
-
-          <aside class="focus" id="focus" aria-labelledby="focusTitle" hidden>
+          <aside class="card focus" id="focus" aria-labelledby="focusTitle" hidden>
             <p class="eyebrow" id="focusEyebrow">Garmin load focus · last 4 weeks</p>
             <h3 id="focusTitle"></h3>
             <p class="about" id="focusAdvice"></p>
             <div class="frows" id="focusRows"></div>
             <div class="status-legend"><span><i class="range-key"></i>Optimal range</span></div>
           </aside>
-        </section>
+        </div>
 
-        <section class="last" id="lastAct" aria-labelledby="lastName" hidden>
-          <header class="last-open">
-            <p class="eyebrow" id="lastWhen"></p>
-            <h2><button type="button" class="last-open" id="lastName"></button></h2>
-            <p class="last-effect" id="lastEffect"></p>
-          </header>
-          <dl class="last-stats last-open" id="lastStats"></dl>
-          <div class="last-map" id="lastMap" role="img" hidden></div>
-        </section>
-      </div>
-
-      <div class="grid">
-        <section>
+        <section class="card">
           <div class="section-head">
             <h2>Fitness and form</h2>
-            <div class="range-switch" id="fitnessRange" role="group" aria-label="Period">
+            <div class="seg small" id="fitnessRange" role="group" aria-label="Period">
               <button type="button" data-days="120">120 days</button>
               <button type="button" data-days="365">1 year</button>
             </div>
           </div>
-          <p class="form-now">Form today: <span class="state" id="state"></span></p>
+          <p class="form-now">Form today <span class="state" id="state"></span></p>
           <p class="reading" id="fitnessReading"></p>
           <div class="chart"><canvas id="fitnessChart" role="img"></canvas></div>
           <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>Fitness</span><span><i class="line" style="background:var(--fatigue)"></i>Fatigue</span><span><i style="background:var(--fitness);opacity:.3"></i>Positive form</span><span><i style="background:var(--fatigue);opacity:.3"></i>Negative form</span></div>
         </section>
 
-        <section id="weeklySection">
+        <section class="card" id="weeklySection">
           <div class="section-head">
             <h2 id="weeklyTitle"></h2>
             <span class="period">Last 12 weeks</span>
@@ -215,7 +296,7 @@
           <div class="legend" id="weeklyLegend"></div>
         </section>
 
-        <section class="wide" id="vo2Section" hidden>
+        <section class="card wide" id="vo2Section" hidden>
           <div class="section-head">
             <h2>VO2 max</h2>
             <span class="period">Last year</span>
@@ -224,25 +305,18 @@
           <div class="chart"><canvas id="vo2Chart" aria-label="VO2 max per week, last 12 months" role="img"></canvas></div>
         </section>
 
-        <section class="wide" id="calSection" hidden>
-          <h2>Training calendar</h2>
+        <section class="card wide" id="calSection" hidden>
+          <div class="section-head">
+            <h2>Training calendar</h2>
+            <div class="legend cal-legend" id="calLegend"></div>
+          </div>
           <p class="reading" id="calReading"></p>
           <div class="cal-scroll"><div class="cal" id="cal" role="img"></div></div>
-          <div class="legend cal-legend" id="calLegend"></div>
         </section>
 
-        <section class="wide">
-          <div class="section-head">
-            <h2>Latest activities</h2>
-            <a class="more-link" href="#activities">All activities</a>
-          </div>
-          <div class="act-layout">
-            <div class="scroll"><table class="act-table">
-              <thead id="recentHead"></thead>
-              <tbody id="recentBody"></tbody>
-            </table></div>
-            <aside class="volume" id="ovVolume" aria-label="Totals for your main sport"></aside>
-          </div>
+        <section class="card wide" id="sportsSection" hidden>
+          <div class="section-head"><h2>By sport</h2></div>
+          <div class="sport-cards" id="sportCards"></div>
         </section>
       </div>
     </div>
@@ -251,89 +325,71 @@
     <div class="page" id="page-health" data-title="Health" hidden>
       <header class="page-head page-head-row">
         <h1>Health</h1>
-        <div class="range-switch" id="healthRange" role="group" aria-label="Period">
+        <div class="seg" id="healthRange" role="group" aria-label="Period">
           <button type="button" data-days="90">90 days</button>
           <button type="button" data-days="365">1 year</button>
         </div>
       </header>
-      <section class="hero" aria-label="Last night and today">
-        <dl class="today" id="healthToday"></dl>
+      <section class="card hero-cal" aria-label="Last night and today">
+        <p class="period hero-from" id="healthFrom" hidden></p>
+        <dl class="tiles" id="healthToday"></dl>
+        <div class="cal-ring" id="calRing" hidden></div>
       </section>
       <div class="grid">
-        <section id="hrvSection">
+        <section class="card" id="hrvSection">
           <h2>Heart rate variability</h2>
           <p class="reading" id="hrvReading"></p>
           <div class="chart"><canvas id="hrvChart" aria-label="Nightly HRV against the normal range, last 90 days" role="img"></canvas></div>
-          <div class="legend"><span><i class="line" style="background:var(--fitness)"></i>HRV</span><span><i style="background:var(--fitness);opacity:.15"></i>Normal range</span></div>
+          <div class="legend"><span><i class="line" style="background:var(--accent)"></i>HRV</span><span><i style="background:var(--accent);opacity:.18"></i>Normal range</span></div>
         </section>
-        <section id="rhrSection">
+        <section class="card" id="rhrSection">
           <h2>Resting heart rate</h2>
           <p class="reading" id="rhrReading"></p>
           <div class="chart"><canvas id="rhrChart" aria-label="Resting heart rate per day, last 90 days" role="img"></canvas></div>
         </section>
-        <section id="sleepSection">
+        <section class="card" id="sleepSection">
           <h2>Sleep</h2>
           <p class="reading" id="sleepReading"></p>
           <div class="chart"><canvas id="sleepChart" aria-label="Hours of sleep per night, last 90 days" role="img"></canvas></div>
         </section>
-        <section id="sleepScoreSection">
+        <section class="card" id="sleepScoreSection">
           <h2>Sleep score</h2>
           <p class="reading" id="sleepScoreReading"></p>
           <div class="chart"><canvas id="sleepScoreChart" aria-label="Sleep score per night with a 7-day average, last 90 days" role="img"></canvas></div>
-          <div class="legend"><span><i style="background:var(--fitness);opacity:.55"></i>Sleep score</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
+          <div class="legend"><span><i style="background:var(--sleep);opacity:.6"></i>Sleep score</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
         </section>
-        <section id="bbSection">
+        <section class="card" id="bbSection">
           <h2>Body Battery</h2>
           <div class="chart"><canvas id="bbChart" aria-label="Daily Body Battery range, last 90 days" role="img"></canvas></div>
         </section>
-        <section id="stressSection">
+        <section class="card" id="stressSection">
           <h2>Stress</h2>
           <div class="chart"><canvas id="stressChart" aria-label="Average stress per day, last 90 days" role="img"></canvas></div>
         </section>
-        <section class="wide" id="stepsSection">
+        <section class="card wide" id="stepsSection">
           <h2>Steps</h2>
           <p class="reading" id="stepsReading"></p>
           <div class="chart"><canvas id="stepsChart" aria-label="Steps per day" role="img"></canvas></div>
-          <div class="legend"><span><i style="background:var(--fitness)"></i>Steps</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
+          <div class="legend"><span><i style="background:var(--low-aerobic);opacity:.7"></i>Steps</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
         </section>
-        <section class="wide" id="caloriesSection">
+        <section class="card wide" id="caloriesSection">
           <h2>Calories burnt</h2>
           <p class="reading" id="caloriesReading"></p>
           <div class="chart"><canvas id="caloriesChart" aria-label="Calories burnt per day" role="img"></canvas></div>
-          <div class="legend"><span><i style="background:var(--fatigue)"></i>Calories burnt</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
+          <div class="legend"><span><i style="background:var(--accent);opacity:.7"></i>Calories burnt</span><span><i class="line" style="background:var(--ink)"></i>7-day average</span></div>
         </section>
       </div>
     </div>
 
-    <!-- Activities: everything, filterable by sport -->
-    <div class="page" id="page-activities" data-title="Activities" hidden>
-      <header class="page-head page-head-row">
-        <h1>Activities</h1>
-        <input type="search" class="search" id="actSearch" placeholder="Search activities" aria-label="Search activities by name, place or type">
-      </header>
-      <section class="activities">
-        <div class="sports" id="sportFilter" role="group" aria-label="Filter by sport"></div>
-        <div class="act-layout">
-          <div class="act-list">
-            <div class="scroll"><table class="act-table">
-              <thead id="actHead"></thead>
-              <tbody id="actBody"></tbody>
-            </table></div>
-            <button type="button" class="more" id="actMore" hidden>Show more</button>
-          </div>
-          <aside class="volume" id="actVolume" aria-label="Activity totals"></aside>
-        </div>
-      </section>
-    </div>
-
     <!-- One sport: its totals, how volume and speed have developed, its records and its activities -->
     <div class="page" id="page-sport" hidden>
-      <header class="page-head">
+      <header class="page-head sport-head">
+        <span id="sportIcon"></span>
         <h1 id="sportTitle"></h1>
       </header>
-      <dl class="tiles" id="sportTiles"></dl>
+      <dl class="card tiles" id="sportTiles"></dl>
       <div class="grid">
-        <section class="wide">
+        <section class="card wide">
           <div class="section-head">
             <h2 id="sportWeeklyTitle"></h2>
             <span class="period">26 weeks</span>
@@ -342,28 +398,32 @@
           <div class="chart"><canvas id="sportWeeklyChart" role="img"></canvas></div>
           <div class="legend" id="sportWeeklyLegend"></div>
         </section>
-        <section class="wide" id="sportYoySection">
+        <section class="card" id="sportYoySection">
           <h2>This year against last year</h2>
           <p class="reading" id="sportYoyReading"></p>
           <div class="chart"><canvas id="sportYoyChart" role="img"></canvas></div>
           <div class="legend" id="sportYoyLegend"></div>
         </section>
-        <section class="wide" id="sportMonthSection">
+        <section class="card" id="sportMonthSection">
           <h2 id="sportMonthTitle"></h2>
           <div class="chart"><canvas id="sportMonthChart" role="img"></canvas></div>
           <div class="legend" id="sportMonthLegend"></div>
         </section>
-        <section class="wide" id="sportRecordsSection">
+        <section class="card wide" id="sportRecordsSection">
           <h2>Personal bests</h2>
           <div class="records" id="sportRecords"></div>
         </section>
-        <section class="wide">
-          <h2>All <span id="sportListName"></span></h2>
+        <section class="card wide act-list">
+          <div class="list-tools">
+            <h2>All <span id="sportListName"></span></h2>
+            <label class="sort-pick">Sort by <select id="sportSort" aria-label="Sort activities by"></select></label>
+          </div>
+          <ul class="acts" id="sportCardsList"></ul>
           <div class="scroll"><table class="act-table">
             <thead id="sportHead"></thead>
             <tbody id="sportBody"></tbody>
           </table></div>
-          <button type="button" class="more" id="sportMore" hidden>Show more</button>
+          <button type="button" class="ghost more" id="sportMore" hidden>Show more</button>
         </section>
       </div>
     </div>
@@ -374,46 +434,75 @@
     <p id="emptyText">The first sync pulls up to six months of activities from Garmin and can take a few minutes. This page updates when it's done.</p>
   </div>
   </div>
+
+  <nav class="tabbar" id="tabbar" aria-label="Pages" hidden>
+    <a href="#home" data-page="home"><i data-icon="home"></i><span>Home</span></a>
+    <a href="#train" data-page="train"><i data-icon="train"></i><span>Train</span></a>
+    <a href="#activities" data-page="activities"><i data-icon="activities"></i><span>Activities</span></a>
+    <a href="#progress" data-page="progress"><i data-icon="progress"></i><span>Progress</span></a>
+    <a href="#health" data-page="health"><i data-icon="health"></i><span>Health</span></a>
+  </nav>
 </div>
 
 <template id="volumeTemplate">
   <p class="eyebrow vol-sport"></p>
-  <div class="vol-block">
-    <h3>This week</h3>
-    <p class="vol-big vol-week"></p>
-    <p class="vol-note vol-week-note"></p>
-    <div class="vol-days" role="img"></div>
-    <p class="vol-note vol-long vol-week-long"></p>
+  <div class="vol-blocks">
+    <div class="vol-block">
+      <h3>This week</h3>
+      <p class="vol-big vol-week"></p>
+      <p class="vol-note vol-week-note"></p>
+      <div class="vol-days" role="img"></div>
+      <p class="vol-note vol-long vol-week-long"></p>
+    </div>
+    <div class="vol-block">
+      <h3>This year</h3>
+      <p class="vol-big vol-year"></p>
+      <p class="vol-note vol-year-note"></p>
+      <p class="vol-note vol-long vol-year-long"></p>
+    </div>
   </div>
-  <div class="vol-block">
-    <h3>This year</h3>
-    <p class="vol-big vol-year"></p>
-    <p class="vol-note vol-year-note"></p>
-    <p class="vol-note vol-long vol-year-long"></p>
-  </div>
+  <a class="more-link vol-link" hidden></a>
 </template>
 
-<dialog class="race-dialog" id="raceDialog" aria-labelledby="raceDialogTitle">
-  <form id="raceForm">
+<!-- Syncing and logging out: a sheet from the bottom on phones, a small window on wide screens -->
+<dialog class="sheet settings" id="settings" aria-labelledby="settingsTitle">
+  <div class="sheet-box">
+    <header class="sheet-head">
+      <h2 id="settingsTitle">Settings</h2>
+      <button type="button" class="icon-btn" id="settingsClose" aria-label="Close"><i data-icon="close"></i></button>
+    </header>
+    <div class="set-row">
+      <div><b>Garmin sync</b><span class="js-synced"></span></div>
+      <button type="button" class="primary js-sync" id="syncBtn">Sync now</button>
+    </div>
+    <form class="logout set-row" id="logout" method="post" action="/logout" hidden>
+      <div><b>This device</b><span>Logged in with the dashboard password</span></div>
+      <button type="submit" class="ghost">Log out</button>
+    </form>
+  </div>
+</dialog>
+
+<dialog class="sheet form-sheet" id="raceDialog" aria-labelledby="raceDialogTitle">
+  <form id="raceForm" class="sheet-box">
     <h2 id="raceDialogTitle">Race goal</h2>
     <label>Race <input id="raceInName" maxlength="80" placeholder="Odense 10K" required></label>
     <label>Date <input id="raceInDate" type="date" required></label>
     <label>Distance
       <select id="raceInDist"></select>
     </label>
-    <label id="raceInKmWrap" hidden>Kilometres <input id="raceInKm" type="number" min="0.1" max="1000" step="0.01"></label>
-    <label>Target time <input id="raceInTime" placeholder="50:00 or 1:45:00" required></label>
+    <label id="raceInKmWrap" hidden>Kilometres <input id="raceInKm" type="number" inputmode="decimal" min="0.1" max="1000" step="0.01"></label>
+    <label>Target time <input id="raceInTime" placeholder="50:00 or 1:45:00" inputmode="numeric" required></label>
     <p class="form-error" id="raceError" role="alert" hidden></p>
     <div class="form-actions">
       <button type="submit" class="primary">Save</button>
-      <button type="button" id="raceCancel">Cancel</button>
-      <button type="button" class="link-btn" id="raceRemove">Remove goal</button>
+      <button type="button" class="ghost" id="raceCancel">Cancel</button>
+      <button type="button" class="link-btn danger" id="raceRemove">Remove goal</button>
     </div>
   </form>
 </dialog>
 
-<dialog class="race-dialog" id="planDialog" aria-labelledby="planDialogTitle">
-  <form id="planForm">
+<dialog class="sheet form-sheet" id="planDialog" aria-labelledby="planDialogTitle">
+  <form id="planForm" class="sheet-box">
     <h2 id="planDialogTitle">Training plan</h2>
     <label>Goal
       <select id="planInGoal"><option value="race">Race</option><option value="triathlon">Triathlon</option>
@@ -430,8 +519,8 @@
     <label id="planInDistWrap"><span id="planInDistLabel">Distance</span>
       <select id="planInDist"></select>
     </label>
-    <label id="planInKmWrap" hidden>Kilometres <input id="planInKm" type="number" min="1" max="100" step="0.01"></label>
-    <label id="planInTimeWrap">Target time (optional) <input id="planInTime" placeholder="50:00 or 1:45:00"></label>
+    <label id="planInKmWrap" hidden>Kilometres <input id="planInKm" type="number" inputmode="decimal" min="1" max="100" step="0.01"></label>
+    <label id="planInTimeWrap">Target time (optional) <input id="planInTime" placeholder="50:00 or 1:45:00" inputmode="numeric"></label>
     <fieldset class="plan-grid">
       <legend>Training days</legend>
       <table id="planInGrid"></table>
@@ -439,38 +528,44 @@
     <label class="plan-check"><input type="checkbox" id="planInMulti"> Rides and swims too</label>
     <div class="plan-sport" id="planInRun">
       <label>Long run on <select id="planInLong"></select></label>
-      <label>Running now, km a week <input id="planInVol" type="number" min="1" max="300" step="1"></label>
+      <label>Running now, km a week <input id="planInVol" type="number" inputmode="decimal" min="1" max="300" step="1"></label>
     </div>
     <div class="plan-sport" id="planInBike" hidden>
       <label>Long ride on <select id="planInLongRide"></select></label>
-      <label>Cycling now, hours a week <input id="planInBikeH" type="number" min="0.5" max="40" step="0.5"></label>
+      <label>Cycling now, hours a week <input id="planInBikeH" type="number" inputmode="decimal" min="0.5" max="40" step="0.5"></label>
     </div>
     <div class="plan-sport" id="planInSwim" hidden>
-      <label>Swimming now, km a week <input id="planInSwimKm" type="number" min="0.5" max="60" step="0.5"></label>
+      <label>Swimming now, km a week <input id="planInSwimKm" type="number" inputmode="decimal" min="0.5" max="60" step="0.5"></label>
       <label>Pool <select id="planInPool"><option value="25">25 m</option><option value="50">50 m</option></select></label>
     </div>
     <p class="form-error" id="planError" role="alert" hidden></p>
     <div class="form-actions">
       <button type="submit" class="primary">Save</button>
-      <button type="button" id="planCancel">Cancel</button>
-      <button type="button" class="link-btn" id="planRemove">End plan</button>
+      <button type="button" class="ghost" id="planCancel">Cancel</button>
+      <button type="button" class="link-btn danger" id="planRemove">End plan</button>
     </div>
   </form>
 </dialog>
 
-<dialog class="act-modal" id="actModal" aria-labelledby="modalName">
+<!-- One activity (or a week's activities): the whole screen on phones, a window on wide screens -->
+<dialog class="sheet act-modal" id="actModal" aria-labelledby="modalName">
   <div class="modal-box">
     <header class="modal-head">
-      <div>
+      <button type="button" class="icon-btn" id="modalClose" aria-label="Close"><i data-icon="close"></i></button>
+      <div class="modal-titles">
         <button type="button" class="link-btn modal-back" id="modalBack" hidden></button>
         <p class="eyebrow" id="modalWhen"></p>
         <h2 id="modalName"></h2>
-        <p class="last-effect" id="modalEffect"></p>
       </div>
-      <button type="button" class="close" id="modalClose" aria-label="Close">&times;</button>
+      <span id="modalIcon"></span>
     </header>
-    <dl class="last-stats" id="modalStats"></dl>
+    <p class="last-effect" id="modalEffect"></p>
     <div class="last-map modal-map" id="modalMap" role="img" hidden></div>
+    <dl class="last-stats" id="modalStats"></dl>
+    <div class="modal-review" id="modalReviewWrap" hidden>
+      <button type="button" class="ghost" id="modalReviewBtn" aria-expanded="false" aria-controls="modalReview"></button>
+      <div class="wk-review" id="modalReview" aria-live="polite" hidden></div>
+    </div>
     <p class="modal-status" id="modalStatus" role="status" hidden></p>
     <div class="modal-details" id="modalDetails"></div>
   </div>

@@ -2,17 +2,18 @@
 
 import { data } from "./state.js";
 import { $, css, fmtShort, fmtDuration, fmtPace, plural, sum, between, fmtKm, mondayOf, statItems, addDays, fmtHours, escapeHtml } from "./util.js";
-import { partialColors, baseOptions, draw } from "./charts.js";
-import { sportLabel, sportColor, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, PAGE, KMH_SPORTS, COLUMNS, DEFAULT_SORT, sortRows, nextSort, tableParts, measureFor } from "./sports.js";
+import { partialColors, baseOptions, draw, monthTicks } from "./charts.js";
+import { sportLabel, sportColor, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, PAGE, KMH_SPORTS, COLUMNS, DEFAULT_SORT, sortRows, nextSort, tableParts, measureFor, actRows, sortOptions, pickedSort } from "./sports.js";
+import { sportIcon } from "./icons.js";
 
 let sportShown = PAGE, sportShownKey = null, sportSort = DEFAULT_SORT;
 
 export function renderSport(key) {
-  Chart.defaults.font.family = css("--body");
   const list = data.activities.filter((a) => a.sport === key);  // newest first
   const label = sportLabel(key), today = data.generated, m = measureFor(list), nouns = SPORT_NOUNS[key];
   if (sportShownKey !== key) { sportShown = PAGE; sportShownKey = key; sportSort = DEFAULT_SORT; }
   $("sportTitle").textContent = label;
+  $("sportIcon").innerHTML = sportIcon(key, "lg");
   $("sportListName").textContent = nouns[1];
 
   // Tiles: this week, the last 4 weeks (against the 4 before), this year and last year
@@ -43,9 +44,12 @@ export function renderSport(key) {
   renderMonthly(key, list, m);
   renderRecords(key, list);
 
-  const t = tableParts(sortRows(list, sportSort).slice(0, sportShown), key, sportSort);
+  // A table on wide screens, a list of rows on phones (styles.css shows one or the other)
+  const rows = sortRows(list, sportSort).slice(0, sportShown), t = tableParts(rows, key, sportSort);
   $("sportHead").innerHTML = t.head;
   $("sportBody").innerHTML = t.body;
+  $("sportCardsList").innerHTML = actRows(rows);
+  $("sportSort").innerHTML = sortOptions(key, sportSort);
   $("sportMore").hidden = list.length <= sportShown;
   $("sportMore").textContent = `Show more (${list.length - sportShown} left)`;
 }
@@ -87,9 +91,10 @@ export function renderYearOnYear(key, list, m) {
     `<span><i class="line dashed" style="color:${muted}"></i>${y - 1}</span>`;
   $("sportYoyChart").setAttribute("aria-label", `Running total of ${m.unit.toLowerCase()} through ${y}, against ${y - 1}`);
   const o = baseOptions({ y: { min: 0, grid: { color: css("--rule") }, ticks: { color: muted }, border: { display: false } } });
-  // A tick at the start of each month
+  // A tick at the start of a month, as many months as the chart has room for
+  const shown = monthTicks("sportYoyChart", days.map((_, i) => i).filter((i) => days[i].endsWith("-01")), 34);
   o.scales.x.ticks = { ...o.scales.x.ticks, autoSkip: false,
-    callback: (i) => (days[i].endsWith("-01") ? new Date(`2000-${days[i]}T12:00:00`).toLocaleDateString("en-GB", { month: "short" }) : null) };
+    callback: (i) => (shown.has(i) ? new Date(`2000-${days[i]}T12:00:00`).toLocaleDateString("en-GB", { month: "short" }) : null) };
   o.plugins.tooltip.callbacks = {
     title: (items) => new Date(`2000-${days[items[0].dataIndex]}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long" }),
     label: (c) => ` ${c.dataset.label}: ${fmt(c.parsed.y)}`,
@@ -189,6 +194,11 @@ $("sportRecords").addEventListener("click", (e) => {
 });
 
 $("sportMore").addEventListener("click", () => { sportShown += PAGE; renderSport(sportShownKey); });
+
+$("sportSort").addEventListener("change", (e) => {
+  sportSort = pickedSort(e.target.value);
+  renderSport(sportShownKey);
+});
 
 $("sportHead").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-sort]");

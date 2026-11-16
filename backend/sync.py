@@ -386,7 +386,7 @@ def run_sync(db_path=None):
             db.set_meta(conn, "predictions_backfilled", "1")
         conn.commit()
 
-        # Lactate threshold and heart rate zones for the workout page, once a day
+        # Lactate threshold and heart rate zones for the Train page, once a day
         if db.get_meta(conn, "profile_date") != today.isoformat():
             profile = fetch_profile(client)
             if profile:  # a failed request keeps the last one

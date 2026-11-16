@@ -1,12 +1,13 @@
-// Workout: today's suggested session per sport (worked out on the server), and the button that sends it to the watch
+// Train: today's suggested session per sport (worked out on the server), and the button that sends it to the watch
 
 import { data } from "./state.js";
 import { $, fmtDay, fmtDuration, fmtPace, isoDay, escapeHtml } from "./util.js";
-import { lastCard } from "./overview.js";
+import { lastCard } from "./sports.js";
 import { routeMap } from "./map.js";
+import { icon } from "./icons.js";
 import { paragraphs, usage } from "./chat.js";
 
-// Volt for easy running, Puls for hard (darker for threshold); a long run's easy steps take the long run's full Volt
+// Cool colours for easy running, warm for hard (styles.css); a long run's easy steps take the long run's own
 const COLOR = { easy: "var(--k-easy)", high: "var(--k-threshold)", anaerobic: "var(--k-vo2)", rest: "var(--k-jog)" };
 const color = (intensity, kind) => (intensity === "easy" && kind === "long" ? "var(--k-long)"
   : intensity === "high" && kind === "vo2" ? "var(--k-vo2)" : intensity === "anaerobic" && kind === "anaerobic" ? "var(--k-anaerobic)"
@@ -78,7 +79,7 @@ export function renderWorkout() {
 
 // ---- The sport's newest activity, at the top, and its review: against the workout the dashboard sent, or the coach's written feedback
 
-export const lastWorkoutMap = routeMap($("wkLastMap"));
+export const lastWorkoutMap = routeMap($("wkLastMap"), { preview: true });
 const NOUN = { run: "run", bike: "ride", swim: "swim" };
 const RECENT_MS = 12 * 3600e3;
 let reviewFor = null;  // the activity whose review is open
@@ -100,8 +101,10 @@ function renderLast() {
   btn.hidden = !shown?.review;
   if (!shown?.review || shown.id !== reviewFor) closeReview();
   btn.dataset.noun = NOUN[sport];
-  btn.textContent = reviewFor ? "Hide review" : `Review ${NOUN[sport]} ›`;
+  btn.innerHTML = reviewFor ? "Hide review" : reviewLabel(NOUN[sport]);
 }
+
+export const reviewLabel = (noun) => `${icon("coach")}Review ${noun}`;
 
 function closeReview() {
   reviewFor = null;
@@ -114,14 +117,14 @@ $("wkReviewBtn").addEventListener("click", () => {
   const btn = $("wkReviewBtn");
   if (reviewFor) {
     closeReview();
-    btn.textContent = `Review ${btn.dataset.noun} ›`;
+    btn.innerHTML = reviewLabel(btn.dataset.noun);
     return;
   }
   const a = data.last_by_sport[sport];
   reviewFor = a.id;
   btn.textContent = "Hide review";
   btn.setAttribute("aria-expanded", "true");
-  openReview(a.id);
+  loadReview($("wkReview"), a.id, () => reviewFor === a.id);
 });
 
 const getJson = async (url, method = "GET") => {
@@ -134,18 +137,18 @@ const getJson = async (url, method = "GET") => {
   }
 };
 
-// The numbers straight away, then the coach's note (asked for the first time only; kept after)
-async function openReview(id) {
-  const panel = $("wkReview");
+// An activity's review in `panel` (here, and in the activity's own window): the numbers straight away, then the
+// coach's note (asked for the first time only; kept after). `wanted()` says whether the panel still shows this one.
+export async function loadReview(panel, id, wanted) {
   panel.hidden = false;
   panel.innerHTML = '<p class="pending">Loading the laps…</p>';
   const r = await getJson(`/api/review/${id}`);
-  if (reviewFor !== id) return;
+  if (!wanted()) return;
   if (r.error) { panel.innerHTML = `<p class="error">${escapeHtml(r.error)}</p>`; return; }
   panel.innerHTML = reviewHtml(r) + `<div class="wk-review-note">${r.note ? noteHtml(r.note) : '<p class="pending">Asking the coach…</p>'}</div>`;
   if (r.note) return;
   const note = await getJson(`/api/review/${id}/note`, "POST");
-  if (reviewFor !== id) return;
+  if (!wanted()) return;
   panel.querySelector(".wk-review-note").innerHTML = note.error ? `<p class="error">${escapeHtml(note.error)}</p>` : noteHtml(note);
 }
 
@@ -161,12 +164,12 @@ function offCell(r) {
 }
 
 function reviewHtml(r) {
-  const stat = (v, label) => (v ? `<div><dd>${v}</dd><dt>${label}</dt></div>` : "");
+  const stat = (v, label) => (v ? `<div><dt>${label}</dt><dd>${v}</dd></div>` : "");
   const effect = r.effect.label && data.effects[r.effect.label] ? data.effects[r.effect.label][0] : "";
   const stats = [
-    r.on_target && stat(`${r.on_target[0]}<span>of ${r.on_target[1]}</span>`, `${r.reps ? "reps" : "steps"} on target`),
-    stat(VERDICT[r.verdict], "plan verdict"),
-    r.projection && stat(`${fmtDuration(r.projection.from_s)} → ${fmtDuration(r.projection.to_s)}`, "projected time"),
+    r.on_target && stat(`${r.on_target[0]}<span>of ${r.on_target[1]}</span>`, `${r.reps ? "Reps" : "Steps"} on target`),
+    stat(VERDICT[r.verdict], "Plan verdict"),
+    r.projection && stat(`${fmtDuration(r.projection.from_s)} → ${fmtDuration(r.projection.to_s)}`, "Projected time"),
     stat(effect && `${effect}${r.effect.aerobic ? `<span>${r.effect.aerobic.toFixed(1)}</span>` : ""}`, "Garmin training effect"),
   ].filter(Boolean).join("");
   const done = (x) => (r.sport === "run" ? fmtPace(x.speed && 1000 / x.speed)
@@ -216,12 +219,13 @@ $("workoutSport").addEventListener("click", (e) => {
   if (b) setSport(b.dataset.sport);
 });
 
-// A send button: "Send …" until sent, then "On the watch ✓", which turns into "Remove from watch" on hover or focus
+// A send button: "Send …" until sent, then "On the watch ✓", which turns into "Remove from watch" under a mouse or
+// with focus; a tap on it asks first
 export function watchButton(btn, onWatch, sendText) {
   btn.disabled = false;
   btn.classList.toggle("on-watch", !!onWatch);
   btn.dataset.send = sendText;
-  btn.innerHTML = onWatch ? '<span class="ok">On the watch ✓</span><span class="rm">Remove from watch</span>' : sendText;
+  btn.innerHTML = onWatch ? '<span class="ok">On the watch ✓</span><span class="rm">Remove from watch</span>' : `${icon("watch")}${sendText}`;
 }
 
 // Sending to or removing from Garmin through the server; the page reloads when it's done, or the note shows the error

@@ -68,9 +68,9 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
 
 SESSION_COOKIE = "training_session"
 SESSION_DAYS = 365
-# Reachable before logging in, with the fonts and the app icons. Phones fetch the app manifest without the login cookie
-OPEN_PATHS = {"/login", "/static/styles.css", "/static/js/theme.js", "/static/manifest.json", "/sw.js"}
-OPEN_PREFIX = ("/static/vendor/fonts/", "/static/icons/")
+# Reachable before logging in, with the app icons. Phones fetch the app manifest without the login cookie
+OPEN_PATHS = {"/login", "/static/styles.css", "/static/manifest.json", "/sw.js"}
+OPEN_PREFIX = ("/static/icons/",)
 
 
 def _session_token():
@@ -560,7 +560,7 @@ async def review_note(activity_id: int):
 
 @app.get("/api/chat")
 def chat_log():
-    """Today's chat on the Workout page, and whether it can run (it needs Claude Code on this machine or
+    """Today's chat on the Train page, and whether it can run (it needs Claude Code on this machine or
     ANTHROPIC_API_KEY), with what the API has cost this month."""
     return {"enabled": coach.backend() is not None, "log": coach.history(DB_PATH), **coach.usage()}
 

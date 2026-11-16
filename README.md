@@ -24,48 +24,58 @@ For a desktop shortcut, right-click the `.bat` → **Send to** → **Desktop (cr
 
 ## Pages
 
-The menu on the left picks the page; on phones it hides behind ☰. The page is dark from 20:00 to 07:00 and otherwise follows the system; **Auto / Light / Dark** at the bottom of the menu overrides that.
+Phones show the pages as tabs along the bottom, wide screens as a menu on the left with a page per sport under it. **Sync now** and **Log out** are in the settings: the button top right on phones, the one at the bottom of the menu on wide screens (where the line beside it syncs at once too).
 
-### Overview
+### Home
 
-![Overview](docs/screenshots/overview.png)
+![Home](docs/screenshots/home.png)
 
-- **Race goal**: target time, Garmin's prediction and the gap, with a 6-month chart. Set with **+ Race goal**, or by a race plan.
-- **Today**: readiness, HRV, sleep, resting heart rate and calories burnt.
-- **Garmin's training status and load focus**, with what to train next.
-- **Last activity**, with its route. Click it for the details.
-- **Fitness and form**: fitness (42-day load) against fatigue (7-day), over 120 days or a year.
-- **Weekly running** over 12 weeks, split by training effect, and **VO2 max** and a **training calendar** over the last year.
+- **This week**: your main sport as a ring against the plan's week, or without a plan against the average of your last four weeks, with the week day by day.
+- **Latest activity**, with its route. Tap it for the details.
+- **Today's session**, with **Send to watch**.
+- **Fitness**: the number and its last 12 weeks, with Garmin's training status and today's form.
+- **Race goal**: days to go, the target and Garmin's prediction.
+- **Recovery**: readiness, HRV, sleep and resting heart rate.
+- **Recent activities**.
 
-### Workout
+### Train
 
-![Workout](docs/screenshots/workout.png)
+![Train](docs/screenshots/train.png)
 
 - **Today's activity** at the top, if it's from today or the last 12 hours. A run or ride has **Review run**, with a few lines from the coach (Claude is asked only when you press it). Done from a session sent with **Send to watch**, it's each step against its lap, how many hit their target, and the plan's verdict and what it moved; done on its own, it's the coach's written feedback: how it went, what could be better and how it fits the last 7 days.
 - **Today's session** for running and cycling (and swimming with a plan that has swims), in steps like a Garmin workout. Warm-ups and cool-downs go by feel, without a target. Without a plan it's picked from readiness, recovery time, sleep, HRV and Garmin's load focus, and can be a short easy session, a recovery session or a rest day; with one, it's the plan's session, with a note to take it easy on a poor day.
-- **The plan**: a strip of the next 7 days (click a day to see it), and the plan week by week (click a week for its sessions).
-- **Send to watch** puts a session in the Garmin calendar, and **Send next 7 days** the plan's coming week. The watch gets them at its next sync with the Garmin Connect app. Once sent, the button reads **On the watch ✓**; hover it to **Remove from watch**. A session on the watch stays today's session, and reads **Done ✓** once you've run it.
-- **The chat**: tell it what to change ("only 40 minutes today", "move Thursday to Friday"), and the sessions change at once. Nothing reaches the watch until you send it. One chat a day; **Undo all changes** takes them back.
-
-### Health
-
-![Health](docs/screenshots/health.png)
-
-HRV against your normal range, resting heart rate, sleep and sleep score, Body Battery, stress, steps and calories, for 90 days or a year. Most have a line on this week against the 30 days before.
+- **The plan**: the next 7 days (tap a day to see it; a row to swipe on phones), and the plan week by week (tap a week for its sessions).
+- **Send to watch** puts a session in the Garmin calendar, and **Send next 7 days** the plan's coming week. The watch gets them at its next sync with the Garmin Connect app. Once sent, the button reads **On the watch ✓**; press it to remove the session from the watch again (it asks first). A session on the watch stays today's session, and reads **Done ✓** once you've run it.
+- **The coach**: tell it what to change ("only 40 minutes today", "move Thursday to Friday"), and the sessions change at once. Nothing reaches the watch until you send it. One chat a day; **Undo all changes** takes them back.
 
 ### Activities
 
 ![Activities](docs/screenshots/activities.png)
 
-- **Every activity**, sortable and searchable, with this week and this year for the chosen sport.
-- **A page per sport** done at least 3 times: totals, weeks, months, this year against last, and personal bests (click one for its top 5).
-- **Click an activity** for every stat Garmin has, with the route and laps.
+- **Every activity**, searchable and filtered by sport, with this week and this year for the chosen sport. Wide screens show a table sorted by its headers; phones show rows, with a **Sort by** picker.
+- **Tap an activity** for every stat Garmin has, with the route and laps. A run or ride has **Review run** there too.
+
+### Progress
+
+![Progress](docs/screenshots/progress.png)
+
+- **Race goal**: target time, Garmin's prediction and the gap, with a 6-month chart. Set with **Add a race goal**, or by a race plan.
+- **Garmin's training status and load focus**, with what to train next.
+- **Fitness and form**: fitness (42-day load) against fatigue (7-day), over 120 days or a year.
+- **Weekly running** over 12 weeks, split by training effect (tap a week for its activities), and **VO2 max** and a **training calendar** over the last year.
+- **A page per sport** done at least 3 times: totals, weeks, months, this year against last, and personal bests (tap one for its top 5).
+
+### Health
+
+![Health](docs/screenshots/health.png)
+
+Last night and today, then HRV against your normal range, resting heart rate, sleep and sleep score, Body Battery, stress, steps and calories, for 90 days or a year. Most have a line on this week against the 30 days before.
 
 The screenshots use demo data.
 
 ## Training plan
 
-Set one up with **+ Training plan** on the Workout page: the plan type, the date, your run days (tick **Rides and swims too** for a multi-sport plan), the long run day and how much you run now (plus the distance and target time where the type asks). A race plan also sets the race goal.
+Set one up with **Create a plan** on the Train page (**Edit** on the plan changes it): the plan type, the date, your run days (tick **Rides and swims too** for a multi-sport plan), the long run day and how much you run now (plus the distance and target time where the type asks). A race plan also sets the race goal.
 
 | Plan type | What it does |
 |---|---|
@@ -94,13 +104,13 @@ Set one up with **+ Training plan** on the Workout page: the plan type, the date
 - **Projected time**: shown as a range that narrows toward race day, for the plan types that have a distance. The header shows the last run that moved it.
 - **Missed sessions**: a missed hard or long run moves to the next easy day that week.
 
-## The chat
+## The coach
 
-It uses Claude Code on this PC, covered by your Claude subscription: install it and log in once by running `claude`. With `ANTHROPIC_API_KEY` in `.env` it uses the Anthropic API instead, which is faster but billed per message: about $0.001 on Haiku (the default) or $0.02–0.03 on Sonnet (`CHAT_MODEL=sonnet`). Each reply shows its tokens and price, the chat shows this month's total, and every message (and run review) is logged in `data/chat_usage.csv`. On Claude Code it shows what the same chats would cost on the API with Haiku and with Sonnet, to compare before switching.
+The coach's chat and reviews use Claude Code on this PC, covered by your Claude subscription: install it and log in once by running `claude`. With `ANTHROPIC_API_KEY` in `.env` it uses the Anthropic API instead, which is faster but billed per message: about $0.001 on Haiku (the default) or $0.02–0.03 on Sonnet (`CHAT_MODEL=sonnet`). Each reply shows its tokens and price, the chat shows this month's total, and every message (and run review) is logged in `data/chat_usage.csv`. On Claude Code it shows what the same chats would cost on the API with Haiku and with Sonnet, to compare before switching.
 
 ## Syncing
 
-The server syncs every `SYNC_INTERVAL_MINUTES`; **Sync now** in the menu syncs at once. `backend/sync.py` syncs without the server.
+The server syncs every `SYNC_INTERVAL_MINUTES`; **Sync now** in the settings syncs at once. `backend/sync.py` syncs without the server.
 
 - **First sync**: takes a few minutes. The rest of your history follows over the next syncs.
 - **Later syncs**: the last few days, and once a day the last 30 days of activities, so edits and deletions on Garmin carry over.
@@ -116,6 +126,8 @@ tailscale serve --bg 8000
 
 Open the `https://….ts.net` address it gives in Chrome on the phone, and choose **Install app**. It then opens like an app, with its own icon.
 
+![Home on a phone](docs/screenshots/phone.png)
+
 ## Settings (`.env`)
 
 | Setting | Default | What it does |
@@ -125,8 +137,8 @@ Open the `https://….ts.net` address it gives in Chrome on the phone, and choos
 | `DASHBOARD_URL` | empty | Where the app window connects, if the server runs on another PC |
 | `HOST` / `PORT` | 0.0.0.0 / 8000 | `127.0.0.1` keeps it to this PC |
 | `SYNC_INTERVAL_MINUTES` | 60 | How often it syncs |
-| `ANTHROPIC_API_KEY` | empty | The chat uses the API instead of Claude Code |
-| `CHAT_MODEL` | haiku | The chat's model on the API: `haiku` or `sonnet` |
+| `ANTHROPIC_API_KEY` | empty | The coach uses the API instead of Claude Code |
+| `CHAT_MODEL` | haiku | The coach's model on the API: `haiku` or `sonnet` |
 | `AEROBIC_THRESHOLD` | 158 | Heart rate between easy and hard, for runs Garmin hasn't labelled |
 | `MAX_HR` | 195 | For training load when Garmin has none |
 | `ACTIVITY_BACKFILL_DAYS`, `DAILY_BACKFILL_DAYS`, `HEALTH_HISTORY_DAYS`, `VO2MAX_BACKFILL_DAYS` | 180, 60, 365, 1095 | How far back the first sync and the backfills go |
@@ -146,10 +158,10 @@ backend/
   coach.py          the chat, and changes.py for the sessions it changes
   review.py         a run against the workout it was run from
   db.py, config.py, login.py, demo.py
-frontend/           the page: index.html, styles.css, js/ (a module per page)
+frontend/           the page: index.html, styles.css, js/ (a module per page), icons/
 desktop/main.py     the app window
 tests/
-assets/             icons for desktop shortcuts
+assets/             the window's icon, and more to pick from for desktop shortcuts
 docs/screenshots/   the screenshots above
 data/               database and app data, not in git
 ```

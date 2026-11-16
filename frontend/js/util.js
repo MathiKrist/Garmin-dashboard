@@ -56,8 +56,9 @@ export const statusLabel = (code) => code ? code.charAt(0) + code.slice(1).toLow
 // "from Mon 5 Oct" for a daily value that isn't from today (the server keeps them up to a week)
 export const fromDay = (iso) => (iso && iso !== data.generated ? `from ${fmtDay(iso)}` : "");
 
+// Stat blocks for a <dl>: the label, the value under it, and a note under that
 export const statItems = (items) => items
-  .map(([label, val, note]) => `<div><dd>${val}</dd><dt>${label}${note ? `<span class="note">${note}</span>` : ""}</dt></div>`).join("");
+  .map(([label, val, note]) => `<div><dt>${label}</dt><dd>${val}</dd>${note ? `<dd class="note">${note}</dd>` : ""}</div>`).join("");
 
 export function alpha(hex, a) {
   const n = parseInt(hex.replace("#", ""), 16);

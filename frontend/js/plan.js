@@ -1,4 +1,4 @@
-// Training plan, on the workout page: weeks of runs (and rides and swims if picked) toward a race,
+// Training plan, on the Train page: weeks of runs (and rides and swims if picked) toward a race,
 // a triathlon or general fitness (worked out on the server), the time it projects, and the button that sends the
 // coming week to the watch
 
@@ -11,13 +11,13 @@ import { total, barHtml, stepsHtml, mainPace, currentSport, setSport, todaysWork
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const SPORTS = [["run", "Run"], ["bike", "Bike"], ["swim", "Swim"]];
 
-// Faster is a Volt triangle up, slower a Puls one down
+// Faster is a green triangle up, slower a red one down
 const moved = (d) => `<span class="${d > 0 ? "over" : "under"}">${d > 0 ? "▼" : "▲"} ${fmtDuration(Math.abs(d))}</span>`;
 const signed = (gap) => `<span class="${gap > 0 ? "over" : "under"}">${gap > 0 ? "+" : "−"}${fmtDuration(Math.abs(gap))}</span>`;
 
 const VERDICT = { better: "Faster than planned", worse: "Slower than planned", "on plan": "On plan" };
 
-// Each run type's colour: Volt for easy running, Puls for hard. A plan with more than runs colours by sport instead
+// Each run type's colour: cool for easy running, warm for hard. A plan with more than runs colours by sport instead
 const KIND = { easy: "easy", shakeout: "easy", recovery: "easy", long: "long", threshold: "threshold", race_pace: "threshold", vo2: "vo2",
   anaerobic: "anaerobic", race: "vo2", brick: "threshold" };
 const LEGEND = [["easy", "Easy"], ["long", "Long run"], ["threshold", "Threshold"], ["vo2", "VO2 max"], ["anaerobic", "Speed"]];
@@ -67,7 +67,7 @@ export function renderPlan() {
   const p = data.plan, sport = currentSport();
   // A plan shows with the sports it holds; without one, it can be set up from any of them
   const shown = !!p && (sport in p.sports || (sport === "run" && p.config.goal === "triathlon"));
-  $("planAdd").hidden = !!p;
+  $("planAddCard").hidden = !!p;
   $("planTop").hidden = $("planWeeksSec").hidden = !shown;
   if (!shown) return;
   const c = p.config, race = c.goal === "race", pr = p.projection;
@@ -102,8 +102,9 @@ function renderStrip(p) {
   const today = data.generated, dates = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(today, i));
   if (!pick || !dates.includes(pick.day) || pick.day === today) pick = { day: today, sport: currentSport() };
   $("planStrip").innerHTML = dates.map((iso) => {
-    const list = sessionsOn(p, iso), name = `${DAYS[(new Date(iso + "T12:00:00").getDay() + 6) % 7]} ${+iso.slice(8)}`;
-    const tag = (s) => (iso === today ? '<span class="tag">Today</span>' : s?.sent ? '<span class="tag sent">✓</span>' : "");
+    const list = sessionsOn(p, iso);
+    const name = iso === today ? '<b class="now">Today</b>' : `${DAYS[(new Date(iso + "T12:00:00").getDay() + 6) % 7]} ${+iso.slice(8)}`;
+    const tag = (s) => (s?.sent ? '<span class="tag sent" title="On the watch">✓</span>' : "");
     if (!list.length) {
       return `<div class="col"><button type="button" class="day rest" data-day="${iso}" aria-pressed="${pick.day === iso}">
         <span class="dn">${name}</span><span class="dt">Rest</span>${tag()}</button></div>`;

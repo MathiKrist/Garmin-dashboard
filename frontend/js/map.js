@@ -2,13 +2,13 @@
 
 import { $, css } from "./util.js";
 
-// Esri's muted grey basemaps (no API key needed), so the route is what stands out; light or dark to match the page
+// Esri's dark grey basemap (no API key needed), so the route is what stands out
 export const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/{service}/MapServer/tile/{z}/{y}/{x}";
 
-export const TILES = ESRI.replace("{service}", "Canvas/World_{style}_Gray_Base");
+export const TILES = ESRI.replace("{service}", "Canvas/World_Dark_Gray_Base");
 
-// Terrain shading laid over the grey map (blended in styles.css); "" or "_Dark" to match the page
-export const HILLSHADE = ESRI.replace("{service}", "Elevation/World_Hillshade{shade}");
+// Terrain shading laid over the grey map (blended in styles.css)
+export const HILLSHADE = ESRI.replace("{service}", "Elevation/World_Hillshade_Dark");
 
 export const SATELLITE = ESRI.replace("{service}", "World_Imagery");
 
@@ -21,21 +21,22 @@ export const ROUTE_STYLES = {
 
 export const DEFAULT_ROUTE = { color: "--route", core: "#FFE0B0", map: "grey" };
 
-// A glowing route map in `el`; show(track, name, sport) draws a route (hiding the map when there's no GPS) and replays it once
-export function routeMap(el) {
+// A glowing route map in `el`; show(track, name, sport) draws a route (hiding the map when there's no GPS) and replays it once.
+// A `preview` (the cards on Home and Train) is a still picture on touch screens: it can't be dragged or zoomed, so a
+// thumb on it scrolls the page, and a tap opens the activity
+export function routeMap(el, { preview = false } = {}) {
   let map = null, layers = null, route = null, stopReplay = null;
+  const still = preview && matchMedia("(pointer: coarse)").matches;
+  el.classList.toggle("still", still);
   const fitRoute = () => {
     map.invalidateSize();
     map.fitBounds(route.getBounds(), { padding: [24, 24], animate: false });
   };
-  // The sport's map: grey, grey with hillshade, or satellite, in the page's light or dark style
-  function setBase(kind, dark) {
+  // The sport's map: grey, grey with hillshade, or satellite
+  function setBase(kind) {
     const { grey, hillshade, satellite } = layers;
     const wanted = kind === "satellite" ? [satellite] : kind === "hillshade" ? [grey, hillshade] : [grey];
     [grey, hillshade, satellite].forEach((l) => { if (!wanted.includes(l)) l.remove(); });
-    const style = dark ? "Dark" : "Light", shade = dark ? "_Dark" : "";
-    if (grey.options.style !== style) { grey.options.style = style; grey.redraw(); }
-    if (hillshade.options.shade !== shade) { hillshade.options.shade = shade; hillshade.redraw(); }
     wanted.forEach((l) => { if (!map.hasLayer(l)) l.addTo(map); });
   }
   function show(track, name, sport) {
@@ -43,21 +44,22 @@ export function routeMap(el) {
     if (el.hidden) return;
     const look = ROUTE_STYLES[sport] || DEFAULT_ROUTE;
     if (!map) {
-      map = L.map(el, { scrollWheelZoom: false, attributionControl: false });
+      map = L.map(el, { scrollWheelZoom: false, attributionControl: false, ...(still
+        ? { dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, zoomControl: false } : {}) });
       // The panel settles its size after the map is made (fonts load, the map stretches to the status column,
       // the popup opens), so refit the whole route whenever the map's size changes
       new ResizeObserver(() => { if (route && el.offsetHeight) fitRoute(); }).observe(el);
       L.control.attribution({ prefix: false }).addTo(map);
       layers = {
         grey: L.tileLayer(TILES, {
-          style: "", maxZoom: 16,  // Esri's grey canvas stops at zoom 16
+          maxZoom: 16,  // Esri's grey canvas stops at zoom 16
           attribution: "Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
         }),
-        hillshade: L.tileLayer(HILLSHADE, { shade: null, maxZoom: 16, className: "tiles-hillshade", attribution: "Esri, USGS" }),
+        hillshade: L.tileLayer(HILLSHADE, { maxZoom: 16, className: "tiles-hillshade", attribution: "Esri, USGS" }),
         satellite: L.tileLayer(SATELLITE, { maxZoom: 18, className: "tiles-satellite", attribution: "Esri, Maxar, Earthstar Geographics" }),
       };
     }
-    setBase(look.map, document.documentElement.dataset.theme === "dark");
+    setBase(look.map);
     stopReplay?.();
     route?.remove();
     const line = css(look.color), paper = css("--paper");
@@ -82,7 +84,7 @@ export function routeMap(el) {
     }
     el.setAttribute("aria-label", `Map of the route: ${name}`);
   }
-  return { show, stop: () => stopReplay?.() };
+  return { show, stop: () => stopReplay?.(), still };
 }
 
 // Metres between two [lat, lon] points (flat-earth approximation, plenty for points a few metres apart)

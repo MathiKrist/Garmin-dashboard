@@ -4,6 +4,7 @@ import { data } from "./state.js";
 import { $, css, fmtDay, fmtDayYear, fmtShort, fmtDuration, fmtPace, plural, sum, between, fmtKm, mondayOf, statusLabel, addDays, fmtHours, escapeHtml } from "./util.js";
 import { stackedBarOptions, barStyle, partialColors, draw } from "./charts.js";
 import { openWeek } from "./modal.js";
+import { sportIcon } from "./icons.js";
 
 export function sportCounts() {
   const counts = {};
@@ -25,7 +26,7 @@ export const NO_PAGE = ["other", "disc_golf"];
 
 export const hasPage = (key, counts = sportCounts()) => counts[key] >= 3 && !NO_PAGE.includes(key);
 
-// The sport's color in the menu and on its page (sports without one use the neutral grey)
+// The sport's color in the menu, on its icon and on its page (sports without one use the neutral grey)
 export const sportColor = (key) => css(`--sp-${key}`) || css("--nohr");
 
 // What each sport's activities are called in a sentence
@@ -94,7 +95,7 @@ export function headlineStats(a) {
     .filter((key) => !["date", "name", "effect", "ascent", "load"].includes(key))
     .map((key) => [COLUMNS[key][0], String(COLUMNS[key][2](a))])
     .filter(([, v]) => v !== "")
-    .map(([label, v]) => `<div><dd>${v.replace(/\s(\S*[a-z]\S*)$/i, "<span>$1</span>")}</dd><dt>${label}</dt></div>`)
+    .map(([label, v]) => `<div><dt>${label}</dt><dd>${v.replace(/\s(\S*[a-z]\S*)$/i, "<span>$1</span>")}</dd></div>`)
     .join("");
 }
 
@@ -224,6 +225,85 @@ export function tableParts(rows, key, sort = null) {
   };
 }
 
+// What an activity's row shows under its name: the sport's first three numbers (distance, time and pace for a run;
+// time, sets and reps for strength)
+const ROW_UNITS = { hr: "bpm", sets: "sets", reps: "reps" };
+
+function rowStats(a) {
+  return (SPORT_COLUMNS[a.sport] || SPORT_COLUMNS.other)
+    .filter((key) => !["date", "name", "effect", "ascent", "descent", "load"].includes(key))
+    .map((key) => [key, String(COLUMNS[key][2](a))]).filter(([, v]) => v !== "").slice(0, 3)
+    .map(([key, v]) => {
+      const [, num, unit] = v.match(/^(\S+)\s?(.*)$/);
+      return `<span><b>${num}</b>${unit || ROW_UNITS[key] ? ` ${unit || ROW_UNITS[key]}` : ""}</span>`;
+    }).join("");
+}
+
+// The rows as a list, for phones and the home page: the sport's icon, the name, when, and the main numbers. Each
+// opens its activity.
+export function actRows(rows) {
+  return rows.map((a) => {
+    const effect = effectCell(a);
+    return `<li><button type="button" class="act-row" data-act="${a.id}">${sportIcon(a.sport)}
+      <span class="act-main"><span class="act-name">${COLUMNS.name[2](a)}</span>
+      <span class="act-meta">${COLUMNS.date[2](a)}${effect ? ` · ${effect}` : ""}</span>
+      <span class="act-stats">${rowStats(a)}</span></span></button></li>`;
+  }).join("");
+}
+
+// The orders phones can pick from (the table's headers do this on wide screens): [column, biggest first, label]
+const SORT_CHOICES = [["date", true, "Newest first"], ["date", false, "Oldest first"], ["distance", true, "Longest"],
+  ["time", true, "Most time"], ["pace", true, "Fastest"], ["speed", true, "Fastest"], ["ascent", true, "Most climbing"],
+  ["descent", true, "Most descent"], ["hr", true, "Highest heart rate"], ["load", true, "Highest load"]];
+
+// The sort picker's options for a sport's list, with the current order picked
+export function sortOptions(key, sort) {
+  const cols = SPORT_COLUMNS[key] || SPORT_COLUMNS.other;
+  return SORT_CHOICES.filter(([col]) => cols.includes(col)).map(([col, desc, label]) =>
+    `<option value="${col}:${desc ? 1 : 0}"${sort.col === col && sort.desc === desc ? " selected" : ""}>${label}</option>`).join("");
+}
+
+export const pickedSort = (value) => { const [col, desc] = value.split(":"); return { col, desc: desc === "1" }; };
+
+// The newest activity as a card (on Home and Train), or hidden without one: its sport, name, when, the sport's
+// stats, and its route on `map` when it has GPS. `label` heads it.
+export function lastCard(root, a, map, label) {
+  root.hidden = !a;
+  if (!a) return;
+  const days = Math.round((new Date(data.generated + "T12:00:00") - new Date(a.date + "T12:00:00")) / 864e5);
+  const day = days === 0 ? "Today" : days === 1 ? "Yesterday" : COLUMNS.date[2](a);
+  root.querySelector(".last-ico").innerHTML = sportIcon(a.sport, "lg");
+  root.querySelector(".eyebrow").textContent = [label, `${day}${a.start ? `, ${a.start.slice(11, 16)}` : ""}`, a.location].filter(Boolean).join(" · ");
+  root.querySelector("h2 button").textContent = a.name || a.type.replace(/_/g, " ");
+  const effect = root.querySelector(".last-effect");
+  effect.innerHTML = effectCell(a);
+  effect.hidden = !effect.innerHTML;
+  root.querySelector(".last-stats").innerHTML = headlineStats(a);
+  // The name, date and stats open the activity. On a mouse the map stays free to pan and zoom; on a touch screen
+  // it's a picture that opens the activity too, so a thumb on it scrolls the page instead of dragging the map
+  root.querySelectorAll(".last-open").forEach((el) => { el.dataset.act = a.id; });
+  map.show(a.track, a.name || label.toLowerCase(), a.sport);
+  if (map.still) root.querySelector(".last-map").dataset.act = a.id;
+}
+
+// The days of this week as bars for `list`, by `value` (km or seconds): the markup and what it says in words
+export function weekBars(list, value, small, label) {
+  const today = data.generated, monday = mondayOf(today);
+  const days = [...Array(7)].map((_, i) => {
+    const iso = addDays(monday, i);
+    return { iso, v: value(list.filter((a) => a.date === iso)) };
+  });
+  const top = Math.max(...days.map((d) => d.v)) || 1;
+  return {
+    html: days.map((d, i) => {
+      const cls = d.iso === today ? "is-today" : d.iso > today ? "future" : "";
+      const h = d.v ? Math.max(8, (d.v / top) * 100) : 0;
+      return `<div class="${cls}" title="${fmtDay(d.iso)}: ${d.v ? small(d.v) : "rest"}"><div class="bar"><i style="height:${h}%"></i></div><span class="day">${"MTWTFSS"[i]}</span></div>`;
+    }).join(""),
+    label: `${label} this week by day: ` + days.filter((d) => d.iso <= today).map((d) => `${fmtDay(d.iso)} ${d.v ? small(d.v) : "rest"}`).join(", "),
+  };
+}
+
 // Strava-style totals for a list of activities in the `root` panel: this week day by day, and this year.
 // For one sport (`key`) with distances, also the longest one this week and this year.
 export function renderVolume(root, list, label, key) {
@@ -244,17 +324,9 @@ export function renderVolume(root, list, label, key) {
   if (prev4 > 0) weekNote.push(`4-week avg ${small(prev4)}`);
   q("vol-week-note").textContent = weekNote.join(" · ");
 
-  const days = [...Array(7)].map((_, i) => {
-    const iso = addDays(monday, i);
-    return { iso, v: value(list.filter((a) => a.date === iso)) };
-  });
-  const top = Math.max(...days.map((d) => d.v)) || 1;
-  q("vol-days").innerHTML = days.map((d, i) => {
-    const cls = d.iso === today ? "is-today" : d.iso > today ? "future" : "";
-    const h = d.v ? Math.max(6, (d.v / top) * 100) : 0;
-    return `<div class="${cls}" title="${fmtDay(d.iso)}: ${d.v ? small(d.v) : "rest"}"><div class="bar"><i style="height:${h}%"></i></div><span class="day">${"MTWTFSS"[i]}</span></div>`;
-  }).join("");
-  q("vol-days").setAttribute("aria-label", `${label} this week by day: ` + days.filter((d) => d.iso <= today).map((d) => `${fmtDay(d.iso)} ${d.v ? small(d.v) : "rest"}`).join(", "));
+  const bars = weekBars(list, value, small, label);
+  q("vol-days").innerHTML = bars.html;
+  q("vol-days").setAttribute("aria-label", bars.label);
 
   const yr = list.filter((a) => a.date.startsWith(year));
   q("vol-year").innerHTML = big(value(yr));
@@ -271,6 +343,10 @@ export function renderVolume(root, list, label, key) {
   };
   q("vol-week-long").textContent = longest(week);
   q("vol-year-long").textContent = longest(yr);
+  // A sport with a page of its own: the way there
+  const link = q("vol-link");
+  link.hidden = !key || !hasPage(key);
+  if (!link.hidden) { link.href = `#sport/${key}`; link.textContent = `${label} in depth`; }
 }
 
 // Distance for sports that record it, time for the rest

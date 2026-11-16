@@ -1,9 +1,15 @@
-// Activity popup: the list's summary straight away, then every stat, the route and the laps once they've loaded
+// An activity in its own window (the whole screen on phones): the list's summary straight away, then every stat,
+// the route and the laps once they've loaded, and for a run or ride the coach's review when asked for
 
 import { data } from "./state.js";
 import { $, fmtDuration, fmtPace, statusLabel, sum, fmtHours } from "./util.js";
 import { routeMap } from "./map.js";
-import { headlineStats, KMH_SPORTS, fmtSpeed, effectCell, COLUMNS, measureFor, tableParts, sportLabel } from "./sports.js";
+import { headlineStats, KMH_SPORTS, fmtSpeed, effectCell, COLUMNS, measureFor, tableParts, sportLabel, actRows } from "./sports.js";
+import { sportIcon } from "./icons.js";
+import { loadReview, reviewLabel } from "./workout.js";
+
+// The sports the coach reviews (the server's review.SPORTS), and what one of their activities is called
+const REVIEW_NOUN = { run: "run", bike: "ride" };
 
 export const modalMap = routeMap($("modalMap"));
 
@@ -36,11 +42,13 @@ export function openWeek(week) {
   const { key, title, partial, rows } = week;
   const list = rows.slice().sort((a, b) => (a.start || a.date).localeCompare(b.start || b.date));
   const { byKm, of, small } = measureFor(list);
-  const stat = (label, v) => `<div><dd>${v.replace(/\s(\S*[a-z]\S*)$/i, "<span>$1</span>")}</dd><dt>${label}</dt></div>`;
+  const stat = (label, v) => `<div><dt>${label}</dt><dd>${v.replace(/\s(\S*[a-z]\S*)$/i, "<span>$1</span>")}</dd></div>`;
   $("modalBack").hidden = true;
   $("modalWhen").textContent = sportLabel(key) + (partial ? " · so far" : "");
   $("modalName").textContent = title;
+  $("modalIcon").innerHTML = sportIcon(key);
   $("modalEffect").hidden = true;
+  showReviewButton(null);
   $("modalStats").innerHTML = [
     byKm ? stat("Distance", small(of(list))) : "",
     stat("Time", fmtHours(sum(list, "duration_s"))),
@@ -48,8 +56,8 @@ export function openWeek(week) {
     sum(list, "load") ? stat("Load", String(Math.round(sum(list, "load")))) : "",
   ].join("");
   const t = tableParts(list, key);
-  $("modalDetails").innerHTML = `<section class="dgroup wide"><div class="scroll"><table class="act-table">
-    <thead>${t.head}</thead><tbody>${t.body}</tbody></table></div></section>`;
+  $("modalDetails").innerHTML = `<section class="dgroup wide act-list"><ul class="acts">${actRows(list)}</ul>
+    <div class="scroll"><table class="act-table"><thead>${t.head}</thead><tbody>${t.body}</tbody></table></div></section>`;
   $("modalMap").hidden = true;
   showModalStatus("");
   showModal();
@@ -69,6 +77,8 @@ export async function openActivity(id) {
   modalDetail = null;
   $("modalWhen").textContent = [COLUMNS.date[2](a) + (a.start ? `, ${a.start.slice(11, 16)}` : ""), a.location].filter(Boolean).join(" · ");
   $("modalName").textContent = a.name || a.type.replace(/_/g, " ");
+  $("modalIcon").innerHTML = sportIcon(a.sport);
+  showReviewButton(a);
   $("modalEffect").innerHTML = effectCell(a);
   $("modalEffect").hidden = !$("modalEffect").innerHTML;
   $("modalStats").innerHTML = headlineStats(a);
@@ -88,14 +98,28 @@ export async function openActivity(id) {
   }
 }
 
+// The coach's review of a run or ride: a button, and the review under it once pressed (Claude is asked only then)
+function showReviewButton(a) {
+  const noun = a && REVIEW_NOUN[a.sport], btn = $("modalReviewBtn");
+  $("modalReviewWrap").hidden = !noun;
+  $("modalReview").hidden = true;
+  $("modalReview").innerHTML = "";
+  btn.setAttribute("aria-expanded", "false");
+  if (noun) btn.innerHTML = reviewLabel(noun);
+}
+
+$("modalReviewBtn").addEventListener("click", () => {
+  const btn = $("modalReviewBtn"), a = modalAct, open = btn.getAttribute("aria-expanded") === "true";
+  if (!a) return;
+  if (open) return showReviewButton(a);
+  btn.textContent = "Hide review";
+  btn.setAttribute("aria-expanded", "true");
+  loadReview($("modalReview"), a.id, () => modalAct === a && btn.getAttribute("aria-expanded") === "true");
+});
+
 export function showModalStatus(text) {
   $("modalStatus").textContent = text || "";
   $("modalStatus").hidden = !text;
-}
-
-// After a theme change: redraw the open popup's map in the new colors
-export function redrawModalMap() {
-  if (modalDetail) modalMap.show(modalDetail.track, modalDetail.name || "activity", modalDetail.sport);
 }
 
 export function closeModal() {

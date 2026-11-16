@@ -195,7 +195,7 @@ def predicted_time(day, metres):
 
 
 def _race(goal, days, acts, today):
-    """The race goal for the overview: target, Garmin's prediction and its last six months, and the result once run.
+    """The race goal for the Home and Progress pages: target, Garmin's prediction and its last six months, and the result once run.
     Shown until a week after race day."""
     race_day = date.fromisoformat(goal["date"])
     if today > race_day + timedelta(days=7):
@@ -321,7 +321,7 @@ def build_dashboard(db_path=None):
         acts = [dict(r) for r in conn.execute(
             f"SELECT {ACTIVITY_SELECT} FROM activities WHERE date IS NOT NULL AND date != '' ORDER BY start_local")]
         track = db.get_track(conn, acts[-1]["id"]) if acts else None
-        # The newest activity of each sport the Workout page has, with its route, for the top of that page
+        # The newest activity of each sport the Train page has, with its route, for the top of that page
         last_of = {}
         for a in reversed(acts):
             if sport_of(a["type"]) in workouts.ALL_SPORTS and sport_of(a["type"]) not in last_of:
@@ -499,7 +499,7 @@ def build_dashboard(db_path=None):
         "activities": recent_acts,
         # The newest activity, with its GPS track when it has one (for the map at the top)
         "last_activity": {**recent_acts[0], "track": track or None} if acts else None,
-        "last_by_sport": last_by_sport,  # the newest run, ride and swim, for the top of the Workout page
+        "last_by_sport": last_by_sport,  # the newest run, ride and swim, for the top of the Train page
         "activities_from": acts[0]["date"] if acts else None,  # the first synced activity, for "this year" totals
         # Names the page shows, from the tables above
         "sports": SPORT_LABELS,

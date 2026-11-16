@@ -1,4 +1,4 @@
-// The chat on the workout page: messages to Claude on the server, which can change today's session, the plan's days
+// The coach's chat on the Train page: messages to Claude on the server, which can change today's session, the plan's days
 // and later days. The conversation lives on the server (one a day), so every device sees the same one.
 
 import { $, escapeHtml } from "./util.js";
@@ -33,6 +33,7 @@ function cost(out) {
 function render() {
   const el = $("chatLog");
   el.hidden = !log.length;
+  $("chatHint").hidden = !!log.length;
   el.innerHTML = log.map(item).join("");
   el.scrollTop = el.scrollHeight;
   $("chatNew").hidden = !log.length || busy;

@@ -18,7 +18,7 @@ export function parseTime(text) {
 export function renderRace() {
   const r = data.race;
   $("race").hidden = !r;
-  $("raceAdd").hidden = !!r;
+  $("raceAddCard").hidden = !!r;
   if (!r) return;
   const pace = (sec) => fmtPace(sec / r.metres * 1000);
   const d = r.days_to_go;
@@ -38,14 +38,14 @@ export function renderRace() {
         ["Gap", gap > 0 ? fmtDuration(gap) : "On target", gap > 0 ? "to find" : ""]);
     }
     // The training plan's projection for race day, a range
-    if (r.plan) items.push(["Plan projects", fmtRange(r.plan.low, r.plan.high), '<a href="#workout">Plan</a>']);
+    if (r.plan) items.push(["Plan projects", fmtRange(r.plan.low, r.plan.high), '<a href="#train">See the plan</a>']);
   }
   $("raceStats").innerHTML = statItems(items);
 
   const h = r.history;
   $("raceTrend").hidden = h.length < 2;
   if (h.length < 2) return;
-  const fit = css("--fitness"), ink = css("--ink");
+  const fit = css("--accent"), ink = css("--ink");
   const o = baseOptions({
     // Faster is higher, so the prediction climbs toward the target as you get fitter
     y: { reverse: true, grid: { color: css("--rule") }, ticks: { color: css("--muted"), callback: (v) => fmtDuration(v) }, border: { display: false },
@@ -57,7 +57,7 @@ export function renderRace() {
     data: {
       labels: h.map((x) => fmtShort(x.date)),
       datasets: [
-        { label: "Garmin predicts", data: h.map((x) => x.s), borderColor: fit, backgroundColor: fit, borderWidth: 2, tension: 0.3,
+        { label: "Garmin predicts", data: h.map((x) => x.s), borderColor: fit, backgroundColor: fit, borderWidth: 2.5, tension: 0.3,
           pointRadius: h.map((_, i) => (i === h.length - 1 ? 4 : 0)) },
         { label: "Target", data: h.map(() => r.target_s), borderColor: ink, borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0 },
       ],

@@ -7,17 +7,16 @@
 <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#0E1116">
-<link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
+<meta name="theme-color" content="#0B0B0D">
 <link rel="stylesheet" href="/static/styles.css">
-<script src="/static/js/theme.js"></script>
 </head>
 <body class="login-page">
 <!-- Served by app.py, which shows the username field when DASHBOARD_USERNAME is set and adds the error after a wrong try -->
 <main class="login">
   <form method="post" action="/login">
     <header>
-      <p class="eyebrow">Training dashboard</p>
+      <span class="brand-mark" aria-hidden="true"></span>
+      <p class="eyebrow">Training</p>
       <h1>Log in</h1>
     </header>
     <label id="userField" hidden>Username <input id="username" autocomplete="username" autocapitalize="none"></label>
