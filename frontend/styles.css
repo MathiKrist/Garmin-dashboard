@@ -11,18 +11,17 @@
   --card-line: #1E1E22;  /* a card's edge */
   --ink: #F5F5F2;
   --muted: #9D9DA6;
-  --accent: #FF5A1F;     /* buttons, the tab you're on, links, single-series charts */
+  --accent: #FF5A1F;     /* buttons, the tab you're on, links, and every chart: a chart's own series are this
+                            orange (or shades of it), what it's compared against is grey */
   --on-accent: #1A0802;
+  --accent-dim: #7A3218;  /* the accent half-way to a card: the lesser part of a chart (resting calories) */
   --good: #3DD68C;       /* better, done */
   --bad: #FF5C7A;        /* worse, errors */
   --easy: #3DD68C;
   --hard: #FFB23E;
-  --fitness: #5AA9FF;    /* fitness against fatigue */
-  --fatigue: #FF5C7A;
+  --fitness: #FF5A1F;    /* fitness against fatigue: fitness is the accent, fatigue grey in the chart */
+  --fatigue: #FF5C7A;    /* also the finish on the maps and the "Overloaded" form */
   --nohr: #5F5F69;       /* no value: unknown effort, sports without a colour */
-  --sleep: #8C8CFF;
-  --body-battery: #4DA8FF;
-  --stress: #C27BC9;
   /* A session's steps and a plan's bars: cool for easy running, warm for hard */
   --k-easy: #2F9E90;
   --k-long: #5CE0C6;
@@ -38,10 +37,10 @@
   --satellite-brightness: 0.58;  /* dims satellite photos so the route stands out */
   --hillshade-blend: screen;
   --hillshade-opacity: 0.55;
-  /* Garmin's load focus colors */
-  --low-aerobic: #50C1F6;
-  --high-aerobic: #FF9A36;
-  --anaerobic: #B46BEB;
+  /* Garmin's load focus, as shades of the accent: darker for easier, lighter for harder */
+  --low-aerobic: #A8431C;
+  --high-aerobic: #FF5A1F;
+  --anaerobic: #FFB089;
   /* Garmin's training status colors */
   --st-peaking: #B57BE6;
   --st-productive: #4CC46C;
@@ -643,9 +642,7 @@ div.ps-row { cursor: default; }
 .form-now .state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--state-color, var(--muted)); }
 
 /* Training calendar: a column per week, Monday at the top, the month above its first week */
-.cal-scroll { overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--pad) * -1); padding: 0 var(--pad); }
-.cal-scroll::-webkit-scrollbar { display: none; }
-.cal { display: flex; gap: 6px; min-width: 660px; }
+.cal { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 6px; }  /* 32 px before the grid: LABELS_WIDTH in js/calendar.js */
 .cal-labels, .cal-grid { display: grid; grid-template-rows: 1.1rem repeat(7, 1fr); gap: 3px; }
 .cal-grid { flex: 1; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 .cal-label, .cal-month { color: var(--muted); font-size: 0.66rem; line-height: 1; white-space: nowrap; }
@@ -678,7 +675,7 @@ div.ps-row { cursor: default; }
 .cal-ring { display: flex; align-items: center; gap: 1rem; }
 .cal-ring svg { width: 104px; height: 104px; flex: none; }
 .cal-ring circle { fill: none; stroke-width: 11; }
-.cal-ring .cal-rest { stroke: var(--low-aerobic); }
+.cal-ring .cal-rest { stroke: var(--accent-dim); }
 .cal-ring .cal-active { stroke: var(--accent); stroke-linecap: butt; }
 .cal-ring text { text-anchor: middle; fill: var(--ink); }
 .cal-ring .cal-total { font: 800 24px var(--body); letter-spacing: -0.03em; }
@@ -686,7 +683,7 @@ div.ps-row { cursor: default; }
 .cal-key p { margin: 0.2rem 0; color: var(--muted); font-size: 0.84rem; white-space: nowrap; }
 .cal-key p.eyebrow { margin-bottom: 0.4rem; font-size: 0.72rem; }
 .cal-key b { margin-right: 0.25rem; color: var(--ink); font-weight: 700; }
-.cal-key i { display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 3px; margin-right: 0.45rem; background: var(--low-aerobic); vertical-align: -1px; }
+.cal-key i { display: inline-block; width: 0.65rem; height: 0.65rem; border-radius: 3px; margin-right: 0.45rem; background: var(--accent-dim); vertical-align: -1px; }
 .cal-key i.active { background: var(--accent); }
 
 /* ---- A sport's page */

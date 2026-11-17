@@ -1,9 +1,14 @@
-// Training calendar: the last 53 weeks, a square per day shaded by its training load (like GitHub's contribution graph)
+// Training calendar: a square per day shaded by its training load (like GitHub's contribution graph), as many of the
+// last 53 weeks as fit the card: the whole year on a wide screen, the last few months on a phone
 
 import { data } from "./state.js";
 import { $, css, fmtDay, mondayOf, alpha, addDays, fmtHours, escapeHtml } from "./util.js";
 
-const WEEKS = 53;
+const MAX_WEEKS = 53, MIN_WEEKS = 13;
+// The narrowest a week's column may get (a square plus the gap), so the squares stay big enough to tap
+const MIN_COLUMN = 14;
+// The day names' column and the gap after it
+const LABELS_WIDTH = 32;
 // Shades of the accent color for the four load levels (quartiles of the days you trained)
 const LEVEL_ALPHA = [0.25, 0.45, 0.7, 1];
 
@@ -13,7 +18,17 @@ function quartiles(loads) {
   return [0.25, 0.5, 0.75].map((q) => sorted[Math.floor(q * (sorted.length - 1))]);
 }
 
+let weeksShown = 0;
+
+// How many weeks fit the calendar's width
+const weeksThatFit = () => {
+  const width = $("cal").clientWidth;
+  return width ? Math.max(MIN_WEEKS, Math.min(MAX_WEEKS, Math.floor((width - LABELS_WIDTH) / MIN_COLUMN))) : MAX_WEEKS;
+};
+
 export function renderCalendar() {
+  $("calSection").hidden = false;  // shown first, so its width can be measured
+  const WEEKS = weeksShown = weeksThatFit();
   const today = data.generated, start = addDays(mondayOf(today), -7 * (WEEKS - 1));
   // Each day's activities, load and time
   const byDay = {};
@@ -59,11 +74,18 @@ export function renderCalendar() {
   let streak = 0, best = 0, prev = null;
   days.forEach((d) => { streak = prev && addDays(prev, 1) === d ? streak + 1 : 1; best = Math.max(best, streak); prev = d; });
   const span = Math.round((new Date(today + "T12:00:00") - new Date(start + "T12:00:00")) / 864e5) + 1;
-  $("calReading").textContent = `${days.length} training days in the last ${WEEKS} weeks, ${(days.length / span * 7).toFixed(1)} a week. ` +
+  const period = WEEKS === MAX_WEEKS ? "year" : `${WEEKS} weeks`;
+  $("calReading").textContent = `${days.length} training days in the last ${period}, ${(days.length / span * 7).toFixed(1)} a week. ` +
     `Longest streak: ${best} day${best === 1 ? "" : "s"}.`;
-  $("cal").setAttribute("aria-label", `Training calendar, last ${WEEKS} weeks: ${days.length} training days`);
+  $("cal").setAttribute("aria-label", `Training calendar, last ${period}: ${days.length} training days`);
   $("calLegend").innerHTML = `<span>Less</span>${colors.map((c) => `<i style="background:${c}"></i>`).join("")}<span>More</span>`;
-  // Phones show the newest weeks first; the older ones are a scroll to the left
-  const scroller = $("cal").parentElement;
-  scroller.scrollLeft = scroller.scrollWidth;
 }
+
+// Turning the phone or resizing the window: redraw when a different number of weeks fits
+let resizeTimer;
+addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (data && !$("calSection").hidden && $("cal").clientWidth && weeksThatFit() !== weeksShown) renderCalendar();
+  }, 150);
+});

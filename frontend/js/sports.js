@@ -59,7 +59,7 @@ export function weeklyChart(canvas, legend, key, list, starts, m) {
     const unknown = starts.map((w) => val(inWeek(w).filter((a) => !a.focus)));
     if (unknown.some(Boolean)) sets.push({ label: "Unknown", data: unknown, color: css("--nohr") });
   } else {
-    sets = [{ label: sportLabel(key), data: starts.map((w) => val(inWeek(w))), color: sportColor(key) }];
+    sets = [{ label: sportLabel(key), data: starts.map((w) => val(inWeek(w))), color: css("--accent") }];
   }
   // A single series needs no legend: the title names it
   $(legend).innerHTML = sets.length > 1 ? sets.map((x) => `<span><i style="background:${x.color}"></i>${x.label}</span>`).join("") : "";

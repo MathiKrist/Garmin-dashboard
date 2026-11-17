@@ -99,7 +99,8 @@ export function renderHealth() {
   const from = addDays(data.generated, -healthDays);
   const tr = data.trends.filter((d) => d.date > from), labels = tr.map((d) => fmtShort(d.date));
   const fit = css("--accent"), muted = css("--muted"), rule = css("--rule"), dots = healthDays > 90 || innerWidth < 600 ? 0 : 2;
-  const blue = css("--low-aerobic"), sleep = css("--sleep");
+  // Every chart in the accent: bars a little see-through, more so under a 7-day average line so the line stands out
+  const bar = alpha(fit, 0.85), barUnder = alpha(fit, 0.7);
   const has = (f) => tr.some((d) => d[f] != null);
   // Each measure gets its own chart (one y-axis each); a chart with no data hides its section
   const chart = (section, id, config) => {
@@ -130,20 +131,20 @@ export function renderHealth() {
     })(),
   });
   chart("rhrSection", "rhrChart", has("resting_hr") && {
-    type: "line", data: { labels, datasets: [line("Resting HR", "resting_hr", css("--fatigue"))] },
+    type: "line", data: { labels, datasets: [line("Resting HR", "resting_hr", fit)] },
     options: opts({ ticks: { color: muted, precision: 0, maxTicksLimit: 6, padding: 4 } }, (c) => ` Resting HR: ${c.parsed.y} bpm`),
   });
   chart("sleepSection", "sleepChart", has("sleep_s") && {
-    data: { labels, datasets: [bars("Sleep", tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(2) : null)), alpha(sleep, 0.85))] },
+    data: { labels, datasets: [bars("Sleep", tr.map((d) => (d.sleep_s ? +(d.sleep_s / 3600).toFixed(2) : null)), bar)] },
     options: opts({ min: 0 }, (c) => ` ${fmtHours(c.parsed.y * 3600)}`),
   });
   // Floating bars from the day's lowest to its highest Body Battery
   chart("bbSection", "bbChart", has("bb_high") && {
-    data: { labels, datasets: [bars("Body Battery", tr.map((d) => (d.bb_high != null && d.bb_low != null ? [d.bb_low, d.bb_high] : null)), css("--body-battery"))] },
+    data: { labels, datasets: [bars("Body Battery", tr.map((d) => (d.bb_high != null && d.bb_low != null ? [d.bb_low, d.bb_high] : null)), bar)] },
     options: opts({ min: 0, max: 100 }, (c) => { const [lo, hi] = c.raw; return ` Body Battery: ${lo} to ${hi}`; }),
   });
   chart("stressSection", "stressChart", has("stress_avg") && {
-    data: { labels, datasets: [bars("Stress", tr.map((d) => d.stress_avg), css("--stress"))] },
+    data: { labels, datasets: [bars("Stress", tr.map((d) => d.stress_avg), bar)] },
     options: opts({ min: 0, max: 100 }, (c) => ` Average stress: ${c.parsed.y} (${stressLevel(c.parsed.y).toLowerCase()})`),
   });
   // The 7-day average of the days with a value, counted over the whole history so the first days of the view have one
@@ -153,7 +154,7 @@ export function renderHealth() {
   }).slice(all.length - tr.length);
   const avgLine = (f) => ({ type: "line", label: "7-day average", data: avg7(f), borderColor: css("--ink"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 3, tension: 0.3, spanGaps: true });
   chart("sleepScoreSection", "sleepScoreChart", has("sleep_score") && {
-    data: { labels, datasets: [bars("Sleep score", tr.map((d) => d.sleep_score), alpha(sleep, 0.6)), avgLine("sleep_score")] },
+    data: { labels, datasets: [bars("Sleep score", tr.map((d) => d.sleep_score), barUnder), avgLine("sleep_score")] },
     options: opts({ min: 0, max: 100 }, (c) => (c.dataset.label === "Sleep score" ? ` Sleep score: ${c.parsed.y}` : ` 7-day average: ${c.parsed.y}`)),
   });
   const isToday = (i) => tr[i].date === data.generated;
@@ -161,7 +162,7 @@ export function renderHealth() {
   chart("stepsSection", "stepsChart", has("steps") && {
     data: { labels, datasets: [
       // Today's steps are still counting: paler, like the other unfinished periods
-      bars("Steps", tr.map((d) => d.steps), tr.map((d) => alpha(blue, d.date === data.generated ? 0.7 * PARTIAL_ALPHA : 0.7))),
+      bars("Steps", tr.map((d) => d.steps), tr.map((d) => alpha(fit, d.date === data.generated ? 0.7 * PARTIAL_ALPHA : 0.7))),
       avgLine("steps"),
     ] },
     options: opts({ min: 0 }, (c) => c.dataset.label === "Steps"
@@ -172,10 +173,9 @@ export function renderHealth() {
   if (best) $("stepsReading").textContent += ` Best day: ${steps(best.steps)} on ${fmtShort(best.date)}.`;
 
   // Calories: the day's total, today's paler as it's still counting; the split into active and resting in the tooltip
-  const red = fit;
   chart("caloriesSection", "caloriesChart", has("cal_total") && {
     data: { labels, datasets: [
-      bars("Calories", tr.map((d) => d.cal_total), tr.map((d) => alpha(red, d.date === data.generated ? 0.7 * PARTIAL_ALPHA : 0.7))),
+      bars("Calories", tr.map((d) => d.cal_total), tr.map((d) => alpha(fit, d.date === data.generated ? 0.7 * PARTIAL_ALPHA : 0.7))),
       avgLine("cal_total"),
     ] },
     options: (() => {

@@ -110,7 +110,7 @@ export function renderLoadFocus() {
   $("focusEyebrow").textContent = ["Garmin load focus · last 4 weeks", fromDay(lf.as_of)].filter(Boolean).join(" · ");
   $("focusTitle").textContent = lf.title;
   const zoneColor = (key) => FOCUS.find((f) => f[0] === key)?.[2];
-  $("focusTitle").style.setProperty("--focus-color", lf.zone ? `var(${zoneColor(lf.zone)})` : "var(--ink)");
+  $("focusTitle").style.setProperty("--focus-color", lf.zone ? "var(--accent)" : "var(--ink)");
   $("focusAdvice").textContent = lf.advice;
   // One shared scale, so the bars compare across zones
   const top = Math.max(...lf.zones.flatMap((z) => [z.value || 0, z.max || 0])) * 1.08 || 1;
@@ -227,13 +227,13 @@ $("fitnessRange").addEventListener("click", (e) => {
 });
 
 export function renderFitnessCharts() {
-  const fit = css("--fitness");
+  const fit = css("--accent");
   $("fitnessRange").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.days) === fitnessDays)));
   $("fitnessChart").setAttribute("aria-label", `Fitness and fatigue over the last ${fitnessDays === 120 ? "120 days" : "year"}`);
 
-  // Fitness and fatigue on one scale: the gap between them is form, shaded blue where fitness is ahead (positive
-  // form) and red where fatigue is
-  const fx = data.fitness.slice(-fitnessDays), fat = css("--fatigue");
+  // Fitness and fatigue on one scale: the gap between them is form, shaded orange where fitness is ahead (positive
+  // form) and grey where fatigue is
+  const fx = data.fitness.slice(-fitnessDays), fat = css("--muted");
   const last = (color) => ({ pointRadius: fx.map((_, i) => (i === fx.length - 1 ? 4 : 0)), pointBackgroundColor: color });
   const o = baseOptions();
   o.plugins.tooltip.callbacks = {

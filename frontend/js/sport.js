@@ -3,7 +3,7 @@
 import { data } from "./state.js";
 import { $, css, fmtShort, fmtDuration, fmtPace, plural, sum, between, fmtKm, mondayOf, statItems, addDays, fmtHours, escapeHtml } from "./util.js";
 import { partialColors, baseOptions, draw, monthTicks } from "./charts.js";
-import { sportLabel, sportColor, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, PAGE, KMH_SPORTS, COLUMNS, DEFAULT_SORT, sortRows, nextSort, tableParts, measureFor, actRows, sortOptions, pickedSort } from "./sports.js";
+import { sportLabel, SPORT_NOUNS, weekStarts, lowShare, weeklyChart, PAGE, KMH_SPORTS, COLUMNS, DEFAULT_SORT, sortRows, nextSort, tableParts, measureFor, actRows, sortOptions, pickedSort } from "./sports.js";
 import { sportIcon } from "./icons.js";
 
 let sportShown = PAGE, sportShownKey = null, sportSort = DEFAULT_SORT;
@@ -86,7 +86,7 @@ export function renderYearOnYear(key, list, m) {
   const fmt = (v) => (m.byKm ? `${fmtKm(v)} km` : fmtHours(v * 3600));
   const thenTotal = before[idx], nowTotal = now[idx];
   $("sportYoyReading").textContent = `${fmt(nowTotal)} so far, against ${fmt(thenTotal)} by this date last year (${fmt(before[365])} in all).`;
-  const color = sportColor(key), muted = css("--muted");
+  const color = css("--accent"), muted = css("--muted");
   $("sportYoyLegend").innerHTML = `<span><i class="line" style="background:${color}"></i>${y}</span>` +
     `<span><i class="line dashed" style="color:${muted}"></i>${y - 1}</span>`;
   $("sportYoyChart").setAttribute("aria-label", `Running total of ${m.unit.toLowerCase()} through ${y}, against ${y - 1}`);
@@ -124,7 +124,7 @@ export function renderMonthly(key, list, m) {
   const now = perMonth(y), before = perMonth(y - 1), thisMonth = Number(month) - 1;
   $("sportMonthSection").hidden = !now.some(Boolean) && !before.some(Boolean);
   if ($("sportMonthSection").hidden) return;
-  const color = sportColor(key), grey = css("--nohr");
+  const color = css("--accent"), grey = css("--nohr");
   $("sportMonthTitle").textContent = `${m.unit} per month`;
   $("sportMonthLegend").innerHTML = `<span><i style="background:${color}"></i>${y}</span><span><i style="background:${grey}"></i>${y - 1}</span>`;
   $("sportMonthChart").setAttribute("aria-label", `${m.unit} per month, ${y} against ${y - 1}`);
