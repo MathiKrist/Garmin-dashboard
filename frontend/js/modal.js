@@ -7,6 +7,7 @@ import { routeMap } from "./map.js";
 import { headlineStats, KMH_SPORTS, fmtSpeed, effectCell, COLUMNS, measureFor, tableParts, sportLabel, actRows } from "./sports.js";
 import { sportIcon } from "./icons.js";
 import { loadReview, reviewLabel } from "./workout.js";
+import { sheetStep } from "./nav.js";
 
 // The sports the coach reviews (the server's review.SPORTS), and what one of their activities is called
 const REVIEW_NOUN = { run: "run", bike: "ride" };
@@ -63,13 +64,23 @@ export function openWeek(week) {
   showModal();
 }
 
-$("modalBack").addEventListener("click", () => { if (backTo) openWeek(backTo); });
+// Back to the week's list: a step back in history, as the phone's back button does (see nav.js)
+$("modalBack").addEventListener("click", () => {
+  if (history.state?.sub) history.back(); else if (backTo) openWeek(backTo);
+});
+
+addEventListener("popstate", () => {
+  if (modal.open && backTo && history.state?.sheet === "actModal" && !history.state.sub) openWeek(backTo);
+});
 
 export async function openActivity(id) {
   const a = data.activities.find((x) => x.id === id);
   if (!a) return;
-  // Opened from a week's list: a link back to it
-  if (modalWeek) backTo = modalWeek;
+  // Opened from a week's list: a link back to it, and a step in history for the back button to undo
+  if (modalWeek) {
+    backTo = modalWeek;
+    if (modal.open) sheetStep();
+  }
   modalWeek = null;
   $("modalBack").hidden = !backTo;
   if (backTo) $("modalBack").textContent = `← ${backTo.title}`;

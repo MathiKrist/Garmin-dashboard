@@ -26,6 +26,8 @@ For a desktop shortcut, right-click the `.bat` → **Send to** → **Desktop (cr
 
 Phones show the pages as tabs along the bottom, wide screens as a menu on the left with a page per sport under it. **Sync now** and **Log out** are in the settings: the button top right on phones, the one at the bottom of the menu on wide screens (where the line beside it syncs at once too).
 
+On a phone, swipe sideways to move between the tabs; swipe right on a sport's page or an activity to go back. Pull down at the top of a page to sync with Garmin. Drag a sheet or an activity down to close it (a form only by its top edge, so a stray drag can't throw away what you typed). The phone's back button works like it does in an app: it closes an open sheet or activity (or goes from an activity back to the week it was opened from), takes a sport's page back to where you opened it, takes any other tab back to Home, and leaves the app from Home. Going back also returns a page to where you'd scrolled it.
+
 ### Home
 
 ![Home](docs/screenshots/home.png)
