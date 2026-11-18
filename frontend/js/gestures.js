@@ -1,8 +1,10 @@
-// Finger gestures on phones: swipe sideways to the next or previous tab (and right to go back from a sport's page or
-// an activity), pull down at the top of a page to sync with Garmin, and drag a sheet or an activity down to close it.
+// Finger gestures on phones: swipe sideways to the next or previous tab (and right to go back from a sport's page),
+// or in an activity to the next or previous one in the list it was opened from (right closes a week's list), pull down
+// at the top of a page to sync with Garmin, and drag a sheet or an activity down to close it.
 // Each follows the finger, and acts only once past a point or on a quick flick; otherwise it springs back.
 
 import { $ } from "./util.js";
+import { showingActivity, neighbour, stepActivity } from "./modal.js";
 
 export const TABS = ["home", "train", "activities", "progress", "health"];
 
@@ -73,8 +75,8 @@ export function initGestures({ route, navigate, back, sync }) {
       // A form keeps its fields safe from a stray drag: only its top edge drags it down
       const grip = !dlg.classList.contains("form-sheet") || g.y < dlg.getBoundingClientRect().top + 64;
       if (down && grip && !inScrolledBox(g.target, dlg)) return "dismiss";
-      if (sideways && g.dx > 0 && !edge && dlg.id === "actModal" && !inSideScroller(g.target, dlg)) return "back";
-      return "";
+      if (!sideways || edge || dlg.id !== "actModal" || inSideScroller(g.target, dlg)) return "";
+      return showingActivity() ? "browse" : g.dx > 0 ? "back" : "";
     }
     if (sideways && !edge && !main.hidden && !inSideScroller(g.target)) return "tabs";
     if (down && scrollY <= 0 && !inScrolledBox(g.target)) return "pull";
@@ -88,6 +90,10 @@ export function initGestures({ route, navigate, back, sync }) {
       g.prev = r.page === "sport" ? "back" : TABS[i - 1];
       g.next = r.page === "sport" ? null : TABS[i + 1];
       g.el = main;
+    } else if (g.kind === "browse") {
+      g.prev = neighbour(-1);
+      g.next = neighbour(1);
+      g.el = g.dialog.querySelector(".modal-box");
     } else if (g.kind === "pull") g.el = ptr;
     else g.el = g.dialog;
     g.el.style.transition = "none";
@@ -95,8 +101,8 @@ export function initGestures({ route, navigate, back, sync }) {
 
   function move() {
     const { kind, el, dx, dy } = g;
-    if (kind === "tabs") {
-      const to = dx > 0 ? g.prev : g.next, x = to ? dx : dx * 0.2;  // a little give where there's no tab
+    if (kind === "tabs" || kind === "browse") {
+      const to = dx > 0 ? g.prev : g.next, x = to != null ? dx : dx * 0.2;  // a little give where there's nothing more
       el.style.transform = `translateX(${x}px)`;
       el.style.opacity = 1 - Math.min(Math.abs(x) / innerWidth, 1) * 0.5;
     } else if (kind === "pull") {
@@ -128,6 +134,19 @@ export function initGestures({ route, navigate, back, sync }) {
           }
         });
       } else settle(el);
+    } else if (kind === "browse") {
+      // The activity slides out, and the next one in from the other side
+      const dir = dx > 0 ? -1 : 1, to = dx > 0 ? g.prev : g.next, vx = speed(g, "x");
+      if (to != null && (Math.abs(dx) > innerWidth * 0.3 || (Math.abs(dx) > 40 && vx * dx > 0 && Math.abs(vx) > 0.35))) {
+        el.style.opacity = "0";
+        slideOut(el, `translateX(${Math.sign(dx) * innerWidth * 0.4}px)`, () => {
+          stepActivity(dir);
+          el.style.transition = "none";
+          el.style.transform = `translateX(${-Math.sign(dx) * 30}%)`;
+          void el.offsetWidth;
+          settle(el);
+        }, 150);
+      } else settle(el);
     } else if (kind === "pull") {
       if (g.ready) {
         el.classList.add("go");
@@ -143,18 +162,8 @@ export function initGestures({ route, navigate, back, sync }) {
       if (dy > 110 || (dy > 30 && speed(g, "y") > 0.5)) {
         slideOut(el, "translateY(100%)", () => { el.close(); el.removeAttribute("style"); }, 200);
       } else settle(el);
-    } else if (dx > innerWidth * 0.3 || (dx > 40 && speed(g, "x") > 0.35)) {
-      // An activity opened from a week goes back to the week's list, sliding in from the left; otherwise it closes
-      if (history.state?.sub) {
-        slideOut(el, "translateX(100%)", () => {
-          history.back();
-          el.style.transition = "none";
-          el.style.transform = "translateX(-30%)";
-          el.style.opacity = "0";
-          void el.offsetWidth;  // lay it out there, so the slide back in is a transition
-          settle(el);
-        });
-      } else slideOut(el, "translateX(100%)", () => { el.close(); el.removeAttribute("style"); }, 200);
+    } else if (dx > innerWidth * 0.3 || (dx > 40 && speed(g, "x") > 0.35)) {  // a week's list: closes
+      slideOut(el, "translateX(100%)", () => { el.close(); el.removeAttribute("style"); }, 200);
     } else settle(el);
   }
 

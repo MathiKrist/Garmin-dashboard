@@ -14,15 +14,53 @@ const REVIEW_NOUN = { run: "run", bike: "ride" };
 
 export const modalMap = routeMap($("modalMap"));
 
-// Any activity row, or a personal best, opens the activity
+// Lists an activity can be opened from: activity rows, the table's rows, a personal best's top 5
+const LISTS = ".acts, .act-table tbody, .rec-top";
+
+const actId = (el) => Number(el.dataset.id || el.dataset.act);
+
+// Any activity row, or a personal best, opens the activity, and swiping moves along the list it was in
 document.addEventListener("click", (e) => {
   const el = e.target.closest(".act-table tbody tr[data-id], [data-act]");
-  if (el) openActivity(Number(el.dataset.id || el.dataset.act));
+  if (!el) return;
+  const box = el.closest(LISTS);
+  openActivity(actId(el), box ? [...new Set([...box.querySelectorAll("tr[data-id], [data-act]")].map(actId))] : null);
 });
 
 const modal = $("actModal");
 
 let modalAct = null, modalDetail = null;
+
+// The activities a swipe (or the arrow keys) moves through: the list the activity was opened from, in the order
+// shown (a week's, the Activities page with its filter and sort, a sport's, a personal best's top 5), or else every
+// activity, newest first
+let modalList = [];
+
+const newestFirst = () => data.activities.slice()
+  .sort((a, b) => (b.start || b.date).localeCompare(a.start || a.date)).map((a) => a.id);
+
+// Whether an activity is shown (rather than a week's list)
+export const showingActivity = () => !!modalAct;
+
+// The activity before (dir -1) or after (dir 1) the one shown, in its list; null at either end
+export function neighbour(dir) {
+  const i = modalAct ? modalList.indexOf(modalAct.id) : -1;
+  return i >= 0 ? modalList[i + dir] ?? null : null;
+}
+
+// Show that one instead; the back button still closes the activity (or goes back to the week) in one step
+export function stepActivity(dir) {
+  const id = neighbour(dir);
+  if (id != null) openActivity(id);
+  return id != null;
+}
+
+// Wide screens: the arrow keys move along the list
+modal.addEventListener("keydown", (e) => {
+  if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !e.target.closest("input, textarea, select, .leaflet-container")) {
+    if (stepActivity(e.key === "ArrowLeft" ? -1 : 1)) e.preventDefault();
+  }
+});
 
 // The week shown in the popup ({ key, title, partial, rows }), and the one an activity opened from it goes back to
 let modalWeek = null, backTo = null;
@@ -73,9 +111,12 @@ addEventListener("popstate", () => {
   if (modal.open && backTo && history.state?.sheet === "actModal" && !history.state.sub) openWeek(backTo);
 });
 
-export async function openActivity(id) {
+// list: the ids of the list it was opened from, if any (see modalList)
+export async function openActivity(id, list = null) {
   const a = data.activities.find((x) => x.id === id);
   if (!a) return;
+  if (list?.includes(id)) modalList = list;
+  else if (!modalList.includes(id)) modalList = newestFirst();
   // Opened from a week's list: a link back to it, and a step in history for the back button to undo
   if (modalWeek) {
     backTo = modalWeek;
@@ -140,6 +181,7 @@ export function closeModal() {
 modal.addEventListener("close", () => {
   modalMap.stop();
   modalAct = modalDetail = modalWeek = backTo = null;
+  modalList = [];
   document.body.classList.remove("modal-open");
 });
 
