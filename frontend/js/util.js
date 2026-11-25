@@ -51,6 +51,21 @@ export const listText = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} 
 
 export const mondayOf = (iso) => addDays(iso, -((new Date(iso + "T12:00:00").getDay() + 6) % 7));
 
+// The ISO week number (weeks start on Monday; week 1 holds the year's first Thursday)
+export function isoWeek(iso) {
+  const thu = new Date(addDays(mondayOf(iso), 3) + "T12:00:00");
+  const days = Math.round((thu - new Date(thu.getFullYear(), 0, 1, 12)) / 864e5);  // rounded: summer time drops an hour
+  return Math.floor(days / 7) + 1;
+}
+
+// A week from its Monday: "Mon 16 – Sun 22 Nov", "Mon 30 Nov – Sun 6 Dec", with the year when it isn't this year's
+export function fmtWeek(monday) {
+  const sunday = addDays(monday, 6), d = (iso) => new Date(iso + "T12:00:00");
+  const sameMonth = d(monday).getMonth() === d(sunday).getMonth();
+  const year = sunday.slice(0, 4) !== data.generated.slice(0, 4) ? ` ${sunday.slice(0, 4)}` : "";
+  return `Mon ${sameMonth ? d(monday).getDate() : fmtShort(monday)} – Sun ${fmtShort(sunday)}${year}`;
+}
+
 export const statusLabel = (code) => code ? code.charAt(0) + code.slice(1).toLowerCase().replace(/_/g, " ") : "No data";
 
 // "from Mon 5 Oct" for a daily value that isn't from today (the server keeps them up to a week)

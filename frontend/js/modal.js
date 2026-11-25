@@ -42,17 +42,21 @@ const newestFirst = () => data.activities.slice()
 // Whether an activity is shown (rather than a week's list)
 export const showingActivity = () => !!modalAct;
 
-// The activity before (dir -1) or after (dir 1) the one shown, in its list; null at either end
+// The activity before (dir -1) or after (dir 1) the one shown, in its list, or with a week shown the week before or
+// after that has any; null at either end
 export function neighbour(dir) {
+  if (modalWeek) return modalWeek.step?.(dir) ?? null;
   const i = modalAct ? modalList.indexOf(modalAct.id) : -1;
   return i >= 0 ? modalList[i + dir] ?? null : null;
 }
 
 // Show that one instead; the back button still closes the activity (or goes back to the week) in one step
 export function stepActivity(dir) {
-  const id = neighbour(dir);
-  if (id != null) openActivity(id);
-  return id != null;
+  const to = neighbour(dir);
+  if (to != null) {
+    if (modalWeek) openWeek(to); else openActivity(to);
+  }
+  return to != null;
 }
 
 // Wide screens: the arrow keys move along the list
@@ -62,7 +66,7 @@ modal.addEventListener("keydown", (e) => {
   }
 });
 
-// The week shown in the popup ({ key, title, partial, rows }), and the one an activity opened from it goes back to
+// The week shown in the popup (sports.weekOf), and the one an activity opened from it goes back to
 let modalWeek = null, backTo = null;
 
 function showModal() {
@@ -78,12 +82,12 @@ export function openWeek(week) {
   modalWeek = week;
   backTo = modalAct = modalDetail = null;
   modalMap.stop();
-  const { key, title, partial, rows } = week;
+  const { key, title, range, partial, rows } = week;
   const list = rows.slice().sort((a, b) => (a.start || a.date).localeCompare(b.start || b.date));
   const { byKm, of, small } = measureFor(list);
   const stat = (label, v) => `<div><dt>${label}</dt><dd>${v.replace(/\s(\S*[a-z]\S*)$/i, "<span>$1</span>")}</dd></div>`;
   $("modalBack").hidden = true;
-  $("modalWhen").textContent = sportLabel(key) + (partial ? " · so far" : "");
+  $("modalWhen").textContent = [sportLabel(key), range, partial ? "so far" : ""].filter(Boolean).join(" · ");
   $("modalName").textContent = title;
   $("modalIcon").innerHTML = sportIcon(key);
   $("modalEffect").hidden = true;
@@ -218,10 +222,18 @@ export function zoneBars(zones, label) {
 // Garmin splits a resort ski day into a lap per run, so winter sports call them runs
 export const lapName = (d) => (d.sport === "winter" ? "Run" : "Lap");
 
-// Lap table columns: [header, cell], headers taking the activity; columns that are empty for every lap are left out
+// Splits worked out for a run or ride recorded without laps (per km, per 5 km on a ride): each by the km it ends at,
+// a short last one by its own distance, as Strava shows them
+const splitName = (l, i, d) => {
+  const every = d.sport === "bike" ? 5 : 1;
+  return Math.abs(l.km - every) < 0.01 ? (i + 1) * every : l.km.toFixed(2);
+};
+
+// Lap table columns: [header, cell], headers taking the activity and whether the rows are splits; columns that are empty
+// for every row are left out
 export const LAP_COLUMNS = [
-  [lapName, (l, i) => i + 1],
-  [() => "Distance", (l) => (l.km ? `${l.km.toFixed(2)} km` : "")],
+  [(d, split) => (split ? "Km" : lapName(d)), (l, i, d, split) => (split ? splitName(l, i, d) : i + 1)],
+  [() => "Distance", (l, i, d, split) => (l.km && !split ? `${l.km.toFixed(2)} km` : "")],
   [() => "Time", (l) => fmtDuration(l.duration_s)],
   [(d) => (KMH_SPORTS.includes(d.sport) ? "Speed" : "Pace"), (l, i, d) => fmtSpeed({ sport: d.sport, speed: l.speed })],
   [(d) => (KMH_SPORTS.includes(d.sport) ? "Max speed" : "Best pace"), (l, i, d) => fmtSpeed({ sport: d.sport, speed: l.max_speed })],
@@ -229,14 +241,15 @@ export const LAP_COLUMNS = [
   [() => "Max HR", (l) => (l.max_hr ? Math.round(l.max_hr) : "")],
   [() => "Ascent", (l) => (l.elev_gain ? `${Math.round(l.elev_gain)} m` : "")],
   [() => "Descent", (l) => (l.elev_loss ? `${Math.round(l.elev_loss)} m` : "")],
+  [() => "Climb", (l) => (l.elev != null ? `${l.elev > 0 ? "+" : ""}${l.elev} m` : "")],
   [() => "Cadence", (l) => (l.cadence ? Math.round(l.cadence) : "")],
   [() => "Power", (l) => (l.power ? `${Math.round(l.power)} W` : "")],
 ];
 
-export function lapTable(d) {
-  const cols = LAP_COLUMNS.filter(([, cell]) => d.laps.some((l, i) => cell(l, i, d) !== ""));
-  return `<div class="scroll"><table class="laps"><thead><tr>${cols.map(([h], i) => `<th${i ? ' class="num"' : ""}>${h(d)}</th>`).join("")}</tr></thead>
-    <tbody>${d.laps.map((l, li) => `<tr>${cols.map(([, cell], i) => `<td${i ? ' class="num"' : ""}>${cell(l, li, d)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+export function lapTable(d, rows = d.laps, split = false) {
+  const cols = LAP_COLUMNS.filter(([, cell]) => rows.some((l, i) => cell(l, i, d, split) !== ""));
+  return `<div class="scroll"><table class="laps"><thead><tr>${cols.map(([h], i) => `<th${i ? ' class="num"' : ""}>${h(d, split)}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map((l, li) => `<tr>${cols.map(([, cell], i) => `<td${i ? ' class="num"' : ""}>${cell(l, li, d, split)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 
 export function renderModalDetail() {
@@ -328,5 +341,6 @@ export function renderModalDetail() {
     group("Best efforts", d.best.map((b) => row(b.label, `${fmtDuration(b.s)}<small>${fmtPace(b.s / b.m * 1000)}</small>`))),
   ];
   $("modalDetails").innerHTML = groups.join("") +
-    (d.laps.length > 1 ? `<section class="dgroup wide"><h3>${lapName(d)}s</h3>${lapTable(d)}</section>` : "");
+    (d.laps.length > 1 ? `<section class="dgroup wide"><h3>${lapName(d)}s</h3>${lapTable(d)}</section>` :
+      d.splits?.length ? `<section class="dgroup wide"><h3>Splits</h3>${lapTable(d, d.splits, true)}</section>` : "");
 }

@@ -132,6 +132,22 @@ class OnItsOwn(unittest.TestCase):
         self.assertEqual([x["label"] for x in r["rows"]], ["Whole session"])
         self.assertIn("No laps recorded", review.prompt(r))
 
+    def test_km_splits_without_laps(self):
+        # Auto-lap off: one lap for the whole run, so the coach reads the splits worked out from the stream
+        splits = [{**lap(441, 441, 140), "km": 1.0, "elev": 2}, {**lap(437, 437, 151), "km": 1.0, "elev": -8},
+                  {**lap(422, 211, 160), "km": 0.5, "elev": 0}]
+        r = review.build_free(run(workout_id=None), [lap(440, 1089, 150)], T.floors, [run()], splits)
+        self.assertEqual([x["label"] for x in r["rows"]], ["Km 1", "Km 2", "2-2.5 km"])
+        text = review.prompt(r)
+        self.assertIn("auto-lap is off on purpose); split per km", text)
+        self.assertIn("Km 2: 7 min, 1.00 km, 7:17/km, 151 bpm, -8 m climb, zone 3", text)
+        self.assertIn("never suggest recording laps", review.system(r))
+
+    def test_laps_come_before_splits(self):
+        r = review.build_free(run(workout_id=None), [lap(330, 330), lap(320, 320)], T.floors, [run()],
+                              [{**lap(330, 330), "km": 1.0, "elev": 0}] * 2)
+        self.assertEqual([x["label"] for x in r["rows"]], ["Lap 1", "Lap 2"])
+
 
 ANAEROBIC = workouts._run_steps("anaerobic", 50, T)
 

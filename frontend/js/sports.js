@@ -1,7 +1,7 @@
 // Sports and activity tables: grouping, labels, columns, weekly volume and the This week / This year panel
 
 import { data } from "./state.js";
-import { $, css, fmtDay, fmtDayYear, fmtShort, fmtDuration, fmtPace, plural, sum, between, fmtKm, mondayOf, statusLabel, addDays, fmtHours, escapeHtml } from "./util.js";
+import { $, css, fmtDay, fmtDayYear, fmtShort, fmtDuration, fmtPace, plural, sum, between, fmtKm, mondayOf, statusLabel, addDays, fmtHours, escapeHtml, isoWeek, fmtWeek } from "./util.js";
 import { stackedBarOptions, barStyle, partialColors, draw } from "./charts.js";
 import { openWeek } from "./modal.js";
 import { sportIcon } from "./icons.js";
@@ -47,6 +47,19 @@ export function lowShare(runs) {
   return known ? `Last 4 weeks: ${Math.round(low / known * 100)}% low aerobic.` : "";
 }
 
+// A week of the sport's activities for the popup, from its Monday, or null when it has none. step(dir) gives the week
+// before (-1) or after (1) that has any, so the popup can swipe from week to week, past the chart's weeks too
+export function weekOf(key, list, monday) {
+  const rows = list.filter((a) => mondayOf(a.date) === monday);
+  if (!rows.length) return null;
+  const step = (dir) => {
+    const weeks = [...new Set(list.map((a) => mondayOf(a.date)))].sort();
+    const next = weeks[weeks.indexOf(monday) + dir];
+    return next ? weekOf(key, list, next) : null;
+  };
+  return { key, title: `Week ${isoWeek(monday)}`, range: fmtWeek(monday), partial: monday === mondayOf(data.generated), rows, step };
+}
+
 // Volume per week in `canvas` (km or hours, by `m`); runs are split by Garmin's training effect, like the load focus
 export function weeklyChart(canvas, legend, key, list, starts, m) {
   const val = (as) => (m.byKm ? +sum(as, "km").toFixed(1) : +(sum(as, "duration_s") / 3600).toFixed(2));
@@ -71,7 +84,7 @@ export function weeklyChart(canvas, legend, key, list, starts, m) {
     data: { labels: starts.map((w) => fmtShort(w)),
       datasets: sets.map(({ color, ...x }) => ({ ...x, backgroundColor: partialColors(color, partial), ...barStyle() })) },
     options: { ...stackedBarOptions({
-      title: (items) => `Week of ${fmtShort(starts[items[0].dataIndex])}${partial[items[0].dataIndex] ? " (so far)" : ""}`,
+      title: (items) => `Week ${isoWeek(starts[items[0].dataIndex])} · ${fmtWeek(starts[items[0].dataIndex])}${partial[items[0].dataIndex] ? " (so far)" : ""}`,
       label: (c) => (c.parsed.y ? ` ${c.dataset.label}: ${fmt(c.parsed.y)}` : null),
       footer: (items) => {
         const as = inWeek(starts[items[0].dataIndex]);
@@ -81,7 +94,7 @@ export function weeklyChart(canvas, legend, key, list, starts, m) {
     onHover: (e, els) => { e.native.target.style.cursor = weekAt(els) >= 0 ? "pointer" : ""; },
     onClick: (e, els) => {
       const i = weekAt(els);
-      if (i >= 0) openWeek({ key, title: `Week of ${fmtShort(starts[i])}`, partial: partial[i], rows: inWeek(starts[i]) });
+      if (i >= 0) openWeek(weekOf(key, list, starts[i]));
     } },
   });
 }

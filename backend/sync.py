@@ -25,6 +25,7 @@ EFFORT_RUNS_PER_SYNC = 40  # runs whose best efforts are worked out per sync (on
 PLAN_LAPS_PER_SYNC = 20  # runs in the training plan whose laps are fetched per sync
 RECHECK_DAYS = 30  # once a day, activities this far back are fetched again, to pick up edits and deletions on Garmin
 EFFORT_DISTANCES = tuple(metrics.DISTANCES)
+SPLIT_EVERY = {"run": 1000, "bike": 5000}  # splits for a run or ride recorded without laps: per km, per 5 km
 
 
 def _get(d, *path):
@@ -187,28 +188,86 @@ def best_efforts(samples, distances=EFFORT_DISTANCES):
     return out
 
 
-def fetch_efforts(client, activity_id):
-    """A run's best efforts from its second-by-second data, or None if the request failed."""
-    details = _try(client.get_activity_details, activity_id, 100000, 1)
-    if details is None:
-        return None
+def _stream(details, times):
+    """(seconds, metres, heart rate, elevation) samples from an activity's second-by-second data, the time from the
+    first of `times` Garmin sent. Heart rate and elevation are None where missing."""
     keys = {m.get("key"): m.get("metricsIndex") for m in details.get("metricDescriptors") or []}
-    # Elapsed time, as Garmin's own fastest splits use: a stop in the middle of a 5 km counts against it
-    ti, di = keys.get("sumElapsedDuration", keys.get("sumDuration")), keys.get("sumDistance")
+    ti, di = next((keys[k] for k in times if keys.get(k) is not None), None), keys.get("sumDistance")
     if ti is None or di is None:
-        return {}
+        return []
+    hi, ei = keys.get("directHeartRate"), keys.get("directElevation")
     samples, last = [], (-1, -1)
     for row in details.get("activityDetailMetrics") or []:
         vals = row.get("metrics") or []
-        t, d = (vals[ti], vals[di]) if len(vals) > max(ti, di) else (None, None)
+        get = lambda i: vals[i] if i is not None and i < len(vals) else None  # noqa: E731
+        t, d = get(ti), get(di)
         if t is None or d is None or t < last[0] or d < last[1]:
             continue  # gaps and the odd backwards step from GPS corrections
-        samples.append((t, d))
+        samples.append((t, d, get(hi), get(ei)))
         last = (t, d)
-    return best_efforts(samples)
+    return samples
+
+
+def efforts_from(details):
+    # Elapsed time, as Garmin's own fastest splits use: a stop in the middle of a 5 km counts against it
+    return best_efforts([(t, d) for t, d, _, _ in _stream(details, ("sumElapsedDuration", "sumDuration"))])
+
+
+def distance_splits(samples, every):
+    """Splits every `every` metres from (seconds, metres, heart rate, elevation) samples, as auto-lap would have
+    recorded them: each with its time, speed, time-weighted heart rate and net climb. The crossing of each boundary
+    is interpolated between samples; a last part shorter than a tenth of a split is left out."""
+    if len(samples) < 2:
+        return []
+    out = []
+    t_s, d_s, _, e_s = samples[0]
+    hr, edge = [0.0, 0.0], d_s + every
+
+    def lerp(a, b, f):
+        return None if a is None or b is None else a + (b - a) * f
+
+    def close(t, d, e):
+        out.append({"km": round((d - d_s) / 1000, 3), "duration_s": round(t - t_s, 1),
+                    "speed": round((d - d_s) / (t - t_s), 3) if t > t_s else None,
+                    "avg_hr": round(hr[0] / hr[1]) if hr[1] else None,
+                    "elev": None if e is None or e_s is None else round(e - e_s)})
+
+    for (t0, d0, _, e0), (t1, d1, h1, e1) in zip(samples, samples[1:]):
+        tc = t0  # where the part of this step not yet counted starts
+        while d1 >= edge:
+            f = (edge - d0) / (d1 - d0)
+            t, e = t0 + (t1 - t0) * f, lerp(e0, e1, f)
+            if h1:
+                hr[0] += h1 * (t - tc)
+                hr[1] += t - tc
+            close(t, edge, e)
+            t_s, d_s, e_s, tc, hr, edge = t, edge, e, t, [0.0, 0.0], edge + every
+        if h1:
+            hr[0] += h1 * (t1 - tc)
+            hr[1] += t1 - tc
+    t1, d1, _, e1 = samples[-1]
+    if d1 - d_s >= every / 10:
+        close(t1, d1, e1)
+    return out
+
+
+def splits_from(details, every):
+    # The timer's time, as auto-lap uses: a pause doesn't count against the split it falls in
+    return distance_splits(_stream(details, ("sumDuration", "sumElapsedDuration")), every)
+
+
+def fetch_efforts(client, activity_id):
+    """A run's best efforts from its second-by-second data, or None if the request failed."""
+    details = _try(client.get_activity_details, activity_id, 100000, 1)
+    return None if details is None else efforts_from(details)
 
 
 _shared_client = None  # logged in once and kept, for activities opened on the page
+FRESH_DAYS = 2  # an activity this recent with no laps stored gets them asked for again: Garmin works them out after upload
+
+
+def _fresh(day):
+    return bool(day) and day >= (date.today() - timedelta(days=FRESH_DAYS)).isoformat()
 
 
 def fetch_details(db_path, activity_id):
@@ -216,32 +275,42 @@ def fetch_details(db_path, activity_id):
     Returns None when all is well, or a message saying why they couldn't be fetched."""
     global _shared_client
     conn = db.connect(db_path)
+
+    def client():
+        global _shared_client
+        _shared_client = _shared_client or _client()
+        return _shared_client
+
     try:
-        row = conn.execute("SELECT json_extract(raw, '$.hasPolyline') AS gps, type FROM activities WHERE id = ?",
+        row = conn.execute("SELECT json_extract(raw, '$.hasPolyline') AS gps, type, date FROM activities WHERE id = ?",
                            (activity_id,)).fetchone()
         if not row:
             return None
-        need_track = bool(row["gps"]) and db.get_track(conn, activity_id) is None
-        laps = db.get_laps(conn, activity_id)
-        # Laps stored before max speed, descent, the workout step and the timer's time were added are fetched again
-        need_laps = laps is None or (laps and not {"max_speed", "step", "moving_s"} <= laps[0].keys())
-        # A run synced since the last batch of best efforts gets them now, so its 400 m shows straight away
-        need_efforts = "running" in (row["type"] or "") and db.get_efforts(conn, activity_id) is None
-        if not (need_track or need_laps or need_efforts):
-            return None
-        _shared_client = _shared_client or _client()
-        if need_track:
-            points = fetch_track(_shared_client, activity_id)
+        fresh = _fresh(row["date"])
+        if bool(row["gps"]) and db.get_track(conn, activity_id) is None:
+            points = fetch_track(client(), activity_id)
             if points is not None:  # a failed request is retried the next time the activity is opened
                 db.set_track(conn, activity_id, points)
-        if need_laps:
-            laps = fetch_laps(_shared_client, activity_id)
+        laps = db.get_laps(conn, activity_id)
+        # Laps stored before max speed, descent, the workout step and the timer's time were added are fetched again,
+        # and so are none on a fresh activity: Garmin may not have worked them out when they were first asked for
+        if laps is None or (laps and not {"max_speed", "step", "moving_s"} <= laps[0].keys()) or (fresh and not laps):
+            laps = fetch_laps(client(), activity_id)
             if laps is not None:
                 db.set_laps(conn, activity_id, laps)
-        if need_efforts:
-            bests = fetch_efforts(_shared_client, activity_id)
-            if bests is not None:
-                db.set_efforts(conn, activity_id, bests)
+        # A run synced since the last batch of best efforts gets them now, so its 400 m shows straight away
+        need_efforts = "running" in (row["type"] or "") and db.get_efforts(conn, activity_id) is None
+        # A run or ride recorded without laps gets its splits worked out, so it can be read km by km
+        every = SPLIT_EVERY.get(metrics.sport_of(row["type"]))
+        splits = db.get_splits(conn, activity_id)
+        need_splits = bool(every) and laps is not None and len(laps) < 2 and (splits is None or (fresh and not splits))
+        if need_efforts or need_splits:
+            details = _try(client().get_activity_details, activity_id, 100000, 1)
+            if details is not None:  # a failed request is retried the next time the activity is opened
+                if need_efforts:
+                    db.set_efforts(conn, activity_id, efforts_from(details))
+                if need_splits:
+                    db.set_splits(conn, activity_id, splits_from(details, every))
         conn.commit()
         return None
     except Exception as e:
@@ -437,12 +506,14 @@ def run_sync(db_path=None):
         plan = json.loads(db.get_meta(conn, "training_plan") or "null")
         if plan:
             todo = conn.execute(
-                "SELECT id FROM activities WHERE type LIKE '%running%' AND date >= ? "
+                "SELECT id, date FROM activities WHERE type LIKE '%running%' AND date >= ? "
                 "AND id NOT IN (SELECT activity_id FROM laps) ORDER BY start_local DESC LIMIT ?",
                 (plan["start"], PLAN_LAPS_PER_SYNC)).fetchall()
             for row in todo:
                 laps = fetch_laps(client, row["id"])
-                if laps is not None:  # a failed request is retried next sync
+                # A failed request is retried next sync, and so is no laps on a run just uploaded: Garmin may not have
+                # worked them out yet
+                if laps is not None and (laps or not _fresh(row["date"])):
                     db.set_laps(conn, row["id"], laps)
                     conn.commit()
 

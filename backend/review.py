@@ -1,5 +1,6 @@
 """How a run went against the workout it was run from: today's suggested session or a plan session, sent to the watch
-from the dashboard. A run or ride done on its own, from no workout the dashboard sent, gets the coach's written feedback instead, read from its laps.
+from the dashboard. A run or ride done on its own, from no workout the dashboard sent, gets the coach's written feedback instead, read from its laps
+or, recorded without laps, from its splits per km.
 
 Garmin marks an activity done from a scheduled workout with that workout's id, and the dashboard keeps each workout
 it sends under its id (the archive), as it went to the watch: a plan's paces adapt later, so the plan's own session
@@ -38,10 +39,12 @@ Reply in plain text without markdown: no headings, no bold, no lists. Paces are 
 FREE_SYSTEM = """You are the coach in a personal training dashboard. The athlete has just done a session on their \
 own, not one the dashboard sent to their watch, and asks for your feedback on it.
 
-You get the session's totals, its laps as the watch recorded them (each with its heart rate zone), Garmin's training \
-effect and the last 7 days of training in the same sport. There were no targets: read from the laps and heart rate what \
-kind of session it was (easy, steady, tempo, intervals, long, a race...). The athlete has already seen the laps; they \
-want a coach's read of them, not the numbers again.
+You get the session's totals, its laps as the watch recorded them or, when it recorded none, its splits per km (per \
+5 km on a ride) worked out from the watch's second-by-second data, each with its heart rate zone, then Garmin's \
+training effect and the last 7 days of training in the same sport. There were no targets: read from the laps and heart \
+rate what kind of session it was (easy, steady, tempo, intervals, long, a race...). The athlete has already seen the \
+laps; they want a coach's read of them, not the numbers again. They run without auto-lap on purpose, so never suggest \
+recording laps or turning auto-lap on.
 
 Write it as a coach talking to the athlete, in three short paragraphs:
 1. How it went: what the session turned out to be, and how it was carried out (pacing, whether the heart rate drifted \
@@ -218,18 +221,38 @@ def _zone(hr, floors):
     return min(5, sum(hr >= f for f in floors[:5])) if hr and floors else None
 
 
-def build_free(a, laps, floors, week):
-    """The review of a run or ride done from no workout the dashboard sent: a row per lap (or the whole session
-    without laps), each with its heart rate zone. `week` is the same sport's activities in the 7 days to its date."""
+def split_labels(splits):
+    """"Km 1", "Km 2", ... for whole km from the start, else the stretch: "7-7.47 km", "5-10 km"."""
+    out, start = [], 0.0
+    for i, x in enumerate(splits):
+        end = start + (x.get("km") or 0)
+        whole = abs(end - start - 1) < 0.01 and abs(start - i) < 0.01
+        out.append(f"Km {i + 1}" if whole else f"{round(start, 2):g}-{round(end, 2):g} km")
+        start = end
+    return out
+
+
+def build_free(a, laps, floors, week, splits=None):
+    """The review of a run or ride done from no workout the dashboard sent: a row per lap, or recorded without laps a
+    row per split (sync.distance_splits), or else the whole session; each with its heart rate zone. `week` is the same
+    sport's activities in the 7 days to its date."""
     laps = [l for l in laps or [] if l.get("duration_s")]
-    if len(laps) < 2:
-        laps = [{"duration_s": a.get("duration_s"), "km": a.get("km"), "speed": a.get("speed"), "avg_hr": a.get("avg_hr")}]
-    rows = [{"label": f"Lap {i + 1}" if len(laps) > 1 else "Whole session", "done_s": l.get("duration_s"),
-             "km": l.get("km"), "speed": l.get("speed"), "power": l.get("power"), "hr": l.get("avg_hr"),
+    splits = [x for x in splits or [] if x.get("duration_s")]
+    by = "laps" if len(laps) > 1 else "splits" if len(splits) > 1 else None
+    if by == "laps":
+        labels = [f"Lap {i + 1}" for i in range(len(laps))]
+    elif by == "splits":
+        laps, labels = splits, split_labels(splits)
+    else:
+        laps, labels = [{"duration_s": a.get("duration_s"), "km": a.get("km"), "speed": a.get("speed"),
+                         "avg_hr": a.get("avg_hr")}], ["Whole session"]
+    rows = [{"label": labels[i], "done_s": l.get("duration_s"), "km": l.get("km"), "speed": l.get("speed"),
+             "power": l.get("power"), "hr": l.get("avg_hr"), "elev": l.get("elev"),
              "zone": _zone(l.get("avg_hr"), floors), "off": None, "target": None}
             for i, l in enumerate(laps)]
     return {
         "id": a["id"], "sport": a["sport"], "title": a.get("name") or "Your session", "date": a["date"], "free": True,
+        "by": by,
         "why": [], "plan": False, "paired": False, "rows": rows, "on_target": None, "reps": False,
         "planned": None, "done": {"s": a.get("duration_s"), "km": a.get("km"), "hr": a.get("avg_hr")},
         "effect": {"label": a.get("te_label"), "aerobic": a.get("aerobic_te"), "anaerobic": a.get("anaerobic_te")},
@@ -255,6 +278,8 @@ def _done(r, sport):
         parts.append(f"{round(r['power'])} W")
     if r["hr"]:
         parts.append(f"{round(r['hr'])} bpm")
+    if r.get("elev") is not None:
+        parts.append(f"{r['elev']:+d} m climb")
     off = "" if r["off"] is None else " - on target" if r["off"] == 0 else \
         f" - {r['off']} {'s/km' if (r['target'] or {}).get('type') == 'pace' else 'W' if r['target']['type'] == 'power' else 'bpm'} {r['side']}"
     return ", ".join(p for p in parts if p) + off
@@ -271,7 +296,9 @@ def _prompt_free(r):
     noun = "runs" if r["sport"] == "run" else "rides"
     lines = [f"Session: {r['title']} ({r['sport']}), {r['date']}, not from a workout the dashboard sent",
              f"Done: {coach._minutes(r['done']['s'] or 0)}, {r['done']['km']} km" + (f", average {round(r['done']['hr'])} bpm" if r["done"]["hr"] else ""),
-             "", "Lap by lap:" if len(r["rows"]) > 1 else "No laps recorded; the whole session:"]
+             "", "Lap by lap:" if r.get("by") == "laps" else
+             f"No laps recorded (auto-lap is off on purpose); split per {'km' if r['sport'] == 'run' else '5 km'} from "
+             "the watch's second-by-second data:" if r.get("by") == "splits" else "No laps recorded; the whole session:"]
     for x in r["rows"]:
         lines.append(f"- {x['label']}: {_done(x, r['sport'])}" + (f", zone {x['zone']}" if x["zone"] is not None else ""))
     lines += ["", _effect_line(r["effect"]),

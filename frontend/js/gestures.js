@@ -1,5 +1,6 @@
 // Finger gestures on phones: swipe sideways to the next or previous tab (and right to go back from a sport's page),
-// or in an activity to the next or previous one in the list it was opened from (right closes a week's list), pull down
+// in an activity to the next or previous one in the list it was opened from, in a week's list to the week before or
+// after (right past the first one closes it), pull down
 // at the top of a page to sync with Garmin, and drag a sheet or an activity down to close it.
 // Each follows the finger, and acts only once past a point or on a quick flick; otherwise it springs back.
 
@@ -76,7 +77,9 @@ export function initGestures({ route, navigate, back, sync }) {
       const grip = !dlg.classList.contains("form-sheet") || g.y < dlg.getBoundingClientRect().top + 64;
       if (down && grip && !inScrolledBox(g.target, dlg)) return "dismiss";
       if (!sideways || edge || dlg.id !== "actModal" || inSideScroller(g.target, dlg)) return "";
-      return showingActivity() ? "browse" : g.dx > 0 ? "back" : "";
+      // An activity moves along its list; a week to the week before or after, and closes past the first one
+      if (showingActivity() || neighbour(g.dx > 0 ? -1 : 1) != null) return "browse";
+      return g.dx > 0 ? "back" : "";
     }
     if (sideways && !edge && !main.hidden && !inSideScroller(g.target)) return "tabs";
     if (down && scrollY <= 0 && !inScrolledBox(g.target)) return "pull";

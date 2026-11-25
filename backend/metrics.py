@@ -291,6 +291,7 @@ def build_activity(db_path, activity_id):
         track = db.get_track(conn, activity_id)
         laps = db.get_laps(conn, activity_id)
         efforts = db.get_efforts(conn, activity_id)
+        splits = db.get_splits(conn, activity_id)
     finally:
         conn.close()
     a = dict(row)
@@ -312,6 +313,8 @@ def build_activity(db_path, activity_id):
                       for m, label in BEST_EFFORTS.items() if raw.get(f"fastestSplit_{m}")],
         "track": track or None,
         "laps": laps or [],
+        # Recorded without laps: per-km splits worked out from the second-by-second data, shown in their place
+        "splits": splits if len(laps or []) < 2 and len(splits or []) > 1 else [],
     }
 
 

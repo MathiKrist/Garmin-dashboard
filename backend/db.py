@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS laps (activity_id INTEGER PRIMARY KEY, laps TEXT);
 -- second-by-second data; "{}" when that couldn't be read
 CREATE TABLE IF NOT EXISTS efforts (activity_id INTEGER PRIMARY KEY, bests TEXT);
 
+-- A run or ride recorded without laps, split per km (per 5 km on a ride) from its second-by-second data, as JSON
+-- [{km, duration_s, speed, avg_hr, elev}, ...]; "[]" when that couldn't be read
+CREATE TABLE IF NOT EXISTS splits (activity_id INTEGER PRIMARY KEY, splits TEXT);
+
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
@@ -123,7 +127,8 @@ def upsert_activity(conn, row):
 
 def delete_activities(conn, ids):
     """Remove activities, with their tracks, laps and best efforts."""
-    for table, col in (("activities", "id"), ("tracks", "activity_id"), ("laps", "activity_id"), ("efforts", "activity_id")):
+    for table, col in (("activities", "id"), ("tracks", "activity_id"), ("laps", "activity_id"), ("efforts", "activity_id"),
+                       ("splits", "activity_id")):
         conn.executemany(f"DELETE FROM {table} WHERE {col} = ?", [(i,) for i in ids])
 
 
@@ -156,6 +161,15 @@ def set_laps(conn, activity_id, laps):
 def get_laps(conn, activity_id):
     row = conn.execute("SELECT laps FROM laps WHERE activity_id = ?", (activity_id,)).fetchone()
     return json.loads(row["laps"]) if row else None
+
+
+def set_splits(conn, activity_id, splits):
+    conn.execute("INSERT OR REPLACE INTO splits (activity_id, splits) VALUES (?, ?)", (activity_id, json.dumps(splits)))
+
+
+def get_splits(conn, activity_id):
+    row = conn.execute("SELECT splits FROM splits WHERE activity_id = ?", (activity_id,)).fetchone()
+    return json.loads(row["splits"]) if row else None
 
 
 def set_efforts(conn, activity_id, bests):

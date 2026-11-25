@@ -117,6 +117,89 @@ class Sync(unittest.TestCase):
         self.assertEqual(self.query("SELECT id FROM activities ORDER BY id"), [(1,), (2,)])
 
 
+class Splits(unittest.TestCase):
+    """Per-km splits for a run recorded without auto-lap, from its second-by-second data."""
+
+    def details(self, samples):
+        keys = ["sumDuration", "sumDistance", "directHeartRate", "directElevation", "sumElapsedDuration"]
+        return {"metricDescriptors": [{"key": k, "metricsIndex": i} for i, k in enumerate(keys)],
+                "activityDetailMetrics": [{"metrics": list(s)} for s in samples]}
+
+    def test_split_per_km_with_heart_rate_and_climb(self):
+        # 2.52 km at 4 m/s, a sample every 10 s: the first km at 140 bpm climbing 10 m, then 160 bpm downhill. The
+        # elapsed time runs a minute ahead from a stop; the splits take the timer's
+        samples, t, d, e = [], 0.0, 0.0, 10.0
+        while d < 2500:
+            samples.append((t, d, 140 if d <= 1000 else 160, e, t + (60 if d > 1200 else 0)))
+            t, d, e = t + 10, d + 40, e + (0.4 if d < 1000 else -0.2)
+        samples.append((t, d, 160, e, t + 60))
+        splits = sync.splits_from(self.details(samples), 1000)
+        self.assertEqual([s["km"] for s in splits], [1.0, 1.0, 0.52])
+        self.assertEqual([s["duration_s"] for s in splits], [250.0, 250.0, 130.0])  # the timer's time
+        self.assertEqual([s["avg_hr"] for s in splits], [140, 160, 160])
+        self.assertEqual([s["elev"] for s in splits], [10, -5, -3])
+        self.assertAlmostEqual(splits[0]["speed"], 4.0)
+
+    def test_a_short_last_bit_is_left_out(self):
+        samples = [(i, i * 4.0, 150, 0, i) for i in range(0, 260)]  # 1036 m
+        self.assertEqual(len(sync.splits_from(self.details(samples), 1000)), 1)
+
+    def test_no_distance_no_splits(self):
+        self.assertEqual(sync.splits_from({"metricDescriptors": [], "activityDetailMetrics": []}, 1000), [])
+
+
+class OpenedActivity(unittest.TestCase):
+    """Laps and splits fetched when an activity is opened."""
+
+    def setUp(self):
+        self.path = Path(tempfile.mkdtemp()) / "test.db"
+        self._client, self._shared = sync._client, sync._shared_client
+        sync._shared_client = None
+
+    def tearDown(self):
+        sync._client, sync._shared_client = self._client, self._shared
+
+    def opened(self, days_ago, stored_laps, garmin_laps):
+        conn = db.connect(self.path)
+        d = (TODAY - timedelta(days=days_ago)).isoformat()
+        db.upsert_activity(conn, {"id": 1, "date": d, "start_local": f"{d} 07:00:00", "type": "running", "raw": "{}"})
+        db.set_laps(conn, 1, stored_laps)
+        db.set_efforts(conn, 1, {})
+        conn.commit()
+        conn.close()
+        stream = Splits().details([(i * 10, i * 40.0, 150, 0, i * 10) for i in range(0, 76)])  # 3 km
+        lap = {"distance": 1000, "duration": 250, "movingDuration": 250, "averageSpeed": 4, "maxSpeed": 5}
+
+        class Garmin:
+            def get_activity_splits(self, activity_id):
+                return {"lapDTOs": [lap] * garmin_laps}
+
+            def get_activity_details(self, *args):
+                return stream
+
+        sync._client = Garmin
+        self.assertIsNone(sync.fetch_details(self.path, 1))
+        conn = db.connect(self.path)
+        try:
+            return len(db.get_laps(conn, 1)), db.get_splits(conn, 1)
+        finally:
+            conn.close()
+
+    def test_no_laps_on_a_fresh_run_are_asked_for_again(self):
+        # Fetched straight after the upload, before Garmin had worked out the laps
+        self.assertEqual(self.opened(0, [], 3), (3, None))
+
+    def test_without_laps_the_run_is_split_per_km(self):
+        laps, splits = self.opened(0, [], 1)
+        self.assertEqual(laps, 1)
+        self.assertEqual([s["km"] for s in splits], [1.0, 1.0, 1.0])
+
+    def test_an_older_run_without_laps_isnt_asked_again(self):
+        laps, splits = self.opened(10, [], 3)
+        self.assertEqual(laps, 0)
+        self.assertEqual(len(splits), 3)
+
+
 class Laps(unittest.TestCase):
     def test_laps_take_the_timer_time(self):
         # A threshold run as Garmin sent it: a 15 min warm-up auto-lapped at each km with a stop at a crossing,

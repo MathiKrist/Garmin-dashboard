@@ -502,11 +502,12 @@ def _review(activity_id):
         if session:
             r = review.build(a, session, db.get_laps(conn, activity_id), data["plan"])
         elif a["sport"] in review.SPORTS:
-            # Done on its own: the coach reads its laps, with the same sport's last 7 days
+            # Done on its own: the coach reads its laps (or its km splits without them), with the same sport's last 7 days
             start = (date.fromisoformat(a["date"]) - timedelta(days=6)).isoformat()
             week = [x for x in data["activities"] if x["sport"] == a["sport"] and start <= x["date"] <= a["date"]]
             profile = json.loads(db.get_meta(conn, "training_profile") or "{}")
-            r = review.build_free(a, db.get_laps(conn, activity_id), workouts.Targets(profile, None).floors, week)
+            r = review.build_free(a, db.get_laps(conn, activity_id), workouts.Targets(profile, None).floors, week,
+                                  db.get_splits(conn, activity_id))
         else:
             return None, None
         r["note"] = review.get_note(conn, r)
